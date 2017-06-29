@@ -1,0 +1,95 @@
+#!/bin/sh
+
+if [ -z "$1" ]; then
+   echo "you need specified arguements"
+   exit 1
+fi
+
+TUN_IDX="$1"
+TUN_PID="$2"
+L2TP_LINKNAME="l2tpc-$TUN_IDX"
+RESET_FILE="/var/run/l2tpc-reset-$TUN_IDX"
+DONT_WANTYPE_UPDATE="/var/run/dont_update_wantype"
+L2TP_RESULT_FILE="/var/run/l2tpc-result-$TUN_IDX"
+L2TP_SOCKET_FILE="/var/run/l2tpctrl-client-$TUN_IDX"
+OVER_IPSEC_RUN_FILE="/var/run/l2tpc-over-ipsec-$TUN_IDX"
+
+if [ -f "/tmp/l2tpc-header" ]; then
+   . /tmp/l2tpc-header
+elif [ -f "/usr/bin/l2tpc-header" ]; then
+   . /usr/bin/l2tpc-header
+fi
+
+stop_l2tp_session()
+{
+   if [ -r "$L2TP_RESULT_FILE" ] ; then
+      CFG="`cat $L2TP_RESULT_FILE`"
+      stt=0
+      for i in $CFG
+      do
+         if [ "$stt" == "1" ] ; then
+            TUNNEL_ID="$i"
+            stt="2"
+            continue
+         fi
+
+         if [ "$stt" == "2" ] ; then
+            LAC_ID="$i"
+            break
+         fi
+
+         [ "$i" == "OK" ] && stt="1"
+      done
+
+      logger -t "l2tpc" "Stop L2TP session $L2TP_SOCKET_FILE $TUNNEL_ID $LAC_ID"
+      echo "L2TP Client start to disconnect! ( l2tp-control -s $L2TP_SOCKET_FILE \"stop-session $TUNNEL_ID $LAC_ID\" )"
+      l2tp-control -s $L2TP_SOCKET_FILE "stop-session $TUNNEL_ID $LAC_ID" >/dev/null 2>&1
+      rm -f $L2TP_RESULT_FILE
+      echo "Stop L2TP Client Daemon (l2tp-control -s $L2TP_SOCKET_FILE \"exit\")"
+      l2tp-control -s $L2TP_SOCKET_FILE "exit"
+   fi
+   kill $TUN_PID > /dev/null 2>&1
+}
+
+main()
+{
+   touch $DONT_WANTYPE_UPDATE
+
+   # Reset all IP Tables & Routing
+   if [ -f "$RESET_FILE" ]; then
+      (. $RESET_FILE)
+      rm -f $RESET_FILE
+   fi
+
+   # Stop L2TP tunnel
+   stop_l2tp_session
+   # Stop IPsec
+   if [ -f "$OVER_IPSEC_RUN_FILE" ]; then
+      #this tunnel over ipsec, stop ipsec tunnel
+         logger -t "l2tpc" "L2TP disconnetc, Stop IPsec"
+         let "ipsec_tun_idx=$TUN_IDX + 1"
+         ipsec-action del $ipsec_tun_idx      
+         rm -rf $OVER_IPSEC_RUN_FILE
+   fi
+   # Reset WebUI
+   clear_l2tpc_cnt_info $TUN_IDX
+   get_l2tpc_tunnel_config $TUN_IDX
+
+   #cnt_type="$C_L2TP_CLI_CONNECT_TYPE"
+   #if [ -z "$cnt_type" ] && [ "$cnt_type" == "$L2TP_CNT_TYPE_ONDEMAND" ]; then
+      #tun_enable="$C_L2TP_CLI_USER_ENABLE"
+      #if [ -n "$tun_enable" ] && [ "$tun_enable" != "0" ]; then
+         #echo "L2TP tunnel $TUN_IDX starts on-demand... "
+         #l2tpc-ondemand start $TUN_IDX
+      #else
+         #echo "L2TP tunnel $TUN_IDX stop on-demand... "
+         #l2tpc-ondemand stop $TUN_IDX
+      #fi
+   #fi
+   rm -f $DONT_WANTYPE_UPDATE
+}
+
+#
+# Main
+#
+main

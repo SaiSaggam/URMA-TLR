@@ -1,0 +1,26 @@
+header {
+  background: $primarycolor;
+  box-shadow: 0px 2px 2px darken($light-gray, 5%);
+  h2 {
+    color: $dark-gray;
+    font-weight: 600;
+    font-size: 1.3em;
+    text-transform: capitalize;
+  }
+
+}
+
+//***********Layout
+header {
+  @include clearfix;
+  padding: $spacing-unit;
+  h2 {
+    @include span-columns(6);
+    @include media($medium){
+      @include span-columns(4 of 8);
+    }
+    @include media($large){
+      @include span-columns(4 of 12);
+    }
+  }
+}

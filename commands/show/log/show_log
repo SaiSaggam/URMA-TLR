@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ -e /home/digi/user/tlr.log ]; then
+  cat /home/digi/user/tlr.log
+else
+  echo "No events available"
+fi
+exit 0
+
+
+

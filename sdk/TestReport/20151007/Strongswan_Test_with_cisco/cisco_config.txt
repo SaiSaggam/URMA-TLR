@@ -1,0 +1,76 @@
+Building configuration...
+Current configuration : 2542 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname cisco
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip cef
+!
+!
+no ip dhcp use vrf connected
+!
+!
+ip auth-proxy max-nodata-conns 3
+ip admission max-nodata-conns 3
+vpdn enable
+!
+voice-card 0
+ no dspfarm
+!
+username cisco password 0 cisco
+!
+crypto isakmp policy 1
+ encr aes
+ authentication pre-share
+ group 2
+crypto isakmp key 1234567890 address 192.168.1.254
+!
+crypto ipsec security-association lifetime seconds 86400
+!
+crypto ipsec transform-set digi esp-aes esp-sha-hmac
+!
+crypto map digi 3000 ipsec-isakmp
+ set peer 192.168.1.254
+ set transform-set digi
+ set pfs group2
+ match address digi
+!
+!
+interface GigabitEthernet0/0
+ ip address 192.168.1.1 255.255.255.0
+ ip nat outside
+ ip virtual-reassembly
+ duplex auto
+ speed auto
+ media-type rj45
+ crypto map digi
+!
+!
+ip forward-protocol nd
+!
+!
+ip http server
+no ip http secure-server
+ip nat inside source list 100 interface GigabitEthernet0/0 overload
+!
+ip access-list extended digi
+ permit ip any any
+!
+!
+control-plane
+!
+line con 0
+line aux 0
+line vty 0 4
+ privilege level 15
+ password c3845
+ login

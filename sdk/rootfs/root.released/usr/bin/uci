@@ -1,0 +1,41 @@
+#!/bin/sh
+# wrapper for uci get, if the element is not in /etc/config which is default
+# then check /usr/config
+#set -x
+
+value=""
+
+if [ "$1" == "get" ]; then
+	value=$(/sbin/uci_exe -c /etc/config get $2 2> /dev/null)
+	RET="$?"
+
+	if [ -z $value ];then
+		# default configuration
+		arr=$(echo $2 | tr "." "\n")
+		i=0
+		package=""
+		section=""
+		option=""
+		for x in $arr; do
+			# echo $x
+			if [ $i == 0 ]; then
+				package=$x
+			elif [ $i == 1 ]; then
+				section=$package
+			elif [ $i == 2 ]; then
+				option=$x
+			fi
+			i=$((i + 1))
+		done
+		default_config="${package}.${section}1.${option}"
+		value=$(/sbin/uci_exe -c /usr/config get $default_config  2> /dev/null)
+		RET="$?"
+	fi
+else
+	value=$(/sbin/uci_exe "$@")
+	RET="$?"
+fi
+
+[ -n "$value" ] && echo "$value"
+
+exit "$RET"

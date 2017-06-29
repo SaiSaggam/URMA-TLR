@@ -1,0 +1,24 @@
+#
+# Makefile to export important environment variables
+#
+# (Corner DE core file)
+
+export TOPDIR ?= $(shell cd ..; pwd)
+export TARGET ?= mipsel-linux
+
+ifndef TOOLPATH
+	export TOOLPATH := $(shell cat $(TOPDIR)/TOOLPATH)
+	export PATH     := $(TOOLPATH):$(PATH)
+endif
+
+
+-include $(TOPDIR)/project_config/project.config
+
+export COMPO_BASE   := $(TOPDIR)/busybox/src
+export INSTALL_ROOT := $(TOPDIR)/busybox/root
+
+#
+
+ifneq ($(wildcard makefile.compo),)
+export FULL_COPY := 1
+endif

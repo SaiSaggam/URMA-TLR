@@ -1,0 +1,6 @@
+*.so
+chat/chat
+pppd/plugins/rp-pppoe/pppoe-discovery
+pppd/pppd
+pppdump/pppdump
+pppstats/pppstats

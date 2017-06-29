@@ -1,0 +1,15 @@
+config 'snmp' 'snmp'
+	option v2c 'on'
+	option v3 'on'
+	option port '1234'
+	option authentication_traps 'off'
+ 
+config 'snmp_community' 'snmp_community1'
+	option community 'public'
+	option access 'ro'
+ 
+config 'snmp_user' 'snmp_user1'
+	option user 'test_user_1'
+	option access 'ro'
+	option authentication 'none'
+	option privacy 'none'

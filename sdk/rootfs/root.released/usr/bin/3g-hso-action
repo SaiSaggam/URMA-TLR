@@ -1,0 +1,128 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Set Interface
+if [ "$2" != "" ]; then
+   ETH="$2"
+else
+   ETH="hso"
+fi
+
+get_index "$3" "$4"
+FileNameCode="${ETH}"
+HSO_ETH_FILE="/var/run/hso-${FileNameCode}"
+HSO_RESULT_FILE="/tmp/HSO-connect-${FileNameCode}.pid"
+
+hso_stop()
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   local DevModem="${CSID_S_USB_MODEM1}"
+   ${ATCMD_PROG} ${DevModem} ATZ
+   ${ATCMD_PROG} ${DevModem} AT_OWANCALL=1,0,0
+   sleep 1
+   ${IFCFG_PROG} ${ETH} down
+   rm -f ${HSO_ETH_FILE}
+
+   clear_all_cnt_status ${Index}
+
+   return 0
+}
+
+hso_start()
+{
+   if [ "`${IFCFG_PROG} | grep ${ETH}`" != "" ] && [ -e ${HSO_ETH_FILE} ]; then
+      echo "HSO (${ETH}) connection already running"        
+      return
+   fi
+
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   #if [ "${CSID_S_LOCAL_MULTIWAN_CNT_FORCE}" == "1" ] ; then # amanda-add090821
+       # Rewrite connect manual force enable
+			 # hso_stop
+			 # Rewrite connect manual force disable
+			 # wrcsman "0x8001000E 0x00"
+   #fi
+   # wrcsman "0x801e4001 0x02"
+
+   local DevModem="${CSID_S_USB_MODEM1}"
+   if [ "${CSID_C_3G_APN}" != "" ]; then
+      ${ATCMD_PROG} ${DevModem} AT+CGDCONT=1,\"IP\",\"${CSID_C_3G_APN}\"
+   fi
+
+   # Secrets 
+   if [ -n "$O3G_USER" ]; then
+      ${ATCMD_PROG} ${DevModem} AT\$QCPDPP=1,1,${CSID_C_3G_PASSWORD},${CSID_C_3G_USERNAME}
+   fi
+
+   ${ATCMD_PROG} ${DevModem} AT_OWANCALL=1,0,0           ; sleep 3
+   ${ATCMD_PROG} ${DevModem} AT_OWANCALL=1,1,0           ; sleep 3
+   ${ATCMD_PROG} ${DevModem} AT_OWANDATA=1 > ${HSO_RESULT_FILE} ; sleep 3
+
+   local IF_IP="`grep '^_OWANDATA' ${HSO_RESULT_FILE}   | cut -d, -f2`"
+   local IF_DNS1="`grep '^_OWANDATA' ${HSO_RESULT_FILE} | cut -d, -f4`"
+   local IF_DNS2="`grep '^_OWANDATA' ${HSO_RESULT_FILE} | cut -d, -f5`"
+   if [ "${IF_IP}" == "" ] ; then
+      ${ATCMD_PROG} ${DevModem} AT_OWANDATA=1 > ${HSO_RESULT_FILE}
+      sleep 3
+      IF_IP="`grep '^_OWANDATA' ${HSO_RESULT_FILE} | cut -d, -f2`"
+      IF_DNS1="`grep '^_OWANDATA' ${HSO_RESULT_FILE} | cut -d, -f4`"
+      IF_DNS2="`grep '^_OWANDATA' ${HSO_RESULT_FILE} | cut -d, -f5`"
+      if [ "${IF_IP}" == "" ] ; then
+         echo "HSO Get NO IP !! IP: ${IF_IP}, DNS: ${IF_DNS1}, ${IF_DNS2}"
+         hso_stop
+         return 1
+      fi
+   fi	 
+   
+   ${IFCFG_PROG} ${ETH} ${IF_IP} netmask 255.255.255.255 up
+
+   # route add default gw ${IF_IP} dev ${ETH}
+
+   echo "${ETH}" > ${HSO_ETH_FILE}
+
+	 sl_get_IP_NM_GW_in_ifconfig ${ETH} IF_IP IF_NM IF_GW
+	 sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+	 sl_get_uptime CNTTIME
+
+   logger -t "O3G/SCRIPT" "Link is up and running on interface ${ETH}"
+   echo "O3G/SCRIPT: Link is up and running on interface ${ETH}"
+   logger -t "O3G/SCRIPT" "IP address :${IF_IP}"
+   logger -t "O3G/SCRIPT" "default gateway :${IF_GW}"
+   logger -t "O3G/SCRIPT" "primary   DNS address :${IF_DNS1}"
+   logger -t "O3G/SCRIPT" "secondary DNS address :${IF_DNS2}"
+
+	 write_cnttime_info "${CNTTIME}" ${Index}
+	 write_if_name "${ETH}" ${Index}
+	 write_if_info "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+	 write_dns_info "${IF_DNS1}" "${IF_DNS2}" ${Index}
+	 write_cnt_status 2 ${Index}
+
+   return 0
+}
+
+usage() {
+	 echo "$0 [start|stop|restart] [IFName] [index]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+   start)        pre_init; hso_start ;;
+   stop)         hso_stop; post_init ;;
+   restart)      hso_stop; hso_start;;
+   *)            usage;;
+esac
+
+exit 0

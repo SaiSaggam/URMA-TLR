@@ -1,0 +1,22 @@
+#include <tunables/global>
+
+/usr/bin/python2.7_sb {
+	#include <abstractions/base>
+	#include <abstractions/python>
+
+	# Give RWX permission for files under user directory
+	@{USERSHOME}/ rix,
+	@{USERSHOME}/** wrix,
+
+	# Create a temporary directory
+	# (Note, this should be created before running Python, and should set
+	# the TMPDIR environment variable)
+	/tmp/python_sb/ rix,
+	/tmp/python_sb/** wrix,
+
+	# TCP/UDP network access
+	network inet  stream,
+	network inet6 stream,
+	network inet  dgram,
+	network inet6 dgram,
+}

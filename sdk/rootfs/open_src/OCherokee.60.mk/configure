@@ -1,0 +1,20 @@
+#!/bin/sh
+
+COMPO_DIR=$1
+TARGET=$2
+HOST=$3
+HANDLE_QUAGGA_IPV6=$4
+
+cd $COMPO_DIR
+
+TargetLib=$TARGET-lib
+
+if [ ! "$HANDLE_QUAGGA_IPV6" == "1" ] ; then
+./configure --build=$TARGET --host=$HOST --disable-ipv6 –disable-pam --with-gnu-ld --with-mysql=no \
+	 --prefix=/usr --localstatedir=/var --sysconfdir=/etc --enable-static --enable-shared=no --enable-static-module=all \
+	 CC=$TARGET-gcc CXX=$TARGET-g++ AR=$TARGET-ar  RANLIB=$TARGET-ranlib LD=$TARGET-ld
+else
+./configure --build=$TARGET --host=$HOST --disable-ipv6 –disable-pam --with-gnu-ld --with-mysql=no \
+	 --prefix=/usr --localstatedir=/var --sysconfdir=/etc --enable-static --enable-shared=no --enable-static-module=all \
+	 CC=$TARGET-gcc CXX=$TARGET-g++ AR=$TARGET-ar  RANLIB=$TARGET-ranlib LD=$TARGET-ld
+fi

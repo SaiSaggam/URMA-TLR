@@ -1,0 +1,287 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+MBIM_CONN="mbim_connect"
+CONN_CONF="/etc/conn.conf"
+
+# Set device node
+DEV_NODE="$2"
+if [ "${DEV_NODE}" == "" ]; then
+	DEV_NODE="qcqmi0"
+fi
+
+# Set Interface
+ETH="$3"
+if [ "${ETH}" == "" ]; then
+	ETH="usbnet0"
+fi
+
+get_index "$4" "$5"
+FileNameCode="${ETH}"
+TMPFIL="/tmp/cdc-mbim-action-${FileNameCode}"
+PDPFIL="/tmp/pdp_context.${FileNameCode}"
+GIPFIL="/tmp/get_ip.${FileNameCode}"
+CNTFIL="/tmp/getinfo-${FileNameCode}"
+
+get_gw_subnet_cnt_info()
+{
+	local get_IP="$1"
+	netmask="255.255.255.252"
+	GW=$get_IP
+ 
+	local count=`cat $CNTFIL | grep 'IP' | cut -d '.' -f 4`
+	mod=`expr ${count} % 4`
+
+	if [ $mod = "1" ] ; then
+		count=`expr $count + 1`
+		i=${GW%.*}
+		GW=$i.$count
+ 
+	elif [ $mod = "2" ] ; then
+		count=`expr $count - 1`
+		i=${GW%.*}
+		GW=$i.$count
+
+	elif [ $mod = "0" ] || [ $mod = "3" ] ; then
+		netmask="255.255.255.248"
+		mod=`expr ${count} % 8`
+			if [ $mod = "0" ] || [ $mod = "7" ]; then
+				netmask="255.255.255.240"
+				mod=`expr ${count} % 16`
+				if [ $mod = "0" ] || [ $mod = "15" ]; then
+					netmask="255.255.255.224"
+					mod=`expr ${count} % 32`
+					if [ $mod = "0" ] || [ $mod = "31" ]; then
+						netmask="255.255.255.192"
+						mod=`expr ${count} % 64`
+						if [ $mod = "0" ] || [ $mod = "63" ]; then
+							netmask="255.255.255.128"
+							mod=`expr ${count} % 128`
+							if [ $mod = "0" ] || [ $mod = "127" ]; then
+								netmask="255.255.255.0"
+							fi
+						fi
+					fi
+				fi
+			fi
+
+		count=`expr $count + 1`
+		i=${GW%.*}
+		GW=$i.$count
+
+	fi
+ 
+	IF_GW=$GW
+	IF_NM=$netmask
+
+	echo "Submask:$netmask" >> $CNTFIL
+	echo "Gateway:$GW" >> $CNTFIL 
+}
+
+cdc_mbim_start()
+{
+	get_general_config ${Index} ${Index_3G}
+	#get_general_status
+	get_config ${Index} ${Index_3G}
+	get_usb_status ${Index}
+
+	local DevModem1="${CSID_S_USB_MODEM1}"
+
+	[ -f "${CONN_CONF}" ] && rm -f "${CONN_CONF}"
+
+	#generate the conn.conf
+	logger -p 8.7 -t "O3G/SCRIPT" "APN:[${CSID_C_3G_APN}]"
+	if [ "${CSID_C_3G_APN}" != "" ]; then
+		echo "apn=${CSID_C_3G_APN}" >> ${CONN_CONF}
+	fi
+
+	#logger -p 8.7 -t "O3G/SCRIPT" "username:[${CSID_C_3G_USERNAME}]"
+	if [ "${CSID_C_3G_USERNAME}" != "" ]; then
+		echo "username=${CSID_C_3G_USERNAME}" >> ${CONN_CONF}
+	fi
+
+	#logger -p 8.7 -t "O3G/SCRIPT" "password:[${CSID_C_3G_PASSWORD}]"
+	if [ "${CSID_C_3G_PASSWORD}" != "" ]; then
+		echo "password=${CSID_C_3G_PASSWORD}" >> ${CONN_CONF}
+	fi
+
+	#logger -p 8.7 -t "O3G/SCRIPT" "auth:[${CSID_C_3G_AUTHTYPE}]"
+	if [ "${CSID_C_3G_AUTHTYPE}" == "1" ] ; then		#PAP
+		echo "auth=pap" >> ${CONN_CONF}
+	elif [ "${CSID_C_3G_AUTHTYPE}" == "2" ] ; then		#CHAP
+		echo "auth=chap" >> ${CONN_CONF}
+	fi
+
+	#logger -p 8.7 -t "O3G/SCRIPT" "iptype:[${CSID_C_3G_MULTIWAN_IP_TYPE}]"
+	if [ "${CSID_C_3G_MULTIWAN_IP_TYPE}" == "1" ]; then    # for IPv6 only
+		echo "iptype=ipv6" >> ${CONN_CONF}
+	elif [ "${CSID_C_3G_MULTIWAN_IP_TYPE}" == "2" ]; then
+		echo "iptype=ipv4v6" >> ${CONN_CONF}
+	fi
+
+	${MBIM_CONN} -c ${DEV_NODE} ${CONN_CONF} ${Index_3G}
+
+	sleep 8
+
+	#to check PDP context status brfore get IP
+	local csid_idx_3g=`expr ${Index_3G} + 1`
+	local SERVICE_TYPE="`rdcsman 0x801e130${csid_idx_3g} u16`"
+	local PDP_STATUS=0
+	if [ "${SERVICE_TYPE}" == "7" ] ; then									# 4G
+		#${MBIM_CONN} -s ${DEV_NODE} ${Index_3G}
+
+		PDP_STATUS="`rdcsman 0x801e236${csid_idx_3g} u16`"
+
+	elif [ "${SERVICE_TYPE}" == "2" -o "${SERVICE_TYPE}" == "0" ] ; then	# 3G or 2G
+		[ -f "${PDPFIL}" ] && rm -f "${PDPFIL}"
+		${ATCMD_PROG} ${DevModem1} 'AT+CGACT?' -t 3 > ${PDPFIL}
+		echo "AT+CGACT?"
+
+		local PDP_ret=`cat ${PDPFIL} | grep OK`
+		if [ ${PDP_ret} != "" ] ; then 
+			PDP_STATUS="` grep '+CGACT:' ${PDPFIL} | cut -d ',' -f2`"
+		fi
+	fi
+
+	if [ "${PDP_STATUS}" == "0" ] ; then
+		logger -p 8.7 -t "O3G/SCRIPT" "PDP context not activated, not try to get IP"
+		echo "PDP context not activated, not try to get IP"
+		write_cnt_status 3 ${Index}
+		return 0
+	fi
+
+	[ -f "${GIPFIL}" ] && rm -f "${GIPFIL}"
+	${ATCMD_PROG} ${DevModem1} 'AT+CGPADDR=1' -t 1 > ${GIPFIL}
+	echo "AT+CGPADDR=1"
+ 
+	#for temp!
+	IF_IP="` grep '+CGPADDR: 1' ${GIPFIL} | cut -d '\"' -f2`"
+	if [ ${IF_IP} == "0.0.0.0" -a ${IF_IP} == "" ] ; then
+		local CNT=0
+
+		while [ ${CNT} < 3 ] ; do
+			CNT=`expr ${CNT}+1`
+
+			[ -f "${GIPFIL}" ] && rm -f "${GIPFIL}"
+			${ATCMD_PROG} ${DevModem1} 'AT+CGPADDR=1' -t 1 > ${GIPFIL}
+			echo "AT+CGPADDR=1"
+
+			IF_IP="` grep '+CGPADDR: 1' ${GIPFIL} | cut -d '\"' -f2`"
+
+			if [ ${IP_IP} != "0.0.0.0" -a ${IF_IP} != "" ] ; then
+				break;
+			fi
+		done;
+	fi
+
+	IP_ret=`cat ${GIPFIL} | grep OK`
+
+	if [ $IP_ret != "" ] ; then 
+
+		write_error_code 0 ${Index} # clean error code
+
+		IF_IP="` grep '+CGPADDR: 1' ${GIPFIL} | cut -d '\"' -f2`"
+		echo "Got DHCP IP: $IF_IP"
+		logger -p 8.7 -t "O3G/SCRIPT" "get ip:[${IF_IP}]"
+
+		if [ $IF_IP != "0.0.0.0" ] ; then
+
+			echo "IP:${IF_IP}" > ${CNTFIL}
+ 
+			# Get DNS
+			[ -f "$TMPFIL" ] && rm -f $TMPFIL
+			#if [ "${VENDORID}" == "16700" ] && [ "${PRODUCTID}" == "33196" ]; then	# Telit LN930
+			#echo "VENDORID=${VENDORID}"
+			#echo "PRODUCTID=${PRODUCTID}"
+				${ATCMD_PROG} ${DevModem1} 'AT+XDNS?' -t 1 > ${TMPFIL} 
+			#fi
+			sleep 2
+
+			# Get subnet mask and gateway 				
+			get_gw_subnet_cnt_info ${IF_IP}
+ 
+			if [ ${CSID_C_3G_MTU} == "" ] || [ ${CSID_C_3G_MTU} -le 0 ] ; then
+				${IFCFG_PROG} ${ETH} ${IF_IP} netmask ${IF_NM} mtu 1500 up
+			else
+				${IFCFG_PROG} ${ETH} ${IF_IP} netmask ${IF_NM} mtu ${CSID_C_3G_MTU} up
+			fi
+
+			IF_DNS1="` grep '+XDNS: 1' $TMPFIL | cut -d '\"' -f2`"
+			IF_DNS2="` grep '+XDNS: 1' $TMPFIL | cut -d '\"' -f4`"
+			echo "nameserver $IF_DNS1" > /etc/resolv.conf
+			echo "nameserver $IF_DNS2" >> /etc/resolv.conf
+        
+			sl_get_uptime CNTTIME
+			write_cnttime_info "${CNTTIME}" ${Index}
+			write_if_name ${ETH} ${Index}
+			write_if_info "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+			write_dns_info "${IF_DNS1}" "${IF_DNS2}" ${Index}
+			write_cnt_status 2 ${Index}
+
+			route add default dev ${ETH} ## gw ${i} ?
+
+		else
+			logger -p 8.7 -t "O3G/SCRIPT" "IF_IP:$IF_IP, shutdown.."
+			echo "IF_IP:$IF_IP, shutdown.."
+			write_cnt_status 3 ${Index}
+			exit 1
+		fi
+	else
+		logger -p 8.7 -t "O3G/SCRIPT" "Get IP fail, shutdown.."
+		echo "Get IP fail, shutdown.."
+		write_cnt_status 3 ${Index}
+		exit 1
+	fi
+}
+
+cdc_mbim_stop()
+{
+	get_general_config ${Index} ${Index_3G}
+	#get_general_status
+	get_config ${Index} ${Index_3G}
+	get_usb_status ${Index}
+
+	${MBIM_CONN} -d ${DEV_NODE} ${CONN_CONF} ${Index_3G}
+
+	[ -f "${CONN_CONF}" ] && rm -f "${CONN_CONF}"
+
+	[ -f "$TMPFIL" ] && rm -f $TMPFIL
+	[ -f "$GIPFIL" ] && rm -f $GIPFIL
+	[ -f "$PDPFIL" ] && rm -f $PDPFIL
+	[ -f "$CNTFIL" ] && rm -f $CNTFIL 
+
+	${IFCFG_PROG} ${ETH} down
+
+	clear_all_cnt_status ${Index}
+	write_cnt_status 0 ${Index}
+
+    return 0
+}
+
+usage() {
+	echo "$0 [start|stop] [DeviceNode] [IFName] [index] [index_3g]"
+	exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+	start)
+		pre_init
+		cdc_mbim_start
+		exit 0
+		;;
+	stop)
+		cdc_mbim_stop
+		exit 0
+		;;
+	*)
+		usage
+		exit 1
+		;;
+esac
+
+exit 0

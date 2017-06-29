@@ -1,0 +1,190 @@
+#!/bin/sh
+
+#. /tmp/lcs-pppoe-header
+. /usr/bin/lcs-pppoe-header
+. /usr/bin/scriptlib
+#logger -p 8.7 -t ip-up-lcs "0:$0, 1:$1, 2:$2, 3:$3, 4:$4, 5:$5, 6:$6"
+
+# $1 interface-name   e.g. ppp0, ppp1 ...etc
+# $2 tty-device       e.g. /dev/modem ...
+# $3 speed 
+# $4 local-IP-address 
+# $5 remote-IP-address 
+# $6 ipparam          e.g. extra parameters 
+   
+IF_PPPOE="$1"   
+LOCAL_IP="$4"   
+REMOTE_IP="$5"   
+LCS_CHK="`rdcsman $CSID_C_PPPOE_LCS_CHECK u8`"
+
+set_resolv_conf()
+{
+    local dns1="`rdcsman $CSID_C_PPPOE_LCS_IF_PRIDNS ipv4`"
+    local dns2="`rdcsman $CSID_C_PPPOE_LCS_IF_SECDNS ipv4`"
+    if [ "$dns1" != "0.0.0.0" ] || [ "$dns2" != "0.0.0.0" ]; then
+        [ "$LCS_CHK" = "0" ] && [ -e $DNS_FILE.lcs ] && cat $DNS_FILE.lcs >> $DNS_FILE
+
+        if [ "$dns1" != "0.0.0.0" ]; then
+            wrcsman "$CSID_S_PPPOE_LCS_IF_PRIDNS {$dns1}"
+            if [ "$LCS_CHK" = "0" ]; then
+                logger -p 8.7 -t ip-up-lcs "route add -host $dns1 dev $IF_PPPOE"
+                route add -host $dns1 dev $IF_PPPOE
+            fi                
+        fi
+
+        if [ "$dns2" != "0.0.0.0" ]; then
+            wrcsman "$CSID_S_PPPOE_LCS_IF_SECDNS {$dns2}"
+            if [ "$LCS_CHK" = "0" ]; then
+                logger -p 8.7 -t ip-up-lcs "route add -host $dns2 dev $IF_PPPOE"
+                route add -host $dns2 dev $IF_PPPOE
+            fi            
+        fi
+    else
+        if [ -e $PPP_DNS_FILE ]; then 
+            dns1="`cat $PPP_DNS_FILE | awk '{if(NR == 1) print $2}'`"
+            dns2="`cat $PPP_DNS_FILE | awk '{if(NR == 2) print $2}'`"
+            wrcsman "$CSID_S_PPPOE_LCS_IF_PRIDNS {$dns1}"
+            wrcsman "$CSID_S_PPPOE_LCS_IF_SECDNS {$dns2}"         
+
+            if [ "$LCS_CHK" = "0" ]; then
+                logger -p 8.7 -t ip-up-lcs "route add -host $dns1/$dns2 dev $IF_PPPOE"
+                route add -host $dns1 dev $IF_PPPOE
+                route add -host $dns2 dev $IF_PPPOE
+
+                grep nameserver $PPP_DNS_FILE >> $DNS_FILE
+            fi            
+        else 
+            logger -p 8.7 -t ip-up-lcs "No found $PPP_DNS_FILE"
+        fi
+
+        if [ -e $PPP_DNS_FILE.orig.lcs ]; then
+            mv $PPP_DNS_FILE.orig.lcs $PPP_DNS_FILE         
+        fi  
+    fi
+    awk '!x[$0]++' $DNS_FILE > $DNS_FILE.tmp
+    mv $DNS_FILE.tmp $DNS_FILE 
+}
+
+set_prt_by_ipmask()
+{
+    local idx=0; 
+    while [ true ]; do
+        if [ $idx -ge $MAX_SRT ]; then
+            break;
+        fi
+
+        sl_get_csid $CSID_C_PPPOE_LCS_PRT_ADDR $idx csid_addr
+        prt_addr="`rdcsman $csid_addr str`"
+        if [ "$prt_addr" = "" ]; then
+            idx=$((idx+1))
+            continue;
+        fi
+
+        sl_get_csid $CSID_C_PPPOE_LCS_PRT_ENABLE $idx csid_addr
+        prt_enable="`rdcsman $csid_addr u8`"
+        if [ "$prt_enable" = "0" ]; then 
+            idx=$((idx+1))
+            continue;
+        fi
+     
+        has_nm="`echo $prt_addr | cut -d / -f 2`"
+        if [ "$has_nm" = "$prt_addr" ] || [ "$has_nm" = "" ]; then
+            # case: www.google.com.tw or 8.8.8.8.8
+            logger -t ip-up-lcs "route add -host $prt_addr dev $IF_PPPOE"
+            route add -host $prt_addr dev $IF_PPPOE &
+        else
+            # case 1: 8.8.8.8/32 or 8.8.8.8/255.255.255.255
+            ip_addr="`echo $prt_addr | cut -d / -f 1`"
+            is_prefix="`echo $has_nm | cut -d . -f 3`"
+
+            #case: /32 ..etc
+            if [ "$is_prefix" = "$has_nm" ]; then 
+                sl_prefix_to_mask $is_prefix tsf_mask
+                has_nm="$tsf_mask"
+            fi
+                
+            #case: /255.255.255.0 ..etc
+            ip_addr_1=$((`echo $ip_addr| cut -d "." -f1` & `echo $has_nm| cut -d "." -f1`))
+            ip_addr_2=$((`echo $ip_addr| cut -d "." -f2` & `echo $has_nm| cut -d "." -f2`))
+            ip_addr_3=$((`echo $ip_addr| cut -d "." -f3` & `echo $has_nm| cut -d "." -f3`))
+            ip_addr_4=$((`echo $ip_addr| cut -d "." -f4` & `echo $has_nm| cut -d "." -f4`))
+            logger -t ip-up-lcs "route add -net $ip_addr_1.$ip_addr_2.$ip_addr_3.$ip_addr_4 netmask $has_nm dev $IF_PPPOE "
+            route add -net $ip_addr_1.$ip_addr_2.$ip_addr_3.$ip_addr_4 netmask $has_nm dev $IF_PPPOE &
+        fi     
+        idx=$((idx+1))
+    done  
+}
+
+stop_ip_forward()
+{
+    #Drop the Outgoning packets without MASQUERADE
+    iptables -I FORWARD 1 -o $IF_PPPOE -j DROP
+    echo 0 > /proc/sys/net/ipv4/ip_forward;
+    flush_rtcache;
+}
+
+start_ip_forward()
+{
+    #Drop the Outgoning packets without MASQUERADE
+    iptables -D FORWARD -o $IF_PPPOE -j DROP
+    echo 1 > /proc/sys/net/ipv4/ip_forward;   
+    flush_rtcache;
+}
+
+main()
+{
+    # Stop IP forward & clear routing cache
+    stop_ip_forward;  
+
+    # /etc/ppp/pap-secrets, /etc/ppp/chap-secrets
+    [ -e $PAP_SECRETS.lcs ] && mv $PAP_SECRETS.lcs $PAP_SECRETS
+    [ -e $CHAP_SECRETS.lcs ] && mv $CHAP_SECRETS.lcs $CHAP_SECRETS
+
+    # IP/Netmask/GW/CNT-Time Status
+    sl_get_uptime CNTTIME
+    wrcsman "$CSID_S_PPPOE_LCS_CNT_TIME $CNTTIME"
+    wrcsman "$CSID_S_PPPOE_LCS_IF_IP {$LOCAL_IP}"
+    wrcsman "$CSID_S_PPPOE_LCS_IF_NM {255.255.255.255}"
+    wrcsman "$CSID_S_PPPOE_LCS_IF_GW {$REMOTE_IP}"
+    wrcsman "$CSID_S_PPPOE_LCS_CNT_STATUS 2" 
+    wrcsman "$CSID_S_PPPOE_LCS_IF_NAME \"$IF_PPPOE"
+    echo $IF_PPPOE > $IFACE_FILE  
+
+    # Set DNS for Secondary PPPoE / resolv.conf
+    set_resolv_conf;
+    lcs-pppoe setdns
+    lcs-pppoe dmfilter
+
+    # iptables
+    rm -f $NAT_FILE
+    if [ "$LCS_CHK" = "0" ]; then
+        local nat_disable="`rdcsman $CSID_C_PPPOE_LCS_NAT_DISABLE u8`"
+        if [ "$nat_disable" = "0" ]; then
+            local lan_ip="`rdcsman $CSID_C_LOCAL_LANIP ipv4`"
+            local lan_nm="`rdcsman $CSID_C_LOCAL_LANNM ipv4`"
+            iptables -t nat -A POSTROUTING -s $lan_ip/$lan_nm -o $IF_PPPOE -j SNAT --to-source $LOCAL_IP
+            echo "iptables -t nat -D POSTROUTING -s $lan_ip/$lan_nm -o $IF_PPPOE -j  SNAT --to-source $LOCAL_IP" >> $NAT_FILE
+        fi        
+
+        # Set Policy routing (IP/Netmask) for Secondary PPPoE
+        set_prt_by_ipmask;
+
+        # Set Policy routing (Keyword) for Secondary PPPoE
+        /usr/bin/proute &
+
+        # Reset ICMP timeout
+        nat reset-icmp
+    else 
+        local if_br="`rdcsman $CSID_S_SYS_IF_BR0 str`" 
+        [ "$if_br" = "" ] && if_br="br0"  
+        iptables -I FORWARD -i $if_br -o $IF_PPPOE -j DROP
+        echo "iptables -D FORWARD -i $if_br -o $IF_PPPOE -j DROP" >> $NAT_FILE
+        #lcs-pppoe-monitor start $IF_PPPOE  # replace by option : idle
+    fi  
+
+    # Stop IP forward & clear routing cache
+    start_ip_forward;     
+}
+
+main;
+

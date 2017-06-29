@@ -1,0 +1,4 @@
+#!/bin/sh
+#echo apply_snmp "$@"
+
+/usr/etc/init.d/init_snmp.sh reload

@@ -1,0 +1,134 @@
+.home-container,
+.page-container {
+    margin: 0 0 ($spacing-unit*2) 0;
+    .row {
+        margin-bottom: ($spacing-unit * 1.5);
+    }
+}
+.page-container {
+    padding: $spacing-unit;
+    background: $white;
+    border-radius: 2px;
+    border: 1px solid $medium-gray;
+    box-shadow: 0px 2px 2px darken($light-gray, 5%);
+    h1 {
+        margin: 0;
+    }
+}
+.config-main {
+    padding: $spacing-unit;
+}
+.config-pane {
+    padding: $spacing-unit;
+    border: 1px solid $medium-gray;
+    border-radius: 2px;
+}
+.config-form-header {
+    padding-top: $spacing-unit;
+    border-top: 1px solid $medium-gray;
+}
+
+.config-actions {
+    margin: $spacing-unit -30px;
+    background: #f5f5f5;
+}
+
+.home-panel {
+    border: 1px solid $medium-gray;
+}
+.home-panel,
+.config-panel-changes {
+    background: $white;
+    border-radius: 2px;
+    box-shadow: 0px 2px 2px $light-gray;
+    h4 {
+        margin-top: 0;
+        padding: $spacing-unit;
+        background: $black;
+        border-radius: 2px 2px 0 0;
+        color: $white;
+        font-weight: 300;
+    }
+}
+
+.home-panel-content {
+    .home-page-content-line {
+        margin-bottom: $spacing-unit;
+        padding-bottom: $spacing-unit;
+        border-bottom: 1px solid $medium-gray;
+        font-size: 1.1em;
+    }
+    img {
+        max-width: 100%;
+        height: auto;
+        margin: ($spacing-unit/2) auto;
+        padding-bottom: ($spacing-unit/2);
+    }
+    .home-page-content-section {
+        padding: $spacing-unit;
+    }
+    .btn-group {
+        width: 100%;
+        padding-bottom: $spacing-unit;
+        margin-bottom: $spacing-unit;
+        border-bottom: 1px solid $medium-gray;
+    }
+}
+.home-panel-content,
+.config-changes-list {
+    padding: 0 $spacing-unit $spacing-unit $spacing-unit;
+    .row {
+        margin-bottom: 0;
+    }
+    .config-panel-changes-header,
+    .home-page-content-header {
+        margin-bottom: ($spacing-unit*1.5);
+        border: 1px solid $medium-gray;
+        border-radius: 2px;
+        h5 {
+            margin: 0;
+            padding: $spacing-unit;
+            background: #f5f5f5;
+            border-radius: 2px 2px 0 0;
+            font-size: 1.2em;
+        }
+    }
+    .config-panel-changes-header {
+        ul {
+            padding: $spacing-unit;
+        }
+    }
+    .home-panel-content-list-item,
+    .config-panel-changes-list-item {
+        padding: ($spacing-unit/3) 0;
+        font-size: 1.1em;
+    }
+    .config-panel-changes-list-item {
+        border-bottom: 1px solid $medium-gray;
+        &:first-child {
+            padding-top: 0;
+        }
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+    .status-indicator {
+        margin-right: ($spacing-unit/2);
+    }
+}
+.home-panel-action {
+    padding: $spacing-unit;
+    border-top: 1px solid $medium-gray;
+    a {
+        text-transform: uppercase;
+    }
+}
+.status-indicator {
+    color: $medium-gray;
+}
+.status-green {
+    color: $normal;
+}
+.status-alert {
+    color: $error;
+}

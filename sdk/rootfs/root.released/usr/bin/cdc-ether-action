@@ -1,0 +1,636 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+UDHCPC="udhcpc"
+
+# Set Interface
+if [ "$2" != "" ]; then
+   ETH="$2"
+else
+   ETH="usbnet0"
+fi
+
+get_index "$3" "$4"
+FileNameCode="${ETH}"
+UDHCPC_PID_FILE="/var/run/udhcpc.${FileNameCode}.pid"
+PIDFILE_CONNECT="/var/run/udhcpc.${FileNameCode}.pid.connect"
+DEMAND_FILE="/var/run/udhcpc.${FileNameCode}.demand"
+UDHCPC_DEFAULT_SCRIPT="/usr/bin/dhcp.script"
+[ -f "/tmp/dhcp.script" ] && UDHCPC_DEFAULT_SCRIPT="/tmp/dhcp.script"
+HOSTNAME="`cat /etc/hostname`"
+if [ "${HOSTNAME}" == "" ]; then
+   HOSTNAME="Router"
+fi
+TMPFIL="/tmp/cdc-ether-connect-${FileNameCode}"
+GIPFIL="/tmp/get_ip.${FileNameCode}"
+CNTFIL="/tmp/getinfo-${FileNameCode}"
+
+CNT_URL="http://192.168.0.1/goform/goform_set_cmd_process?goformId=CONNECT_NETWORK"
+DISCNT_URL="http://192.168.0.1/goform/goform_set_cmd_process?goformId=DISCONNECT_NETWORK" 
+URLCNT_LOG="/tmp/urlcnt.${FileNameCode}"
+URLDISCNT_LOG="/tmp/urldiscnt.${FileNameCode}"
+
+cdc_ether_status()
+{
+   get_general_config ${Index} ${Index_3G}
+   get_general_status ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   TIME=0
+   TIMEOUT=10
+   while [ true ] ; do	
+      sl_get_IP_NM_GW_in_ifconfig ${ETH} IF_IP IF_NM IF_GW
+      #echo "$0 : IF_IP=${IF_IP} IF_NM=${IF_NM} IF_GW=${IF_GW}"	
+      if [ "${IF_IP}x" != "x" ] && [ "${IF_NM}x" != "x" ] && [ "${IF_GW}x" != "x" ]; then	
+         return 0		
+      else			
+         sleep 1
+         TIME=$((TIME+1))
+         if [ ${TIME} -gt ${TIMEOUT} ] ; then
+            return 1	
+         fi			
+      fi
+   done
+}
+
+get_cdcether_cnt_info()
+{
+    local get_IP="$1"
+    netmask="255.255.255.252"
+    GW=$get_IP
+ 
+    local count=`cat $CNTFIL | grep 'IP' | cut -d '.' -f 4`
+    mod=`expr ${count} % 4`
+ 
+    if [ $mod = "1" ] ; then
+        count=`expr $count + 1`
+        i=${GW%.*}
+        GW=$i.$count
+ 
+    elif [ $mod = "2" ] ; then
+        count=`expr $count - 1`
+        i=${GW%.*}
+        GW=$i.$count
+ 
+    elif [ $mod = "0" ] || [ $mod = "3" ] ; then
+      netmask="255.255.255.248"
+			mod=`expr ${count} % 8`
+			if [ $mod = "0" ] || [ $mod = "7" ]; then
+				netmask="255.255.255.240"
+				mod=`expr ${count} % 16`
+				if [ $mod = "0" ] || [ $mod = "15" ]; then
+					netmask="255.255.255.224"
+					mod=`expr ${count} % 32`
+					if [ $mod = "0" ] || [ $mod = "31" ]; then
+						netmask="255.255.255.192"
+						mod=`expr ${count} % 64`
+						if [ $mod = "0" ] || [ $mod = "63" ]; then
+							netmask="255.255.255.128"
+							mod=`expr ${count} % 128`
+							if [ $mod = "0" ] || [ $mod = "127" ]; then
+								netmask="255.255.255.0"
+							fi
+						fi
+					fi
+				fi
+			fi
+
+        count=`expr $count + 1`
+        i=${GW%.*}
+        GW=$i.$count
+		 
+    fi
+ 
+    IF_GW=$GW
+    IF_NM=$netmask
+
+    echo "Submask:$netmask" >> $CNTFIL
+    echo "Gateway:$GW" >> $CNTFIL 
+    
+}
+
+cdc_ether_HW909u_start()
+{
+    logger -t "O3G/SCRIPT" -p 8.7 "APN:[$CSID_C_3G_APN]"
+
+        echo "AT^NDISDUP=1,0"
+        ${ATCMD_PROG} ${DevModem1} 'AT^NDISDUP=1,0'
+        sleep 1
+        echo "AT+CGDCONT=1,"IP","$CSID_C_3G_APN""
+        ${ATCMD_PROG} ${DevModem1} AT+CGDCONT=1,\"IP\",\"$CSID_C_3G_APN\"
+        sleep 1
+        ${ATCMD_PROG} ${DevModem1} AT+CGDCONT=16,\"IP\",\"$CSID_C_3G_APN\"
+        sleep 1
+        ${ATCMD_PROG} ${DevModem1} 'AT+CGATT=1' -t 1
+        sleep 1
+        if [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" == "" -a "${CSID_C_3G_PASSWORD}" == "" ]; then
+            CNT="0"
+            RET="1"
+            while [ "$RET" -eq "1" -a "$CNT" -le "10" ]; do
+            	echo "AT^NDISDUP=1,1,${CSID_C_3G_APN}"
+                ${ATCMD_PROG} ${CSID_S_USB_MODEM1} AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\"
+                echo "AT^NDISSTATQRY?"
+                ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT^NDISSTATQRY?' -T 1 > $TMPFIL
+        		CNT=$((CNT+1));
+            	sleep 1
+        		cat $TMPFIL | grep "1,"         # It will show ^NDISSTATQRY: 1,,,"IPV4",0,0,,"IPV6")
+        		RET=$?
+        	done;
+
+        elif  [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" != "" -o "${CSID_C_3G_PASSWORD}" != "" ] ; then
+
+            if [ "${CSID_C_3G_AUTHTYPE}" == "2" ] ; then
+                auth_type=2     #CHAP
+            else
+                auth_type=1     #PAP
+            fi
+
+            #${ATCMD_PROG} ${DevModem1} AT^AUTHDATA=1,${auth_type},\"\",\"${CSID_C_3G_PASSWORD}\",\"${CSID_C_3G_USERNAME}\"
+            #sleep 1
+            ${ATCMD_PROG} ${DevModem1} AT^AUTHDATA=16,${auth_type},\"\",\"${CSID_C_3G_PASSWORD}\",\"${CSID_C_3G_USERNAME}\"
+            sleep 1
+
+            #${ATCMD_PROG} ${DevModem1} AT\$QCAPNE=1,${auth_type},\"${CSID_C_3G_APN}\",\"IPV4V6\",\"LTE\",0,0
+            #sleep 1
+            ${ATCMD_PROG} ${DevModem1} AT\$QCAPNE=16,${auth_type},\"${CSID_C_3G_APN}\",\"IPV4V6\",\"LTE\",0,0
+            sleep 1
+
+            CNT="0"
+            RET="1" 
+            while [ "$RET" -eq "1" -a "$CNT" -le "3" ]; do
+            ${ATCMD_PROG} ${CSID_S_USB_MODEM1} AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\",\"${CSID_C_3G_USERNAME}\",\"${CSID_C_3G_PASSWORD}\",${auth_type} > $TMPFIL
+            	echo "AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\",\"${CSID_C_3G_USERNAME}\",\"${CSID_C_3G_PASSWORD}\",${auth_type}"
+        		CNT=$((CNT+1));
+            	sleep 1
+        		cat $TMPFIL | grep "OK"
+        		RET=$?
+        	done;
+
+        else
+            echo "AT^NDISDUP=1,1,\"\""
+            ${ATCMD_PROG} ${CSID_S_USB_MODEM1} AT^NDISDUP=1,1,\"\"
+        fi 
+
+        sleep 2
+        return $?
+}
+
+cdc_ether_start2()
+{
+    get_general_config ${Index} ${Index_3G}
+    #get_general_status
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+
+    #local DevModem1="${CSID_S_USB_MODEM2}"
+    local DevModem1="${CSID_S_USB_MODEM1}"
+
+    user_name="${CSID_C_3G_USERNAME}"
+    passwd="${CSID_C_3G_PASSWORD}"
+    dns1="${CSID_C_3G_MULTIWAN_IF_PRIDNS}"
+    dns2="${CSID_C_3G_MULTIWAN_IF_SECDNS}"
+
+    logger -t "O3G/SCRIPT" -p 8.7 "tmpfil:${TMPFIL}"
+	if [ "${CSID_C_3G_APN}" != "" ]; then
+        echo "AT+CGDCONT=1,\"IP\",\"$CSID_C_3G_APN\""
+        ${ATCMD_PROG} ${DevModem1} AT+CGDCONT=1,\"IP\",\"$CSID_C_3G_APN\" > $TMPFIL
+	fi
+
+    if [ "${CSID_C_3G_AUTHTYPE}" == "1" ] ; then
+        auth_type=0     #PAP
+    elif [ "${CSID_C_3G_AUTHTYPE}" == "2" ] ; then
+        auth_type=1     #CHAP
+    else
+        auth_type=3     #PAP+CHAP
+    fi
+
+	if [ "${user_name}" != "" ] ||[ "${passwd}" != "" ] ||
+       [ "${dns1}" != "" ] ||[ "${dns2}" != "" ] || [ "${auth_type}" != "" ] ; then
+        ${ATCMD_PROG} ${DevModem1} AT+CGPRCO=1,\"$user_name\",\"$passwd\",\"$dns1\",\"$dns2\",$auth_type,1 >> $TMPFIL
+	fi
+
+
+	CNT="0"
+	RET="1" 
+	while [ "$RET" -eq "1" -a "$CNT" -le "3" ]; do
+    	${ATCMD_PROG} ${DevModem1} 'AT+CGACT=1,1' -t 1
+    	echo "AT+CGACT=1,1"
+		CNT=$((CNT+1));
+    	sleep 1
+    	${ATCMD_PROG} ${DevModem1} 'AT+CGACT?' -t 3 > /tmp/cgact-${FileNameCode}
+    	sleep 1
+		cat /tmp/cgact-${FileNameCode} | grep "1, 1"
+		RET=$?
+	done;
+
+	rm -f $GIPFIL;
+    ${ATCMD_PROG} ${DevModem1} 'AT+CGPADDR=1' -t 1 > $GIPFIL
+    echo "AT+CGPADDR=1"
+    sleep 1
+ 
+    IP_ret=`cat ${GIPFIL} | grep OK`
+
+    if [ $IP_ret != "" ] ; then 
+
+    	write_error_code 0 ${Index} # clean error code
+
+ 	    IF_IP="` grep '+CGPADDR: 1' ${GIPFIL} | cut -d '\"' -f2`"
+        echo "Got DHCP IP: $IF_IP"
+        logger -t "O3G/SCRIPT" -p 8.7 "get ip:$IF_IP"
+
+        if [ $IF_IP ] ; then
+
+      	    echo "IP:$IF_IP" > $CNTFIL
+ 
+            ${ATCMD_PROG} ${DevModem1} 'AT+CGPRCO?' -t 1 >> $TMPFIL 
+            sleep 2
+
+            # Get subnet mask and gateway 				
+            get_cdcether_cnt_info ${IF_IP}
+ 
+ 	        if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+	            ${IFCFG_PROG} ${ETH} ${IF_IP} netmask ${IF_NM} mtu 1500 up
+	        else
+	            ${IFCFG_PROG} ${ETH} ${IF_IP} netmask ${IF_NM} mtu ${CSID_C_3G_MTU} up
+	        fi
+
+            IF_DNS1="` grep '+CGPRCO: 1' $TMPFIL | cut -d '\"' -f2`"
+ 	        IF_DNS2="` grep '+CGPRCO: 1' $TMPFIL | cut -d '\"' -f4`"
+     	    echo "nameserver $IF_DNS1" > /etc/resolv.conf
+	        echo "nameserver $IF_DNS2" >> /etc/resolv.conf
+        
+	        ${ATCMD_PROG} ${DevModem1} 'AT+CGDATA="M-MBIM",1,1' -t 1 >> $TMPFIL 
+        
+	        sl_get_uptime CNTTIME
+		    write_cnttime_info "${CNTTIME}" ${Index}
+		    write_if_name ${ETH} ${Index}
+		    write_if_info "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+		    write_dns_info "${IF_DNS1}" "${IF_DNS2}" ${Index}
+		    write_cnt_status 2 ${Index}
+
+            route add default dev ${ETH} ## gw ${i} ?
+
+        else
+            logger -p 8.7 -t "O3G/SCRIPT" "IF_IP:$IF_IP, shutdown.."
+            echo "IF_IP:$IF_IP, shutdown.."
+            write_cnt_status 3 ${Index}
+            exit 1
+        fi
+    else
+#        cdc_ether_stop
+        logger -p 8.7 -t "O3G/SCRIPT" "Get IP fail, shutdown.."
+        echo "Get IP fail, shutdown.."
+        write_cnt_status 3 ${Index}
+        exit 1
+    fi
+
+   	logger -t "O3G/SCRIPT" -p 8.7 "Got IP: $IF_IP, DNS1:$IF_DNS1, DNS2:$IF_DNS2" 
+   	return $? 
+} 
+cdc_ether_start()
+{
+    get_general_config ${Index} ${Index_3G}
+    get_general_status ${Index} ${Index_3G}
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+    get_3g_cnt_status ${Index} ${Index_3G}
+
+    # wrcsman "0x801e4001 0x01"
+
+    kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+
+
+    
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+    local DevModem1="${CSID_S_USB_MODEM1}"
+    local DevModem2="${CSID_S_USB_MODEM2}"
+
+    if [ "${VENDORID}" -eq 8193 -a "${PRODUCTID}" -eq 32004 ] ||
+       [ "${VENDORID}" -eq 8224 -a "${PRODUCTID}" -eq 16386 ]     ; then    # module P300A
+        cdc_ether_start2
+        return $?
+    fi
+    
+    if [ "${VENDORID}" -eq "5136" -a "${PRODUCTID}" -eq "45057" ] ||
+       [ "${VENDORID}" -eq "5136" -a "${PRODUCTID}" -eq "28721" ] ||        # Novatel Ovation MC679 Card (Bell)
+       [ "${VENDORID}" -eq "5136" -a "${PRODUCTID}" -eq "36881" ]  ; then   # for Novatel E371
+
+        ${ATCMD_PROG} ${DevModem1} 'AT$NWQMIDISCONNECT'
+        sleep 1
+        ${ATCMD_PROG} ${DevModem1} 'AT$NWQMICONNECT=,,' > ${TMPFIL}
+        tmpfil="`cat ${TMPFIL}`"
+        logger -t "O3G/SCRIPT" -p 8.7 "tmpfil:${tmpfil}"
+        echo "AT$NWQMICONNECT=1"
+        #	sleep 1
+        PIP="`cat ${TMPFIL} | grep 'OK' | cut -d, -f2 | cut -d\" -f2`"
+        logger -t "O3G/SCRIPT" -p 8.7 "pip:${PIP}"
+
+        if [ "${PIP}" == "" ]; then
+		    logger -t "O3G/SCRIPT" -p 8.7 "again"
+			${ATCMD_PROG} ${DevModem1} 'AT$NWQMICONNECT=,,' > ${TMPFIL}
+			tmpfil="`cat ${TMPFIL}`"
+			logger -t "O3G/SCRIPT" -p 8.7 "tmpfil:${tmpfil}"
+			echo "AT$NWQMICONNECT=1"
+			sleep 1
+		    PIP="`cat ${TMPFIL} | grep 'OK' | cut -d, -f2 | cut -d\" -f2`"
+			logger -t "O3G/SCRIPT" -p 8.7 "pip:${PIP}"
+			if [ "${PIP}" == "" ]; then
+			    write_cnt_status 3 ${Index}
+			fi
+        fi
+        # ${ATCMD_PROG} ${DevModem1} 'AT$NWQMISTATUS' > ${TMPFIL}
+        # sleep 1
+    elif [ "${VENDORID}" == "6797" ] && [ "${PRODUCTID}" == "4109" ]; then
+	    ${ATCMD_PROG} ${DevModem2} 'AT$WANCALL=0'
+		sleep 1
+        if [ "${CSID_C_3G_APN}" != "" ]; then
+            ${ATCMD_PROG} ${DevModem1} 'AT+CGDCONT=1,\"IP\",\"${CSID_C_3G_APN}\"' > ${LOG}
+	    fi
+		${ATCMD_PROG} ${DevModem2} 'AT$WANCALL=1' > ${TMPFIL}
+		logger -t "O3G/SCRIPT" -p 8.7 "tmpfil:${TMPFIL}"
+		echo "AT$WANCALL=1"
+		sleep 1
+		PIP="`cat ${TMPFIL} | grep 'OK' | cut -d, -f2 | cut -d\" -f2`"
+		logger -t "O3G/SCRIPT" -p 8.7 "pip:${PIP}"
+		if [ "${PIP}" == "" ]; then
+		    logger -t "O3G/SCRIPT" -p 8.7 "again"
+			${ATCMD_PROG} ${DevModem2} 'AT$WANCALL=1'
+			echo "AT$WANCALL=1"
+			sleep 4
+        fi
+    elif [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "4480" ]; then
+		if [ "${CSID_C_3G_APN}" != "" ]; then
+            ${ATCMD_PROG} ${DevModem1} 'AT+CGDCONT=1,\"IP\",\"${CSID_C_3G_APN}\"' > ${LOG}
+	    fi
+	    ${ATCMD_PROG} ${DevModem1} 'AT%IPDPACT=1,0'
+	    sleep 1
+	    ${ATCMD_PROG} ${DevModem1} 'AT%IPDPACT=1,1' > ${TMPFIL}
+	    logger -t "O3G/SCRIPT" -p 8.7 "tmpfil:${TMPFIL}"
+	    echo "AT%IPDPACT=1,1"
+	    sleep 1
+	    PIP="`cat ${TMPFIL} | grep 'OK' | cut -d, -f2 | cut -d\" -f2`"
+	    logger -t "O3G/SCRIPT" -p 8.7 "pip:${PIP}"
+		if [ "${PIP}" == "" ]; then
+		   logger -t "O3G/SCRIPT" -p 8.7 "again"
+		   ${ATCMD_PROG} ${DevModem1} 'AT%IPDPACT=1,1'
+		   echo "AT$WANCALL=1"
+		   sleep 4
+		fi
+    elif [ "${VENDORID}" == "4817" ] && [ "${PRODUCTID}" == "5491" ] ; then # HUAWEI ME909u-521 module
+
+        cdc_ether_HW909u_start
+        logger -t "O3G/SCRIPT" -p 8.7 "ret: $?"
+    elif [ "${VENDORID}" == "8559" ] && [ "${PRODUCTID}" == "71" ]; then  #AltairA3800 module
+
+        echo "AT+CFUN=1,0"
+        ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT+CFUN=1,0'
+        sleep 1
+
+        if [ "${CSID_C_3G_APN}" != "" ]; then
+            ${ATCMD_PROG} ${DevModem1} AT+CGDCONT=1,\"IP\",\"${CSID_C_3G_APN}\"
+	    fi 
+
+        CNT="0"
+        RET="1" 
+        while [ "$RET" -eq "1" -a "$CNT" -le "3" ]; do 
+            echo "AT+CGATT=1"
+            ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT+CGATT=1' > $TMPFIL
+            sleep 1
+            echo "AT%CMATT=1"
+            ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT%CMATT=1' >> $TMPFIL
+            sleep 1
+            CNT=$((CNT+1));
+            cat $TMPFIL | grep "OK"
+            RET=$?
+        done;
+    fi
+
+    write_error_code 0 ${Index} # clean error code
+    if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+        ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+    else
+        ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu ${CSID_C_3G_MTU} up
+    fi
+    
+    logger -t "O3G/SCRIPT" -p 8.7 "befre"
+
+    if [ "${CSID_S_LOCAL_MULTIWAN_CNT_FORCE}" == "1" ]; then
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+        # wrcsman "0x8001000e 0x00"
+    elif [ "${CSID_C_3G_CNT_TYPE}" == "0" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G on demand
+        # udhcpc-connect-sierra &
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    elif [ "${CSID_C_3G_CNT_TYPE}" == "2" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G manually
+        # udhcpc-connect-sierra &
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    else
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    fi
+    
+		if [ "${VENDORID}" == "4817" ] && [ "${PRODUCTID}" == "5491" ] ; then # HUAWEI ME909u-521 module
+	    		bridge_en=`rdcsman 0x80015007 u8`
+	    if [ "$bridge_en" == "1" ]; then
+		    IF_IP=`rdcsman 0x805500f$Index ipv4`
+		    #echo "nameserver $IF_IP" > /tmp/111
+		    echo "IP:$IF_IP" > $CNTFIL
+				get_cdcether_cnt_info ${IF_IP}
+		 
+		 	  if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+			  	${IFCFG_PROG} ${ETH} ${IF_IP} netmask ${IF_NM} mtu 1500 up
+			  else
+			  	${IFCFG_PROG} ${ETH} ${IF_IP} netmask ${IF_NM} mtu ${CSID_C_3G_MTU} up
+			  fi
+				#echo "nameserver $IF_NM" > /tmp/222
+			  write_if_info "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+		  fi
+		fi
+		
+    if  [ $VENDORID -eq 6610 -a $PRODUCTID -eq 5123 ] ||
+        [ $VENDORID -eq 6610 -a $PRODUCTID -eq 5128 ] ||        # ZTE MF825A
+        [ "$CSID_S_3G_MULTIWAN_CARD_INFO" == "MF823" ] ;  then   # ZTE MF823
+        sleep 2
+        echo "cdc-ether card info = $CSID_S_3G_MULTIWAN_CARD_INFO"
+
+        COUNT=1
+        while [ true ] ; do
+
+            wget_tool data_get $CNT_URL $URLCNT_LOG
+            sleep 2
+
+            urlret=`cat $URLCNT_LOG | cut -d\" -f4`
+            logger -t "O3G/SCRIPT" -p 8.7 "cdc-ether try to network urlret=$urlret"
+            echo "cdc-ether try to network urlret:$urlret"
+
+            ping 8.8.8.8 -c 4
+
+            if [ "$?" -eq "0" ]; then
+                logger -t "O3G/SCRIPT" -p 8.7 "cdc-ether connect ok!"
+                echo "cdc-ether connect connect ok!"
+                break;
+            elif [ $COUNT -eq "8" ] ; then      # try 8 times to wget network 
+                logger -t "O3G/SCRIPT" -p 8.7 "cdc-ether connect out"
+                echo "cdc-ether connect out"
+                break; 
+            fi   
+
+            COUNT=$(($COUNT+1))
+            sleep 1
+        done 
+
+        exit 0
+    elif [ "${VENDORID}" == "8559" ] && [ "${PRODUCTID}" == "71" ]; then  #AltairA3800 module
+        get_cnt_status ${Index}
+        echo "A3800 get IP:$CSID_S_USB_IF_IP"
+        if [ $CSID_S_USB_IF_IP == "10.0.0.10" ] ; then
+            echo "IP:$CSID_S_USB_IF_IP is fake to stop"
+            logger -t "O3G/SCRIPT" -p 8.7 "IP:$CSID_S_USB_IF_IP is fake to stop"
+            cdc_ether_stop
+        fi
+        exit 0
+    fi
+
+    return $?
+}
+
+cdc_ether_stop()
+{
+    get_general_config ${Index} ${Index_3G}
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+
+    local DevModem1="${CSID_S_USB_MODEM1}"
+    local DevModem2="${CSID_S_USB_MODEM2}"
+
+    if [ "${VENDORID}" == "5136" ] && [ "${PRODUCTID}" == "45057" ]; then
+         #kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+         ${ATCMD_PROG} ${DevModem} 'AT$NWQMIDISCONNECT'
+         #send_ATcmd /dev/modem 'AT$NWQMIDISCONNECT'
+         #sleep 1
+         #killall send_ATcmd > /dev/null 2>&1
+         #rmmod cdc_ether
+         #rmmod usbnet
+    elif [ "${VENDORID}" == "6797" ] && [ "${PRODUCTID}" == "4109" ]; then
+        ${ATCMD_PROG} ${DevModem2} 'AT$WANCALL=0'
+    elif [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "4480" ]; then
+        ${ATCMD_PROG} ${DevModem1} 'AT$IPDPACT=1,0'
+    elif [ "${VENDORID}" == "5136" ] && [ "${PRODUCTID}" == "36881" ]; then
+        ${ATCMD_PROG} ${DevModem1} 'At$nwqmidisconnect'
+    elif [ "${VENDORID}" == "4817" ] && [ "${PRODUCTID}" == "5491" ] ; then # HUAWEI ME909u-521 module
+        echo "AT^NDISDUP=1,0"
+        ${ATCMD_PROG} ${DevModem1} 'AT^NDISDUP=1,0' -t 1
+        sleep 1
+        echo "AT+CGATT=0"
+        ${ATCMD_PROG} ${DevModem1} 'AT+CGATT=0' -t 1
+        sleep 4
+        echo "AT+CGATT=1"
+        ${ATCMD_PROG} ${DevModem1} 'AT+CGATT=1' -t 1
+    elif [ "${VENDORID}" == "8193" -a "${PRODUCTID}" == "32004" ] ||
+         [ "${VENDORID}" == "8224" -a "${PRODUCTID}" == "16386" ] ; then      # module P300A
+        ${ATCMD_PROG} ${DevModem1} 'AT+CGACT=0,1' -t 1 &
+        echo "shut down link..."
+ 
+        [ -f "$GIPFIL" ] && rm -f $GIPFIL
+        [ -f "$CNTFIL" ] && rm -f $CNTFIL 
+        #rm -f /tmp/get_ip > /dev/null 2>&1
+        #rm -f /tmp/get_dns > /dev/null 2>&1
+        #rm -f /tmp/cdc-ether-connect > /dev/null 2>&1
+
+    elif [ "${VENDORID}" == "8559" ] && [ "${PRODUCTID}" == "71" ]; then  #AltairA3800 module
+        echo "AT+CGATT=0"
+        ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT+CGATT=0'
+        sleep 1
+        echo "AT%CMATT=0"
+        ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT%CMATT=0'
+        sleep 1
+    fi
+
+    [ -f "${DEMAND_FILE}" ] && rm -f ${DEMAND_FILE}
+    [ -f "$TMPFIL" ] && rm -f $TMPFIL
+
+    if [ -f "${PIDFILE_CONNECT}" ] ; then
+        CONNECT_PID="`cat ${PIDFILE_CONNECT}`"
+        kill -9 ${CONNECT_PID} > /dev/null 2>&1
+        rm -f ${PIDFILE_CONNECT} > /dev/null 2>&1	
+    fi
+
+    if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+        UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+        rm -f ${UDHCPC_PID_FILE}
+        kill -9 ${UDHCPC_PID} > /dev/null 2>&1 || exit 1
+    fi
+
+    ${IFCFG_PROG} ${ETH} down
+
+    clear_all_cnt_status ${Index}
+    write_cnt_status 0 ${Index}
+
+    #wrcsman "0x8001000E 0x01"
+
+    return 0
+}
+
+usage() {
+	 echo "$0 [start|stop|release|renew] [IFName] [index] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+   start)
+      pre_init     
+      cdc_ether_start
+      if [ "$?" == "1" ] ; then
+			   logger -t "O3G/SCRIPT" -p 8.7 "connect fail!!\n"
+			   ${IFCFG_PROG} ${ETH} 0.0.0.0 
+			   write_cnt_status 3 ${Index}
+         exit 1
+      fi
+      exit 0
+      ;;
+
+   stop)
+      cdc_ether_stop
+      ;;
+
+   release)
+      if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -USR2 ${UDHCPC_PID}
+      fi
+      write_dns_info "0.0.0.0" "" ${Index}
+
+      exit 0
+      ;;
+
+   renew)
+      if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+         cdc_ether_stop
+         cdc_ether_start
+      elif [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -USR1 ${UDHCPC_PID}
+         cdc_ether_status	
+      else
+         ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      fi
+
+      exit 0
+      ;;
+		
+	*)
+      usage
+      exit 1
+      ;;
+esac
+
+exit 0		

@@ -1,0 +1,26 @@
+#!/bin/sh
+
+COMPO_DIR=$1
+TARGET=$2
+HOST=$3
+HANDLE_QUAGGA_IPV6=$4
+
+cd $COMPO_DIR
+
+TargetLib=$TARGET-lib
+
+if [ ! "$HANDLE_QUAGGA_IPV6" == "1" ] ; then
+# if the prefix == "", Configure would set cross-compile-prefix default to $(CROSS_COMPILE)
+./Configure --cross-compile-prefix=" " \
+	--prefix=/usr \
+	--openssldir=/usr/lib/ssl \
+	shared linux-mips32 \
+	zlib-dynamic
+else
+# if the prefix == "", Configure would set cross-compile-prefix default to $(CROSS_COMPILE)
+./Configure --cross-compile-prefix=" " \
+	--prefix=/usr \
+	--openssldir=/usr/lib/ssl \
+	shared linux-mips32 \
+	zlib-dynamic
+fi

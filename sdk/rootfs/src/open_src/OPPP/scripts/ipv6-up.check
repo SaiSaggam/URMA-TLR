@@ -1,0 +1,43 @@
+#!/bin/sh
+
+IF=$1
+
+if [ -z "$IF" ]; then 
+	echo "interface error"
+	exit 1
+fi
+
+check_address()
+{
+	ADDR=$(ifconfig $IF | grep 'Scope:Global' | awk '{ print $3 }')
+	if [ -n "$ADDR" ]; then
+		echo "addr: $ADDR"
+		return 0
+	fi
+	return 1
+}
+
+wait_for_address()
+{
+	time=1
+	while [ $time -le 10 ]; do
+		if check_address ; then
+			return 0
+		fi
+		sleep 1
+		time=$(( $time+1 ))
+	done
+	return 1
+}
+
+ret=0
+
+if wait_for_address ; then
+	echo 1 > /proc/sys/net/ipv6/conf/$IF/forwarding
+	ret=0
+else
+	ret=1
+fi
+
+exit $err
+

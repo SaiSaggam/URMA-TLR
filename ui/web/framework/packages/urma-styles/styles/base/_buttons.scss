@@ -1,0 +1,51 @@
+button {
+  display: inline-block;
+  margin-bottom: 0;
+  font-weight: normal;
+  text-align: center;
+  vertical-align: middle;
+  touch-action: manipulation;
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  padding: 6px 12px;
+  background-image: none;
+  border-radius: 0;
+  font-size: 1em;
+  font-weight: 600;
+  text-transform: uppercase;
+  background-image: none;
+  a {
+    color: $white;
+    &:hover, &:focus {
+      color: $white;
+    }
+  }
+  &:hover {
+    background-color: $hover;
+    color: $white;
+    transition:all ease 1s;
+  }
+  &:focus {
+    box-shadow: none;
+    color: $white;
+  }
+}
+
+button {
+  &.button-main-menu {
+    @include button-no-background;
+  }
+}
+
+button {
+  &.btn-gray {
+    @include button-colors-secondary;
+  }
+}
+
+button[disabled] {
+  a {
+    pointer-events: none;
+  }
+}

@@ -1,0 +1,36 @@
+#!/bin/bash
+TOOL="../../../tools/config/dist/ConfigGenerator.jar"
+
+java -jar $TOOL
+java -jar $TOOL -help
+
+printf "Calling the tool with invalid path option:\n"
+java -jar $TOOL -path=./invalid_path mlchan:mlchan "Linux Application" 1 config.rci
+
+printf "Calling the tool with invalid option:\n"
+java -jar $TOOL -nooption
+
+printf "Calling the tool with no server name specified for -server option:\n"
+java -jar $TOOL -server
+
+printf "Calling the tool with -verbos=true, invalid option:\n"
+java -jar $TOOL -verbose=true
+
+printf "Calling the tool with invalid vendor id:\n"
+java -jar $TOOL -vendor=0xLL mlchan:mlchan  "Linux Application" 1 config.rci
+
+printf "Calling the tool with invalid firmware version number:\n"
+java -jar $TOOL mlchan:mlchan "Linux Application" 0x1 config.rci
+
+printf "Calling the tool with -server= test.etherios.com:\n"
+java -jar $TOOL -url= test.etherios.com mlchan:mlchan "Linux Application" 1 config.rci
+
+printf "Calling the tool with extra argument:\n"
+java -jar $TOOL mlchan:mlchan "Linux Application" 1 config.rci option
+
+
+for file in $(ls *.rci)
+do
+    printf "\n\n%s\n" $file
+    java -jar $TOOL -url=test.etherios.com mlchan:mlchan "Linux Application" 1 $file
+done

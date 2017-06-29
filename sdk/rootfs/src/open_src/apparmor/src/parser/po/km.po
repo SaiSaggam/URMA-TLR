@@ -1,0 +1,528 @@
+# translation of apparmor-parser.km.po to Khmer
+# Khoem Sokhem <khoemsokhem@khmeros.info>, 2006, 2007, 2008.
+# Auk Piseth <piseth_dv@khmeros.info>, 2006, 2007.
+# translation of apparmor-parser.km.po to
+msgid ""
+msgstr ""
+"Project-Id-Version: apparmor-parser.km\n"
+"Report-Msgid-Bugs-To: apparmor-general@forge.novell.com\n"
+"POT-Creation-Date: 2008-09-22 23:04-0700\n"
+"PO-Revision-Date: 2008-09-25 13:37+0700\n"
+"Last-Translator: Khoem Sokhem <khoemsokhem@khmeros.info>\n"
+"Language-Team: Khmer <support@khmeros.info>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: KBabel 1.11.4\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: ../parser_include.c:96 ../parser_main.c:450
+#, c-format
+msgid "Error: Could not read profile %s: %s.\n"
+msgstr "កំហុស ៖ មិនអាច​អាន​ទម្រង់ %s: %s ។\n"
+
+#: ../parser_include.c:115
+msgid "Error: Could not allocate temporary file.\n"
+msgstr "កំហុស ៖  មិន​អាច​បម្រុង​ទុក​ឯកសារ​បណ្ដោះ​អាសន្នបាន​ឡើយ​\n"
+
+#: ../parser_include.c:166
+msgid "Error: Out of memory.\n"
+msgstr "កំហុស ៖ អស់​សតិ ។\n"
+
+#: ../parser_include.c:176
+#, c-format
+msgid "Error: basedir %s is not a directory, skipping.\n"
+msgstr "កំហុស  ៖  basedir %s មិនមែន​ថត​ឡើយ​ កំពុង​រំលង ។\n"
+
+#: ../parser_include.c:190
+#, c-format
+msgid "Error: Could not add directory %s to search path.\n"
+msgstr "កំហុស​ ៖ មិន​អាច​បន្ថែម​ថត​ %s ដើម្បី​ស្វែងរក​ផ្លូវ​បាន​ឡើយ​ ។ \n"
+
+#: ../parser_include.c:200
+msgid "Error: Could not allocate memory.\n"
+msgstr "កំហុស​ ៖ មិន​អាច​បម្រុង​សតិ​ទុក​​ ។\n"
+
+#: ../parser_include.c:297
+#, c-format
+msgid "Error: Could not allocate buffer for include at line %d in %s.\n"
+msgstr "កំហុស ៖ មិន​អាច​បម្រុង​សតិ​បណ្ដោះ​អាសន្ន​ទុក​សម្រាប់​រួម​បញ្ចូល​នៅ​បន្ទាត់ %d នៅ​ក្នុង %s ។\n"
+
+#: ../parser_include.c:313 ../parser_include.c:333
+#, c-format
+msgid "Error: Bad include at line %d in %s.\n"
+msgstr "កំហុស ៖ ការ​រួមបញ្ចូល​ខូច​នៅ​បន្ទាត់ %d ក្នុង %s ​។\n"
+
+#: ../parser_include.c:378
+#, c-format
+msgid "Error: #include %s%c not found at line %d in %s.\n"
+msgstr "កំហុស ៖ រក​មិនឃើញ #include %s%c នៅ​បន្ទាត់ %d ក្នុង %s ។\n"
+
+#: ../parser_include.c:459
+#, c-format
+msgid "Error: Exceeded %d levels of includes.  Not processing %s include.\n"
+msgstr "កំហុស ៖ បាន​ហួស​កម្រិត %d នៃ​ការ​រួម​បញ្ចូល ។  មិន​ដំណើរការ​ការ​រួម​បញ្ចូល %s \n"
+
+#: ../parser_interface.c:72
+msgid "Bad write position\n"
+msgstr "ទីតាំង​សរសេរ​ខូច\n"
+
+#: ../parser_interface.c:75
+msgid "Permission denied\n"
+msgstr "សិទ្ធិ​ត្រូវ​បាន​បដិសេធ\n"
+
+#: ../parser_interface.c:78
+msgid "Out of memory\n"
+msgstr "អស់​សតិ\n"
+
+#: ../parser_interface.c:81
+msgid "Couldn't copy profile Bad memory address\n"
+msgstr "មិន​អាច​ចម្លង​ទម្រង់ ដោយ​សារ​តែ​អាសយដ្ឋាន​សតិ​ខូច\n"
+
+#: ../parser_interface.c:84
+msgid "Profile doesn't conform to protocol\n"
+msgstr "ទម្រង់​មិន​អះអាង​ទៅ​ពិធីការ\n"
+
+#: ../parser_interface.c:87
+msgid "Profile does not match signature\n"
+msgstr "ទម្រង់​មិន​ផ្គូផ្គង​ហត្ថលេខា\n"
+
+#: ../parser_interface.c:90
+msgid "Profile version not supported by Apparmor module\n"
+msgstr "ទម្រង់កំណែ​​មិន​ត្រូវ​បាន​គាំទ្រ​ដោ​យ​ម៉ូឌុល​ Apparmor ឡើយ\n"
+
+#: ../parser_interface.c:93
+msgid "Profile already exists\n"
+msgstr "ទម្រង់​មាន​រួច​ហើយ\n"
+
+#: ../parser_interface.c:96
+msgid "Profile doesn't exist\n"
+msgstr "មិន​មាន​ទម្រង់​ឡើយ\n"
+
+#: ../parser_interface.c:99
+msgid "Unknown error\n"
+msgstr "កំហុស​មិន​ស្គាល់\n"
+
+#: ../parser_interface.c:116
+#, c-format
+msgid "%s: Unable to add \"%s\".  "
+msgstr "%s ៖ មិន​អាច​បន្ថែម \"%s\" ។  "
+
+#: ../parser_interface.c:121
+#, c-format
+msgid "%s: Unable to replace \"%s\".  "
+msgstr "%s ៖ មិន​អាច​ជំនួស \"%s\" ។  "
+
+#: ../parser_interface.c:126
+#, c-format
+msgid "%s: Unable to remove \"%s\".  "
+msgstr "%s ៖ មិន​អាច​យក \"%s\" ចេញ ។  "
+
+#: ../parser_interface.c:131
+#, c-format
+msgid "%s: Unable to write to stdout\n"
+msgstr "%s ៖ មិន​អាច​សរសេរ​ទៅ stdout\n"
+
+#: ../parser_interface.c:135 ../parser_interface.c:158
+#, c-format
+msgid "%s: ASSERT: Invalid option: %d\n"
+msgstr "%s ៖ ASSERT ៖ ជម្រើស​មិន​ត្រឹមត្រូវ ៖ %d\n"
+
+#: ../parser_interface.c:144
+#, c-format
+msgid "Addition succeeded for \"%s\".\n"
+msgstr "ការ​បន្ថែម​បាន​ជោគជ័យ​សម្រាប់ \"%s\" ។\n"
+
+#: ../parser_interface.c:148
+#, c-format
+msgid "Replacement succeeded for \"%s\".\n"
+msgstr "ការ​ជំនួស​បាន​ជោគជ័យ​សម្រាប់ \"%s\" ។\n"
+
+#: ../parser_interface.c:152
+#, c-format
+msgid "Removal succeeded for \"%s\".\n"
+msgstr "ការ​យក​ចេញ​បាន​ជោគជ័យ​សម្រាប់ \"%s\" ។\n"
+
+#: ../parser_interface.c:247
+#, c-format
+msgid "PANIC bad increment buffer %p pos %p ext %p size %d res %p\n"
+msgstr "PANIC bad increment buffer %p pos %p ext %p size %d res %p\n"
+
+#: ../parser_interface.c:798 ../parser_interface.c:931
+#, c-format
+msgid "Unable to open %s - %s\n"
+msgstr "មិន​អាច​បើក %s - %s បានឡើយ​\n"
+
+#: ../parser_interface.c:822
+#, c-format
+msgid "Memory Allocation Error: Unable to remove ^%s\n"
+msgstr "កំហុស​ក្នុង​កា​របម្រុងទុក​សតិ ៖ មិន​អាច​យក ^%s ចេញ\n"
+
+#: ../parser_interface.c:835
+#, c-format
+msgid "Memory Allocation Error: Unable to remove %s:%s."
+msgstr "កំហុស​ក្នុង​កា​របម្រុង​ទុក​សតិ ៖ មិន​អាច​យក %s:%s ។"
+
+#: ../parser_interface.c:854
+msgid "unable to create work area\n"
+msgstr "មិន​អាច​បង្កើត​តំបន់​ធ្វើការ\n"
+
+#: ../parser_interface.c:862
+#, c-format
+msgid "unable to serialize profile %s\n"
+msgstr "មិន​អាច​កំណត់​ទម្រង់ %s ជា​ស៊េរី​បាន​ឡើយ\n"
+
+#: ../parser_interface.c:872 ../parser_interface.c:943
+#, c-format
+msgid "%s: Unable to write entire profile entry\n"
+msgstr "%s ៖ មិន​អាច​សរសេរធាតុ​ទម្រង់​ទាំង​មូល\n"
+
+#: parser_lex.l:122 parser_lex.l:155 parser_lex.l:354 parser_lex.l:123
+#: parser_lex.l:158 parser_lex.l:191 parser_lex.l:392
+#, c-format
+msgid "Found unexpected character: '%s'"
+msgstr "រក​ឃើញ​តួអក្សរ​ដែល​មិន​រំពឹង ៖ '%s'"
+
+#: parser_lex.l:196 parser_lex.l:232
+#, c-format
+msgid "(network_mode) Found unexpected character: '%s'"
+msgstr "(network_mode) រក​ឃើញ​តួអក្សរ​ដែល​មិន​រំពឹង​ទុក ៖ '%s'"
+
+#: ../parser_main.c:137 ../parser_main.c:146
+#, c-format
+msgid "Warning (%s line %d): %s"
+msgstr "ការព្រមាន (%s បន្ទាត់ %d) ៖ %s"
+
+#: ../parser_main.c:264 ../parser_main.c:275
+#, c-format
+msgid "%s: Could not allocate memory for subdomainbase mount point\n"
+msgstr "%s ៖ មិន​អាច​បម្រុង​ទុក​សតិ​សម្រាប់​ចំណុច​ម៉ោនមូលដ្ឋាន​ដែនរង​\n"
+
+#: ../parser_main.c:310 ../parser_main.c:321
+#, c-format
+msgid ""
+"Warning: unable to find a suitable fs in %s, is it mounted?\n"
+"Use --subdomainfs to override.\n"
+msgstr ""
+"ការ​ព្រមាន ៖ មិន​អាច​រក​ fs ដែល​សមរម្យ​នៅ​ក្នុង %s តើ​វា​ត្រូវ​បាន​ម៉ោន​ហើយ​ឬនៅ ?\n"
+"ប្រើ --subdomainfs ដើម្បី​បដិសេធ ។\n"
+
+#: ../parser_main.c:330 ../parser_main.c:341
+#, c-format
+msgid ""
+"%s: Sorry. You need root privileges to run this program.\n"
+"\n"
+msgstr ""
+"%s ៖ សូម​ទោស ។ អ្នក​ត្រូវ​ការ​សិទ្ធិ​ជា root ដើម្បី​រត់​កម្មវិធី​នេះ ។\n"
+"\n"
+
+#: ../parser_main.c:337 ../parser_main.c:348
+#, c-format
+msgid ""
+"%s: Warning! You've set this program setuid root.\n"
+"Anybody who can run this program can update your AppArmor profiles.\n"
+"\n"
+msgstr ""
+"%s ៖ ​ព្រមាន ! អ្នក​បាន​កំណត់​កម្មវិធី​នេះជា setuid root ។\n"
+"អ្នក​ដែល​រត់​កម្មវិធី​នេះ អាច​ធ្វើ​ឲ្យ​ទម្រង់ AppArmor ​របស់​អ្នក​ទាន់​សម័យ ។\n"
+"\n"
+
+#: ../parser_main.c:415 ../parser_main.c:509
+#, c-format
+msgid "%s: Errors found in file. Aborting.\n"
+msgstr "%s ៖ រក​ឃើញ​កំហុស​ក្នុង​ឯកសារ ។ បោះបង់ ។\n"
+
+#: ../parser_misc.c:281 parser_yacc.y:216 parser_yacc.y:240 parser_yacc.y:346
+#: parser_yacc.y:358 parser_yacc.y:426 parser_yacc.y:528 parser_yacc.y:566
+#: parser_yacc.y:884 parser_yacc.y:893 parser_yacc.y:904 parser_yacc.y:914
+#: parser_yacc.y:985 parser_yacc.y:1033 parser_yacc.y:1044 parser_yacc.y:1119
+#: parser_yacc.y:1134 parser_yacc.y:1141 parser_yacc.y:1152
+#: ../parser_main.c:464 ../parser_misc.c:288 parser_yacc.y:243
+#: parser_yacc.y:352 parser_yacc.y:364 parser_yacc.y:432 parser_yacc.y:534
+#: parser_yacc.y:572 parser_yacc.y:902 parser_yacc.y:974 parser_yacc.y:1022
+#: parser_yacc.y:1108 parser_yacc.y:1126 parser_yacc.y:1133 parser_yacc.y:1144
+#: ../parser_misc.c:292
+msgid "Memory allocation error."
+msgstr "កំហុស​បម្រុង​ទុក​សតិ ។"
+
+#: ../parser_misc.c:437 ../parser_misc.c:444 ../parser_misc.c:448
+msgid ""
+"Uppercase qualifiers \"RWLIMX\" are deprecated, please convert to lowercase\n"
+"See the apparmor.d(5) manpage for details.\n"
+msgstr "ឧបករណ៍​​បញ្ជាក់​​គុណលក្ខណៈអក្សរ​​​ធំ​ \"RWLIMX\" ត្រូវ​បាន​បរិយាយ​ សូម​បម្លែង​វា​ទៅ​ជា​អក្សរ​តូច​វិញ​មើល​សេចក្ដី​លម្អិត​​ក្នុងទំព័រ​មេ​របស់​​ apparmor.d (៥​)  ​។ \n"
+
+#: ../parser_misc.c:473 ../parser_misc.c:480 ../parser_misc.c:487
+#: ../parser_misc.c:484 ../parser_misc.c:491
+msgid "Conflict 'a' and 'w' perms are mutually exclusive."
+msgstr "ប៉ះទង្កិច 'a' និង 'w' ដក​ចេញ​ដោយ​ដៃ ។"
+
+#: ../parser_misc.c:497 ../parser_misc.c:504 ../parser_misc.c:508
+msgid "Exec qualifier 'i' invalid, conflicting qualifier already specified"
+msgstr "Exec qualifier 'i' មិន​ត្រឹមត្រូវ​ឡើយ, qualifier ដែល​ប៉ះទង្គិច​ត្រូវ​បាន​បញ្ជាក់​រួច​ហើយ"
+
+#: ../parser_misc.c:508 ../parser_misc.c:515 ../parser_misc.c:519
+#, c-format
+msgid "Unconfined exec qualifier (%c%c) allows some dangerous environment variables to be passed to the unconfined process; 'man 5 apparmor.d' for details.\n"
+msgstr "មិន​បាន​​មានការ​បង្ខំ exec ដែល​មាន​គុណភាព​ (%c%c) ព័ត៌មាន​លម្អិត​អនុញ្ញាត​ឲ្យមាន​​អថេរបរិស្ថាន​គ្រោះ​ថ្នាក់​មួយ​ចំនួន​​ឆ្លង​កាត់​ដំណើរការ​ដែល​គ្មាន​ការ​បង្ខំ​ដោយ​ 'man ៥ apparmor.d'  ។\n"
+
+#: ../parser_misc.c:516 ../parser_misc.c:549 ../parser_misc.c:523
+#: ../parser_misc.c:556 ../parser_misc.c:527 ../parser_misc.c:560
+#, c-format
+msgid "Exec qualifier '%c' invalid, conflicting qualifier already specified"
+msgstr "Exec qualifier '%c' មិន​ត្រឹមត្រុវ ការ​ប៉ះទង្គិច​ qualifier already specified"
+
+#: ../parser_misc.c:543 ../parser_misc.c:550 ../parser_misc.c:554
+#, c-format
+msgid "Exec qualifier '%c%c' invalid, conflicting qualifier already specified"
+msgstr "Exec qualifier '%c%c' មិន​ត្រឹមត្រូវ កា​រប៉ះទង្គិច​បាន​បញ្ជាក់​រួច​ហើយ"
+
+#: ../parser_misc.c:591 ../parser_misc.c:598 ../parser_misc.c:602
+#, c-format
+msgid "Internal: unexpected mode character '%c' in input"
+msgstr "ខាង​ក្នុង ៖ តួអក្សរ​របៀប​ដែល​មិន​រំពឹង '%c' ក្នុង​ព័ត៌មាន​បញ្ចូល"
+
+#: ../parser_misc.c:613 ../parser_misc.c:620 ../parser_misc.c:624
+#, c-format
+msgid "Internal error generated invalid perm 0x%llx\n"
+msgstr "កំហុស​ខាង​ក្នុង​បាន​បង្កើត​ perm មិន​ត្រឹមត្រូវ 0x%llx\n"
+
+#: ../parser_misc.c:833 ../parser_symtab.c:556 ../parser_regex.c:658
+#: ../parser_variable.c:227 ../parser_misc.c:840 ../parser_regex.c:660
+#: ../parser_misc.c:844
+#, c-format
+msgid "AppArmor parser error: %s\n"
+msgstr "កំហុស​ឧបករណ៍​ញែក AppArmor ៖ %s\n"
+
+#: ../parser_merge.c:94
+msgid "Couldn't merge entries. Out of Memory\n"
+msgstr "ធាតុ​មិន​អាច​បញ្ចូល​ចូល​គ្នា​បាន​ឡើយ​ ។  អស់​សតិ\n"
+
+#: ../parser_merge.c:113
+#, c-format
+msgid "profile %s: has merged rule %s with multiple x modifiers\n"
+msgstr "ទម្រង់ %s ៖ បាន​បញ្ចូល​ក្បួន %s ចូល​គ្នា​ជា​មួយ​អ្នក​កែប្រែ x ជា​ច្រើន\n"
+
+#: parser_yacc.y:220
+msgid "Profile names must begin with a '/', or keyword 'profile'."
+msgstr "ឈ្មោះ​ទម្រង់​ត្រូវតែ​ចាប់ផ្ដើម​ដោយ '/' ។"
+
+#: parser_yacc.y:263 parser_yacc.y:269
+#, c-format
+msgid "Failed to create alias %s -> %s\n"
+msgstr "បាន​បរាជ័យ​ក្នុង​កា​របង្កើត​ឈ្មោះ​ក្លែងក្លាយ %s -> %s\n"
+
+#: parser_yacc.y:399 parser_yacc.y:405
+msgid "Profile flag 'debug' is no longer valid."
+msgstr "ទង់​តម្រង់ 'បំបាត់​កំហុស' មិន​ត្រឹមត្រូវ​ទៀតទេ ។"
+
+#: parser_yacc.y:405 parser_yacc.y:411
+#, c-format
+msgid "Invalid profile flag: %s."
+msgstr "ទង់​ទម្រង់​មិន​ត្រឹមត្រូវ ៖ %s ។"
+
+#: parser_yacc.y:440 parser_yacc.y:462 parser_yacc.y:446 parser_yacc.y:468
+msgid "Assert: `rule' returned NULL."
+msgstr "អះអាង ៖ `ច្បាប់' បាន​ត្រឡប់ NULL ។"
+
+#: parser_yacc.y:443 parser_yacc.y:488 parser_yacc.y:449 parser_yacc.y:494
+msgid "Invalid mode, in deny rules 'x' must not be preceded by exec qualifier 'i', 'p', or 'u'"
+msgstr "របៀប​មិន​ត្រឹមត្រូវ 'x' មិន​ត្រូវ​​បន្ត​ដោយ exec qualifier 'i' 'u' ឬ 'p'"
+
+#: parser_yacc.y:466 parser_yacc.y:472
+msgid "Invalid mode, 'x' must be preceded by exec qualifier 'i', 'p', 'c', or 'u'"
+msgstr "របៀប​មិន​ត្រឹមត្រូវ, 'x' ត្រូវ​តែ​បន្ត​ដោយ exec qualifier 'i', 'u' ឬ 'p'"
+
+#: parser_yacc.y:491 parser_yacc.y:497
+msgid "Invalid mode, 'x' must be preceded by exec qualifier 'i', 'p', or 'u'"
+msgstr "របៀប​មិន​ត្រឹមត្រូវ, 'x' ត្រូវ​តែ​បន្ត​ដោយ exec qualifier 'i', 'u' ឬ 'p'"
+
+#: parser_yacc.y:516 parser_yacc.y:554 parser_yacc.y:522 parser_yacc.y:560
+msgid "Assert: `network_rule' return invalid protocol."
+msgstr "អះអាង ៖ `network_rule' ត្រឡប់​ពិធីការ​មិន​ត្រឹមត្រូវ ។"
+
+#: parser_yacc.y:591 parser_yacc.y:597
+msgid "Assert: `change_profile' returned NULL."
+msgstr "អះអាង ៖ `change_profile' ត្រឡប់ NULL ។"
+
+#: parser_yacc.y:600
+msgid "Assert: `change_hat' returned NULL."
+msgstr "អះអាង ៖ `change_hat' returned NULL ។"
+
+#: parser_yacc.y:631 parser_yacc.y:628
+msgid "Assert: 'hat rule' returned NULL."
+msgstr "អះអាង ៖ 'ច្បាប់ hat' បាន​ត្រឡប់ NULL ។"
+
+#: parser_yacc.y:640 parser_yacc.y:637
+msgid "Assert: 'local_profile rule' returned NULL."
+msgstr "អះអាង ៖ 'local_profile rule' returned NULL ។"
+
+#: parser_yacc.y:772
+#, c-format
+msgid "Unset boolean variable %s used in if-expression"
+msgstr "អថេរ​ប៊ូលីន​មិន​កំណត់ %s បាន​ប្រើ​ក្នុង​កន្សោម if"
+
+#: parser_yacc.y:830
+msgid "subset can only be used with link rules."
+msgstr "សំណុំ​រង​អាច​ត្រូវ​បាន​ប្រើ​តែ​ជា​មួយ​ច្បាប់​តំណ​ប៉ុណ្ណោះ ។"
+
+#: parser_yacc.y:832
+msgid "link and exec perms conflict on a file rule using ->"
+msgstr "តំណ និង exec perms ប៉ះទង្គិច​​ច្បាប់​ឯកសារ ដោយ​ប្រើ ->"
+
+#: parser_yacc.y:834 parser_yacc.y:853
+msgid "link perms are not allowed on a named profile transition.\n"
+msgstr "តំណ perms មិន​ត្រូវ​បាន​អនុញ្ញាត​នៅ​លើ​​ដំណើរការ​ផ្លាស់ប្ដូរ​ទម្រង់​ដែល​មានឈ្មោះ ។\n"
+
+#: parser_yacc.y:850
+msgid "unsafe rule missing exec permissions"
+msgstr "unsafe rule missing exec permissions"
+
+#: parser_yacc.y:853
+msgid "link perms are not allowed on a named profile transtion.\n"
+msgstr "តំណ perms មិន​ត្រូវ​បាន​អនុញ្ញាត​នៅ​លើដំណើរការ​ផ្លាស់ប្ដូរ​​ទម្រង់​ដែល​មាន​ឈ្មោះ ។\n"
+
+#: parser_yacc.y:866
+#, c-format
+msgid "missing an end of line character? (entry: %s)"
+msgstr "បាត់​តួអក្សរ​ចុង​បន្ទាត់​មួយឬ ? (ធាតុ ៖ %s)"
+
+#: parser_yacc.y:1000 parser_yacc.y:1010 parser_yacc.y:989 parser_yacc.y:999
+msgid "Invalid network entry."
+msgstr "ធាតុ​បណ្ដាញ​មិន​ត្រឹមត្រូវ ។"
+
+#: parser_yacc.y:1064 parser_yacc.y:1072 parser_yacc.y:1053 parser_yacc.y:1061
+#, c-format
+msgid "Invalid capability %s."
+msgstr "សមត្ថភាព​មិន​ត្រឹមត្រូវ %s ។"
+
+#: parser_yacc.y:1089 parser_yacc.y:1078
+#, c-format
+msgid "AppArmor parser error in %s at line %d: %s\n"
+msgstr "កំហុស​ឧបករណ៍​ញែក AppArmor %s នៅ​​បន្ទាត់ %d ៖ %s\n"
+
+#: parser_yacc.y:1092 parser_yacc.y:1081
+#, c-format
+msgid "AppArmor parser error, line %d: %s\n"
+msgstr "កំហុស​ឧបករណ៍​ញែក AppArmor បន្ទាត់ %d ៖ %s\n"
+
+#: ../parser_regex.c:283
+#, c-format
+msgid "%s: Illegal open {, nesting groupings not allowed\n"
+msgstr "%s ៖ ការ​បើក​មិន​ត្រឹមត្រូវ {, ការ​ដាក់​ជា​ក្រុម​ក្នុង​មិន​បាន​អនុញ្ញាត\n"
+
+#: ../parser_regex.c:303
+#, c-format
+msgid "%s: Regex grouping error: Invalid number of items between {}\n"
+msgstr "%s ៖ កំហុស​ការ​ដាក់​កន្សោម​ធម្មតា​ជា​ក្រុម ៖ ចំនួន​ធាតុ​មិន​ត្រឹមត្រូវ​ចន្លោះ {}\n"
+
+#: ../parser_regex.c:309
+#, c-format
+msgid "%s: Regex grouping error: Invalid close }, no matching open { detected\n"
+msgstr "%s ៖ កំហុស​ការ​ដាក់​កន្សោម​ធម្មតា​ជាក្រុម ៖ បិទ​មិន​ត្រឹមត្រូវ } មិន​ផ្គូផ្គង​នឹង​ការ​បើក { ដែល​បាន​រក​ឃើញ\n"
+
+#: ../parser_regex.c:375
+#, c-format
+msgid "%s: Regex grouping error: Unclosed grouping or character class, expecting close }\n"
+msgstr "%s ៖ Regex កំហុស​ការ​ដាក់​ជា​ក្រុម ៖ ការ​ដាក់​ជា​ក្រុម​ដែល​បាន​បិទ ឬ​ថ្នាក់​តួអក្សរ រំពឹង​ថា​បិទ }\n"
+
+#: ../parser_regex.c:389
+#, c-format
+msgid "%s: Internal buffer overflow detected, %d characters exceeded\n"
+msgstr "%s ៖ បាន​រកឃើញ​សតិ​បណ្ដោះ​អាសន្ន​ខាង​ក្នុង​លើស​ចំណុះ បាន​លើសតួអក្សរ %d \n"
+
+#: ../parser_regex.c:393
+#, c-format
+msgid "%s: Unable to parse input line '%s'\n"
+msgstr "%s ៖ មិន​អាច​ញែក​បន្ទាត់​បញ្ចូល '%s'\n"
+
+#: ../parser_regex.c:445
+#, c-format
+msgid "%s: Failed to compile regex '%s' [original: '%s']\n"
+msgstr "%s ៖ បាន​បរាជ័យក្នុង​ការ​ចងក្រង​កន្សោម​ធម្មតា '%s' [ដើម ៖ '%s']\n"
+
+#: ../parser_regex.c:449
+#, c-format
+msgid "%s: error near               "
+msgstr "%s ៖ កំហុស​ជិត               "
+
+#: ../parser_regex.c:459
+#, c-format
+msgid "%s: error reason: '%s'\n"
+msgstr "%s ៖ ហេតុផល​កំហុស ៖ '%s'\n"
+
+#: ../parser_regex.c:468
+#, c-format
+msgid "%s: Failed to compile regex '%s' [original: '%s'] - malloc failed\n"
+msgstr "%s ៖ បរាជ័យក្នុង​ការ​ចង់ក្រង​កន្សោម​ធម្មតា '%s' [ដើម ៖ '%s'] - malloc បាន​បរាជ័យ\n"
+
+#: ../parser_policy.c:194 ../parser_policy.c:200
+#, c-format
+msgid "ERROR merging rules for profile %s, failed to load\n"
+msgstr "កំហុស​ក្នុង​ការ​បញ្ចូល​ក្បួន​ចូល​គ្នា​សម្រាប់​ទម្រង់ %s បាន​បរាជ័យ​ក្នុង​ការ​ផ្ទុក\n"
+
+#: ../parser_policy.c:226 ../parser_policy.c:232
+#, c-format
+msgid ""
+"ERROR profile %s contains policy elements not usable with this kernel:\n"
+"\t'*', '?', character ranges, and alternations are not allowed.\n"
+"\t'**' may only be used at the end of a rule.\n"
+msgstr ""
+"កំហុស​ទម្រង់ %s មាន​ធាតុ​គោល​នយោបាយដែល​មិន​អាច​ប្រើ​ជា​មួយ​នឹង​ខឺណែល​នេះ ៖\n"
+"\t'*', '?', ជួរ​តួអក្សរ និង​ការ​ជំនួស​មិន​ត្រូវ​បាន​អនុញ្ញាត ។\n"
+"\t'**' អាច​ត្រូវ​បាន​ប្រើ​តែ​នៅ​ចុង​ក្បួន​តែ​ប៉ុណ្ណោះ ។\n"
+
+#: ../parser_policy.c:271 ../parser_policy.c:277
+#, c-format
+msgid "ERROR processing regexs for profile %s, failed to load\n"
+msgstr "កំហុស​ក្នុង​ការ​ចូល​ដំណើរការ regexs សម្រាប់​ទម្រង់ %s បាន​បរាជ័យ​ក្នុង​ការ​ផ្ទុក\n"
+
+#: ../parser_policy.c:298 ../parser_policy.c:304
+#, c-format
+msgid "ERROR expanding variables for profile %s, failed to load\n"
+msgstr "កំហុស ពង្រីក​អថេរ​សម្រាប់​ទម្រង់ %s បាន​បរាជ័យ​ក្នុង​​​ការ​ផ្ទុក\n"
+
+#: ../parser_policy.c:481 ../parser_policy.c:486
+#, c-format
+msgid "ERROR in profile %s, failed to load\n"
+msgstr "កំហុស​ក្នុង​ទម្រង់ %s បាន​បរាជ័យ​ក្នុង​ការ​ផ្ទុក\n"
+
+#: ../parser_policy.c:659 ../parser_policy.c:668
+#, c-format
+msgid "%s: Errors found during postprocessing.  Aborting.\n"
+msgstr "%s ៖ មាន​​កំហុស​កំឡុង​ពេល​ដំណើរការ​បន្ទាប់ ។  បោះបង់ ។\n"
+
+#: ../parser_policy.c:666 ../parser_policy.c:687 ../parser_policy.c:675
+#: ../parser_policy.c:696
+#, c-format
+msgid "%s: Errors found during regex postprocess.  Aborting.\n"
+msgstr "%s ៖ មាន​កំហុស​កំឡុង​ពេល​ដំណើរ​ការ regex ជា​មុន ។  បោះបង់ ។\n"
+
+#: ../parser_policy.c:673 ../parser_policy.c:682
+#, c-format
+msgid "%s: Errors found during postprocess.  Aborting.\n"
+msgstr "%s ៖ មាន​កំហុស​កំឡុង​ពេល​ដំណើរការ​បន្ទាប់ ។  បោះបង់ ។\n"
+
+#: ../parser_policy.c:680 ../parser_policy.c:689
+#, c-format
+msgid "%s: Errors found in combining rules postprocessing. Aborting.\n"
+msgstr "%s ៖ រក​ឃើញ​កំហុស​ក្នុង​ច្បាប់​បន្សំ​ដំណើរការ​ជា​មុន ។ បោះបង់ ។\n"
+
+#: ../parser_misc.c:37 ../parser_misc.c:38
+#, c-format
+msgid "%s permission: not supported on current system.\n"
+msgstr "%s សិទ្ធិ ៖ មិន​បាន​គាំទ្រ​នៅ​លើ​​ប្រព័ន្ធ​បច្ចុប្បន្ន ។\n"
+
+#: ../parser_misc.c:38 ../parser_misc.c:39
+#, c-format
+msgid "%s rule: not supported on current system.\n"
+msgstr "%s ច្បាប់ ៖ មិនបានគាំទ្រ​នៅ​លើ​ប្រព័ន្ធ​បច្ចុប្បន្ន​ទេ ។\n"
+
+#: parser_yacc.y:220
+msgid "Profile names must begin with a '/', or keyword 'profile' or 'hat'."
+msgstr "ឈ្មោះ​ទម្រង់​ត្រូវ​តែ​ចាប់ផ្ដើម​ដោយ '/' ឬ​ពាក្យ​គន្លឹះ 'profile' ឬ 'hat' ។"
+
+#: ../parser_policy.c:389
+#, c-format
+msgid "ERROR adding hat access rule for profile %s\n"
+msgstr "កំហុស​ក្នុង​​បន្ថែម​ច្បាប់​​ចូលដំណើរការ hat សម្រាប់​ទម្រង់ %s\n"
+

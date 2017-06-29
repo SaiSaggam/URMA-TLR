@@ -1,0 +1,5 @@
+#!/bin/sh
+
+if [ $IFACE == dsl ]; then
+    sendmsg dslmon 1 disconnected dsl 1
+fi

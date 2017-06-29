@@ -1,0 +1,13 @@
+# Ignore compiled python data
+*.pyc
+
+# Ignore results folder
+results
+
+# Ignore python binaries folder
+python/src
+python/eggs
+python/develop-eggs
+python/bin
+python/.mr.developer.cfg
+python/.installed.cfg

@@ -1,0 +1,668 @@
+#!/bin/sh
+
+if [ -f "/tmp/pptpc-customer" ]; then
+   . /tmp/pptpc-customer
+elif [ -f "/usr/bin/pptpc-customer" ]; then
+   . /usr/bin/pptpc-customer
+fi
+
+usage() {
+   echo "$0 [start|stop|restart|config|status]"
+   echo "$0 [start|stop|restart|config|status] [MULTIWAN Index: 0~$((MAX_MULTIWAN-1))]"
+   echo "$0 [ppp-up|ppp-down] [PPP Arguments]"
+   exit 1
+}
+
+[ -z "$1" ] && usage
+
+if [ "$1" != "ip-up" ] && [ "$1" != "ip-down" ]; then
+   # Check if exist multiwan index
+   if [ -n "$2" ]; then
+      if [ $(($2)) -ge 0 ] && [ $(($2)) -lt $MAX_MULTIWAN ]; then
+         MULTIWAN="$2"
+      else
+         usage
+      fi
+   else
+      MULTIWAN=""
+   fi
+elif [ -n "$6" ]; then # For ip-up or ip-down
+   if [ "`echo $6 | cut -c 1-4`" == "pptp" ]; then # Check if the prefix name is equal to "pptp" from ipparam
+      MULTIWAN="`echo $6 | cut -c 5-`" # Get Multiwan index from ipparam
+      if [ -z "$MULTIWAN" ] || [ $((MULTIWAN)) -lt 0 ] || [ $((MULTIWAN)) -ge $MAX_MULTIWAN ]; then
+         MULTIWAN=""
+      fi
+   else
+      MULTIWAN=""
+   fi
+else
+   usage
+fi
+
+RUNNING="/var/run/pptp-action-running"
+RESOLV_CONF="/etc/resolv.conf"
+PPTP_LINKNAME="pptp$MULTIWAN" # Must pass to ipparam with the prefix name "pptp" for getting multiwan index
+PPPD_AUTHFAILED_FILE="/var/run/ppp_auth_fail"
+PIDFILE_PPPD="/var/run/ppp-$PPTP_LINKNAME.pid"
+PPTP_CLR_PHASE1="/var/run/$PPTP_LINKNAME-phase1.clr"
+PPTP_CLR="/var/run/$PPTP_LINKNAME.clr"
+PEERS_DIR="/etc/ppp/peers"
+PEERS_FILE="$PEERS_DIR/$PPTP_LINKNAME"
+
+pptp_stop() {
+   get_wantype_pptp_config $MULTIWAN
+
+   get_wan_info $MULTIWAN
+   #local PPTP_PNSSERVER="$C_PPTP_PNS_SERVER"
+
+   # Get Domain name IP
+   #if [ -e "/usr/bin/getHostIP" ]; then
+   #   PPTP_PNSSERVER="`getHostIP $PPTP_PNSSERVER`"
+   #   [ "$PPTP_PNSSERVER" == "" ] && PPTP_PNSSERVER="$C_PPTP_PNS_SERVER"
+   #fi
+   #C_PPTP_PNS_SERVER_IP="$PPTP_PNSSERVER"
+
+   #check_kernel_mode
+   #local KERNEL_MODE="$?"
+   # Kill user mode pptp client
+   #if [ "$KERNEL_MODE" != "1" ]; then
+   #   for pid in `ps|grep "pptp: call for" |grep $PPTP_PNSSERVER |grep -v grep|awk '{print $1}'` ; do
+   #      echo "Killing WAN Type PPTP (PID¡G$pid)"
+   #      kill $pid >/dev/null 2>&1
+   #      [ $? != 0 ] && kill -9 $pid > /dev/null 2>&1
+   #   done
+   #fi
+
+   # Kill pppd for user/kernel mode
+   if [ -r $PIDFILE_PPPD ] ; then
+      sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+      echo "Kill PPTP Connection: $PPP_PID"
+      kill -0 $PPP_PID > /dev/null 2>&1
+      [ $? == 0 ] && kill $PPP_PID > /dev/null 2>&1
+      [ $? != 0 ] && kill -9 $PPP_PID > /dev/null 2>&1
+      rm -rf $PIDFILE_PPPD
+   fi
+
+   # Clear PPTP status
+   [ -e $PPTP_CLR_PHASE1 ] && sh $PPTP_CLR_PHASE1
+   [ -e $PPTP_CLR ] && sh $PPTP_CLR
+   rm -rf /var/run/ppp_auth* $PPTP_CLR $PPTP_CLR_PHASE1
+
+   clear_pptp_cnt_info $MULTIWAN
+   clear_pptp_cnt_status $MULTIWAN
+
+   if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+      clear_local_cnt_force_status $MULTIWAN
+   fi
+
+#   get_failover_config
+#
+#   LOADSHARING="$C_FAILOVER_LOADSHARING_ENABLE"
+#   SEAMLESS_MODE="$C_3G_FAILOVER_MODE"
+#   if [ -e /var/run/multiwan_enable ] ||
+#      [ "$LOADSHARING" == "1" ] ||
+#      [ "$SEAMLESS_MODE" == "1" ] ||
+#      [ -e /var/run/dont_update_wantype ]; then
+#      logger -p 8.7 -t "ip-down-pptp" "Exit ip-down directly (Under LoadSharing, Seamless, MultiWAN)!\""
+#      rm -f /var/run/dont_update_wantype
+#      return 0 # may pppoe/l2tp/pppoe client -> do nothing
+#   fi
+#
+#   get_failover_cnt_status
+#
+#   # For failover status, do not set dns info and do not set default gw
+#   AUTOBAK_MODE="$S_3G_AUTOBAK_MODE"
+#   if [ "$AUTOBAK_MODE" == "1" ] ; then
+#      logger -p 8.7 -t "ip-down-pptp" "Under Autoback mode, dont write to local \""
+#      return 0
+#   fi
+#
+#   FAILOVER_MODE="$S_FAILOVER_STATUS"
+#   if [ "$FAILOVER_MODE" == "1" ]; then
+#      get_failover_config
+#      FAILOVER_WANTYPE="$C_FAILOVER_WANTYPE"
+#      if [ $FAILOVER_WANTYPE -eq 7 ]; then # PPTP is the backup wan
+#         clear_failover_cnt_info
+#         clear_failover_cnt_status
+#      else  # PPTP is the main wan, and try to failback
+#         logger -p 8.7 -t "pptp ip-down" "Under Failover mode, dont write to local \""
+#         return 0
+#      fi
+#   fi
+
+   # Recover wan interface default gateway on Russian mode
+   local RUSSIAN_MODE="$C_PPTP_RUSSIAN_MODE"
+   if [ "$RUSSIAN_MODE" != "0" ] ; then
+      local IF_GW=""
+      if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ] ; then
+         get_phase1_dhcp_status $MULTIWAN
+         IF_GW="$S_DHCP_CLI_IF_GW"
+      elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then
+         IF_GW="$C_PPTP_P1FIXED_GW"
+      fi
+      # TODO: Need consider autoback/failover/loadsharing !?
+      if [ "$IF_GW" != "" ] ; then
+         route delete default > /dev/null 2>&1
+         route add default gw $IF_GW > /dev/null 2>&1
+      fi
+   fi
+
+   clear_local_cnt_info $MULTIWAN
+   clear_local_cnt_status $MULTIWAN
+
+   return 0
+}
+
+pptp_start_pre()
+{
+   # HW NAT may affect VPN throughput
+   [ "`lsmod | grep hw_nat`" != "" ] && rmmod hw_nat
+
+   # clear last ppp auth fail temp file
+   [ -e $PPTP_CLR_PHASE1 ] && sh $PPTP_CLR_PHASE1
+   [ -e $PPTP_CLR ] && sh $PPTP_CLR
+   rm -rf /var/run/ppp_auth* $PPTP_CLR $PPTP_CLR_PHASE1
+
+   clear_local_cnt_force_status $MULTIWAN
+}
+
+pptp_phase1_start() {
+   get_wan_info $MULTIWAN
+
+   #local ETH="$S_SYS_IF_WAN0"
+
+   #check_exist_interface "$S_SYS_IF_WAN0"
+   #if [ "$?" == "0" ]; then
+   #   check_exist_interface "$S_SYS_IF_WAN1"
+   #   [ "$?" != "0" ] && ETH="$S_SYS_IF_WAN1"
+   #fi
+
+   logger -t "pptp" "S_SYS_IF_WAN = $S_SYS_IF_WAN, S_SYS_MULTIWAN_IF_WAN=$S_SYS_MULTIWAN_IF_WAN"    
+   local ETH="$S_SYS_IF_WAN"   
+   if [ -z "$MULTIWAN" ]; then 
+      check_exist_interface "$S_SYS_IF_WAN"
+	  ETH="$S_SYS_IF_WAN"
+   else
+      check_exist_interface "$S_SYS_MULTIWAN_IF_WAN"  
+      ETH="$S_SYS_MULTIWAN_IF_WAN"   	  
+   fi
+   #if [ "$?" == "0" ]; then
+   #   logger -t "pptp" "check_exist_interface return 0"     
+   #else
+   #   logger -t "pptp" "check_exist_interface return 1"     
+   #fi
+   
+	 local IF_IP="0.0.0.0"
+	 local IF_NM="0.0.0.0"
+	 local IF_GW="0.0.0.0"
+	 local IF_DNS1=""
+	 local IF_DNS2=""
+
+   if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ]; then
+      udhcpc-action stop $MULTIWAN
+      udhcpc-action start $MULTIWAN
+      local RET="$?"
+      if [ "$RET" != "0" ]; then
+         echo "Can't get IP/GW form DHCP Server !"
+         logger -t "pptp" "Can't get IP/GW form DHCP Server !"
+         return 1
+      fi
+      echo "udhcpc-action stop" >> $PPTP_CLR
+      #logger -t "pptp" "get_phase1_dhcp_status $MULTIWAN"
+      get_phase1_dhcp_status $MULTIWAN
+      IF_GW="$S_DHCP_CLI_IF_GW"
+      IF_DNS1="$S_DHCP_CLI_IF_PRIDNS"
+      IF_DNS2="$S_DHCP_CLI_IF_SECDNS"
+   elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then
+      IF_IP="$C_PPTP_P1FIXED_IP"
+      IF_NM="$C_PPTP_P1FIXED_NM"
+      IF_GW="$C_PPTP_P1FIXED_GW"
+      IF_DNS1="$C_PPTP_P1FIXED_PRIDNS"
+      IF_DNS2="$C_PPTP_P1FIXED_SECDNS"
+      ifconfig $ETH $IF_IP netmask $IF_NM
+      echo "ifconfig $ETH 0.0.0.0" >> $PPTP_CLR
+   fi
+
+   if [ "$IF_DNS1" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS1
+      route add -host $IF_DNS1 gw $IF_GW dev $ETH
+      #logger -t "pptp" "route add -host $IF_DNS1 gw $IF_GW dev $ETH"
+      echo "route delete -host $IF_DNS1 gw $IF_GW dev $ETH" >> $PPTP_CLR_PHASE1
+   fi
+
+   if [ "$IF_DNS2" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS2
+      route add -host $IF_DNS2 gw $IF_GW dev $ETH
+      #logger -t "pptp" "route add -host $IF_DNS2 gw $IF_GW dev $ETH"	  
+      echo "route delete -host $IF_DNS2 gw $IF_GW dev $ETH" >> $PPTP_CLR_PHASE1
+   fi
+
+   return 0
+}
+
+russian_pptp_phase1_start() {
+   get_wan_info $MULTIWAN
+
+   local ETH="$S_SYS_IF_WAN0"
+
+   check_exist_interface "$S_SYS_IF_WAN0"
+   if [ "$?" == "0" ]; then
+      check_exist_interface "$S_SYS_IF_WAN1"
+      [ "$?" != "0" ] && ETH="$S_SYS_IF_WAN1"
+   fi
+
+   local IF_IP="0.0.0.0"
+   local IF_NM="0.0.0.0"
+   local IF_GW="0.0.0.0"
+   local IF_DNS1=""
+   local IF_DNS2=""
+
+   if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ]; then
+      get_phase1_dhcp_status $MULTIWAN
+      [ "$S_DHCP_CLI_CNT_STATUS" != "2" ] && pptp_ip_down "Phase 1 connect isn't ready !" # Phase 1 connection does not completed.
+      IF_GW="$S_DHCP_CLI_IF_GW"
+      IF_DNS1="$S_DHCP_CLI_IF_PRIDNS"
+      IF_DNS2="$S_DHCP_CLI_IF_SECDNS"
+   elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then # static
+      get_phase1_static_status $MULTIWAN
+      [ "$S_FIX_CNT_STATUS" != "2" ] && pptp_ip_down "Phase 1 connect isn't ready !" # Phase 1 connection does not completed.
+
+      IF_GW="$C_PPTP_P1FIXED_GW"
+      IF_DNS1="$C_PPTP_P1FIXED_PRIDNS"
+      IF_DNS2="$C_PPTP_P1FIXED_SECDNS"
+   fi
+
+   if [ "$IF_DNS1" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS1
+      route add -host $IF_DNS1 gw $IF_GW dev $ETH
+      echo "route delete -host $IF_DNS1 gw $IF_GW dev $ETH" >> $PPTP_CLR_PHASE1
+   fi
+
+   if [ "$IF_DNS2" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS2
+      route add -host $IF_DNS2 gw $IF_GW dev $ETH
+      echo "route delete -host $IF_DNS2 gw $IF_GW dev $ETH" >> $PPTP_CLR_PHASE1
+   fi
+
+   return 0
+}
+
+set_pptpserv_routing() {
+   get_wan_info $MULTIWAN
+   
+	  #logger -t "pptp" "S_SYS_IF_WAN = $S_SYS_IF_WAN, S_SYS_MULTIWAN_IF_WAN=$S_SYS_MULTIWAN_IF_WAN"    
+   local ETH="$S_SYS_IF_WAN"   
+   if [ -z "$MULTIWAN" ]; then 
+      check_exist_interface "$S_SYS_IF_WAN"
+	  ETH="$S_SYS_IF_WAN"
+   else
+      check_exist_interface "$S_SYS_MULTIWAN_IF_WAN"  
+      ETH="$S_SYS_MULTIWAN_IF_WAN"   	  
+   fi
+   #if [ "$?" == "0" ]; then
+   #   logger -t "pptp" "check_exist_interface return 0"     
+   #else
+   #   logger -t "pptp" "check_exist_interface return 1"     
+   #fi
+
+   local PPTP_PNSSERVER="$C_PPTP_PNS_SERVER"
+
+   local p1wan_ip="`ifconfig $ETH |grep 'inet addr:'|cut -f2 -d:|awk '{print $1}'`"
+   local p1wan_nm="`ifconfig $ETH |grep 'inet addr:'|cut -f4 -d:`"
+   #echo "p1wan_ip: $p1wan_ip"
+   #echo "p1wan_nm: $p1wan_nm"
+   # Get Domain name IP
+   if [ -e "/usr/bin/getHostIP" ]; then
+      PPTP_PNSSERVER="`getHostIP $PPTP_PNSSERVER`"
+      [ "$PPTP_PNSSERVER" == "" ] && pptp_ip_down "PPTP_PNSSERVER Connect fail!"
+   fi
+   C_PPTP_PNS_SERVER_IP="$PPTP_PNSSERVER"
+   # Check if string is empty (Avoid Syntax error)
+   if [ "`echo $p1wan_ip | cut -d "." -f1`" = "" ] || [ "`echo $p1wan_ip | cut -d "." -f2`" = "" ] ||
+      [ "`echo $p1wan_ip | cut -d "." -f3`" = "" ] || [ "`echo $p1wan_ip | cut -d "." -f4`" = "" ] ||
+      [ "`echo $p1wan_nm | cut -d "." -f1`" = "" ] || [ "`echo $p1wan_nm | cut -d "." -f2`" = "" ] ||
+      [ "`echo $p1wan_nm | cut -d "." -f3`" = "" ] || [ "`echo $p1wan_nm | cut -d "." -f4`" = "" ] ||
+      [ "`echo $PPTP_PNSSERVER | cut -d "." -f1`" = "" ] || [ "`echo $PPTP_PNSSERVER | cut -d "." -f2`" = "" ] ||
+      [ "`echo $PPTP_PNSSERVER | cut -d "." -f3`" = "" ] || [ "`echo $PPTP_PNSSERVER | cut -d "." -f4`" = "" ]; then
+	  pptp_ip_down "Connect fail!"
+   fi
+
+   local ip1_1=$((`echo $p1wan_ip| cut -d "." -f1` & `echo $p1wan_nm| cut -d "." -f1`))
+   local ip1_2=$((`echo $p1wan_ip| cut -d "." -f2` & `echo $p1wan_nm| cut -d "." -f2`))
+   local ip1_3=$((`echo $p1wan_ip| cut -d "." -f3` & `echo $p1wan_nm| cut -d "." -f3`))
+   local ip1_4=$((`echo $p1wan_ip| cut -d "." -f4` & `echo $p1wan_nm| cut -d "." -f4`))
+
+   local ip2_1=$((`echo $PPTP_PNSSERVER | cut -d "." -f1` & `echo $p1wan_nm | cut -d "." -f1`))
+   local ip2_2=$((`echo $PPTP_PNSSERVER | cut -d "." -f2` & `echo $p1wan_nm | cut -d "." -f2`))
+   local ip2_3=$((`echo $PPTP_PNSSERVER | cut -d "." -f3` & `echo $p1wan_nm | cut -d "." -f3`))
+   local ip2_4=$((`echo $PPTP_PNSSERVER | cut -d "." -f4` & `echo $p1wan_nm | cut -d "." -f4`))
+#logger -t "pptp" "ip1_1 = $ip1_1, ip1_2 = $ip1_2, ip1_3 = $ip1_3, ip1_4 = $ip1_4" 
+#logger -t "pptp" "ip2_1 = $ip2_1, ip2_2 = $ip2_2, ip2_3 = $ip2_3, ip2_4 = $ip2_4" 
+   if [ "$ip1_1" == "$ip2_1" ] && [ "$ip1_2" == "$ip2_2" ] &&
+      [ "$ip1_3" == "$ip2_3" ] && [ "$ip1_4" == "$ip2_4" ]; then
+      echo "Server is in the same subnet, don't set routing."
+      logger -t "pptp" "Server is in the same subnet, don't set routing"     	  
+   else
+      local IF_GW=""
+      if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ] ; then
+         get_phase1_dhcp_status $MULTIWAN
+         IF_GW="$S_DHCP_CLI_IF_GW"
+      elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then
+         IF_GW="$C_PPTP_P1FIXED_GW"
+      fi
+
+      echo "Server is in the different subnet, set routing for the server."
+	  logger -t "pptp" "Server is in the different subnet, set routing for the server."
+      route add -host $PPTP_PNSSERVER gw $IF_GW dev $ETH
+	  #logger -t "pptp" "route add -host $PPTP_PNSSERVER gw $IF_GW dev $ETH"
+      echo "route delete -host $PPTP_PNSSERVER gw $IF_GW dev $ETH" >> $PPTP_CLR
+   fi
+
+   return 0
+}
+
+pptp_start() {
+   # Make sure only one script running.
+   local MaxWaitTime="120"
+   local TimeCounter="1"
+   while [ $TimeCounter -le $MaxWaitTime ];
+   do
+     [ ! -f "$RUNNING" ] && break
+     echo "File $RUNNING exists. Max Waiting Time: $TimeCounter/$MaxWaitTime"
+     sleep 1
+     TimeCounter="$((TimeCounter+1))"
+   done
+   echo 1 > $RUNNING
+
+   get_local_cnt_force_status $MULTIWAN
+
+   local CNT_FORCE="$S_LOCAL_WAN_CNT_FORCE"
+   if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+      pptp_stop $MULTIWAN
+   fi
+
+   # Check for pidfile
+   if [ -r "$PIDFILE_PPPD" ] ; then
+      PID=`cat "$PIDFILE_PPPD"`
+      echo "$0: There already seems to be a PPTP connection up (PID $PID)" >& 2
+      return 0
+   fi
+
+   local pppd_pid=`ps | grep "pppd call $PPTP_LINKNAME " | grep -v grep | sed '2,$d' | awk '{print $1}'`
+   if [ "$pppd_pid" != "" ] ; then
+#      kill $pppd_pid > /dev/null 2>&1
+#      [ $? != 0 ] && kill -9 $pppd_pid > /dev/null 2>&1
+      kill -9 $pppd_pid > /dev/null 2>&1
+      return 0
+   fi
+
+   echo "before get_wantype_pptp_config MULTIWAN = $MULTIWAN"
+   get_wantype_pptp_config $MULTIWAN
+
+   # Check Server
+   local PPTP_PNSSERVER="$C_PPTP_PNS_SERVER"
+   if [ "$PPTP_PNSSERVER" == "" ]; then
+      echo "No Peer IP/Domain for PPTP client !"
+      logger -t "pptp" "No Peer IP/Domain for PPTP client"   
+      pptp_ip_down "No Peer IP/Domain for PPTP client !"
+      return 1
+   fi   
+
+   pptp_start_pre
+   local RUSSIAN_MODE="$C_PPTP_RUSSIAN_MODE"
+   if [ "$RUSSIAN_MODE" != "0" ]; then
+   	  #logger -t "pptp" "russian_pptp_phase1_start!" 
+      russian_pptp_phase1_start
+   else
+	  #logger -t "pptp" "pptp_phase1_start!" 
+      pptp_phase1_start
+   fi
+
+   echo "$0: Start PPTP session to $C_PPTP_PNS_SERVER ... "
+   logger -t "pptp" "$0: Start PPTP session to $C_PPTP_PNS_SERVER ... " 
+   set_pptpserv_routing
+   gen_wantype_pptp_options
+   pppd call $PPTP_LINKNAME &
+   sleep 2
+
+   # Monitor connection
+   local MAX_TIMEOUT=30
+   local retry=0
+   local pptp_status=0
+   while [ true ]; do
+      if [ -f "$PIDFILE_PPPD" ] ; then
+         sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+         if [ $? = 0 ]; then
+            get_pptp_cnt_status $MULTIWAN
+            pptp_status="$S_PPTP_CNT_STATUS"
+         fi
+      fi
+
+      if [ "$pptp_status" == "2" ]; then
+         logger -t "pptp" "Link is up and running on interface $PPP_IF (PID: $PPP_PID)"
+         echo "pptp-status: Link is up and running on interface $PPP_IF"
+         if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+            write_local_cnt_force_status "0" $MULTIWAN
+         fi
+         break;
+      elif [ -f "$PPPD_AUTHFAILED_FILE" ] ; then
+         write_pptp_cnt_status "6" $MULTIWAN
+         write_local_cnt_status "6" $MULTIWAN
+         if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+            write_local_cnt_force_status "0" $MULTIWAN
+         fi
+         pptp_ip_down "Authentication fail!"
+      else
+         if [ "$PPP_PID" != "" ]; then
+            kill -0 $PPP_PID 2>/dev/null
+            if [ "$?" != "0" ]; then
+               if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+                  write_local_cnt_force_status "0" $MULTIWAN
+               fi
+               pptp_ip_down "Connect fail!"
+            fi
+         fi
+
+         if [ $retry -gt $MAX_TIMEOUT ] ; then
+            if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+               write_local_cnt_force_status "0" $MULTIWAN
+            fi
+            pptp_ip_down "Connect PPTP tunnel Timeout !"
+         else
+            echo "PPTP connecting ... (Retry: $retry, Status: $pptp_status)"
+            retry=$(($retry+1))
+         fi
+       fi
+       sleep 1
+   done
+}
+
+print_pptp_config() {
+   get_wantype_pptp_config $MULTIWAN
+
+   echo "C_PPTP_CNTTYPE                : $C_PPTP_CNTTYPE"
+   echo "C_PPTP_CNTTYPE_UI             : $C_PPTP_CNTTYPE_UI"
+   echo "C_PPTP_NAT_DISABLE            : $C_PPTP_NAT_DISABLE"
+   if [ -n "$C_PPTP_RUSSIAN_MODE_SUPPORT" ] && [ "$C_PPTP_RUSSIAN_MODE_SUPPORT" != "0" ]; then
+      echo "C_PPTP_RUSSIAN_MODE           : $C_PPTP_RUSSIAN_MODE"
+   else
+      echo "C_PPTP_RUSSIAN_MODE           : No Support"
+   fi
+   echo "C_PPTP_PHASE1_TYPE            : $C_PPTP_PHASE1_TYPE ($C_PHASE1_TYPE_STR)"
+   echo "C_PPTP_P1FIXED_IP             : $C_PPTP_P1FIXED_IP"
+   echo "C_PPTP_P1FIXED_NM             : $C_PPTP_P1FIXED_NM"
+   echo "C_PPTP_P1FIXED_GW             : $C_PPTP_P1FIXED_GW"
+   echo "C_PPTP_P1FIXED_PRIDNS         : $C_PPTP_P1FIXED_PRIDNS"
+   echo "C_PPTP_P1FIXED_SECDNS         : $C_PPTP_P1FIXED_SECDNS"
+   echo "C_PPTP_PNS_SERVER             : $C_PPTP_PNS_SERVER"
+   #echo "C_PPTP_AUTHTYPE               : $C_PPTP_AUTHTYPE"
+   echo "C_PPTP_USER                   : $C_PPTP_USER"
+   echo "C_PPTP_PASS                   : $C_PPTP_PASS"
+   echo "C_PPTP_MTU                    : $C_PPTP_MTU"
+   echo "C_PPTP_IDLETIME               : $C_PPTP_IDLETIME"
+   echo "C_PPTP_ENABLE_MPPE            : $C_PPTP_ENABLE_MPPE"
+   echo "C_PPTP_ENABLE_MPPE_40         : $C_PPTP_ENABLE_MPPE_40"
+   echo "C_PPTP_ENABLE_MPPE_56         : $C_PPTP_ENABLE_MPPE_56"
+   echo "C_PPTP_ENABLE_MPPE_128        : $C_PPTP_ENABLE_MPPE_128"
+   echo "C_PPTP_PRIDNS                 : $C_PPTP_PRIDNS"
+   echo "C_PPTP_SECDNS                 : $C_PPTP_SECDNS"
+
+   get_failover_config
+
+   echo "C_FAILOVER_LOADSHARING_ENABLE : $C_FAILOVER_LOADSHARING_ENABLE"
+   echo "C_3G_FAILOVER_MODE            : $C_3G_FAILOVER_MODE"
+   echo "C_FAILOVER_WANTYPE            : $C_FAILOVER_WANTYPE"
+   echo "C_3G_AUTOBAK_ENABLE           : $C_3G_AUTOBAK_ENABLE"
+}
+
+print_pptp_cnt_status() {
+   get_pptp_cnt_info $MULTIWAN
+   get_pptp_cnt_status $MULTIWAN
+
+   echo "S_PPTP_CNT_TIME               : $S_PPTP_CNT_TIME"
+   echo "S_PPTP_IF_IP                  : $S_PPTP_IF_IP"
+   echo "S_PPTP_IF_NM                  : $S_PPTP_IF_NM"
+   echo "S_PPTP_IF_GW                  : $S_PPTP_IF_GW"
+   echo "S_PPTP_IF_PRIDNS              : $S_PPTP_IF_PRIDNS"
+   echo "S_PPTP_IF_SECDNS              : $S_PPTP_IF_SECDNS"
+   echo "S_PPTP_IF_NAME                : $S_PPTP_IF_NAME"
+   echo "S_PPTP_CNT_STATUS             : $S_PPTP_CNT_STATUS"
+
+   get_local_cnt_info $MULTIWAN
+   get_local_cnt_status $MULTIWAN
+
+   echo "S_LOCAL_CNT_TIME              : $S_LOCAL_CNT_TIME"
+   echo "S_LOCAL_WAN_IP                : $S_LOCAL_WAN_IP"
+   echo "S_LOCAL_WAN_NM                : $S_LOCAL_WAN_NM"
+   echo "S_LOCAL_WAN_GW                : $S_LOCAL_WAN_GW"
+   echo "S_LOCAL_WAN_PRIDNS            : $S_LOCAL_WAN_PRIDNS"
+   echo "S_LOCAL_WAN_SECDNS            : $S_LOCAL_WAN_SECDNS"
+   echo "S_LOCAL_WAN_IF_NAME           : $S_LOCAL_WAN_IF_NAME"
+   echo "S_LOCAL_WAN_STATUS            : $S_LOCAL_WAN_STATUS"
+
+   get_failover_cnt_info
+   get_failover_cnt_status
+
+   echo "S_FAILOVER_CNT_TIME           : $S_FAILOVER_CNT_TIME"
+   echo "S_FAILOVER_WAN_IP             : $S_FAILOVER_WAN_IP"
+   echo "S_FAILOVER_WAN_NM             : $S_FAILOVER_WAN_NM"
+   echo "S_FAILOVER_WAN_GW             : $S_FAILOVER_WAN_GW"
+   echo "S_FAILOVER_WAN_PRIDNS         : $S_FAILOVER_WAN_PRIDNS"
+   echo "S_FAILOVER_WAN_SECDNS         : $S_FAILOVER_WAN_SECDNS"
+   echo "S_FAILOVER_WAN_IF_NAME        : $S_FAILOVER_WAN_IF_NAME"
+   echo "S_FAILOVER_STATUS             : $S_FAILOVER_STATUS"
+
+   echo "S_3G_AUTOBAK_MODE             : $S_3G_AUTOBAK_MODE"
+   echo "S_3G_AUTOBAK_STATUS           : $S_3G_AUTOBAK_STATUS"
+}
+
+# $1 interface-name   e.g. ppp0, ppp1 ...etc
+# $2 tty-device       e.g. /dev/modem ...
+# $3 speed
+# $4 local-IP-address
+# $5 remote-IP-address
+# $6 ipparam          e.g. extra parameters
+pptp_ip_up()
+{
+   get_wantype_pptp_config $MULTIWAN
+
+   logger -t "ip-up-pptp" "$*"
+   echo "ip-up-pptp: $*"
+   [ -f $PPTP_CLR_PHASE1 ] && sh $PPTP_CLR_PHASE1
+   rm -rf /var/run/ppp_auth* $PPTP_CLR_PHASE1
+
+   # PPTP DNS info.
+   IF_DNS1="$C_PPTP_PRIDNS"
+   IF_DNS2="$C_PPTP_SECDNS"
+   if [ "$IF_DNS1" == "0.0.0.0" ] && [ "$IF_DNS2" == "0.0.0.0" ] ; then
+      sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+   fi
+
+   #PPTP interface info.
+   IFNAME="$2"
+   ifconfig $IFNAME txqueuelen 1000
+   sl_get_IP_NM_GW_in_ifconfig $IFNAME IF_IP IF_NM IF_GW
+   sl_get_uptime CNTTIME
+   write_pptp_cnt_info "$CNTTIME" "$IF_IP" "$IF_NM" "$IF_GW" "$IF_DNS1" "$IF_DNS2" "$IFNAME" $MULTIWAN
+   write_pptp_cnt_status "2" $MULTIWAN
+
+#   get_failover_config
+#
+#   LOADSHARING="$C_FAILOVER_LOADSHARING_ENABLE"
+#   SEAMLESS_MODE="$C_3G_FAILOVER_MODE"
+#   if [ -e /var/run/multiwan_enable ] ||
+#      [ "$LOADSHARING" == "1" ] ||
+#      [ "$SEAMLESS_MODE" == "1" ] ||
+#      [ -e /var/run/dont_update_wantype ]; then
+#      logger -p 8.7 -t "ip-up-pptp" "Exit ip-up directly (Under LoadSharing, Seamless, MultiWAN)!\""
+#      rm -f /var/run/dont_update_wantype
+#      return 0 # may pptp/l2tp/pppoe client -> do nothing
+#   fi
+#
+#   # Autoback
+#   AUTOBAK_MODE="$S_3G_AUTOBAK_MODE"
+#   if [ "$AUTOBAK_MODE" == "1" ] ; then
+#      logger -p 8.7 -t "pptp ip-up" "Under Autoback mode, dont write to local \""
+#      route delete default gw $IF_GW dev $IFNAME
+#      return 0
+#   fi
+#
+#   FAILOVER_MODE="$S_FAILOVER_STATUS"
+#   if [ "$FAILOVER_MODE" == "1" ]; then
+#      get_failover_config
+#      FAILOVER_WANTYPE="$C_FAILOVER_WANTYPE"
+#      if [ $FAILOVER_WANTYPE -eq 7 ]; then  # PPTP is the backup wan
+#         write_failover_cnt_info "$CNTTIME" "$IF_IP" "$IF_NM" "$IF_GW" "$IF_DNS1" "$IF_DNS2" "$IFNAME"
+#         write_failover_cnt_status "2"
+#      else  # PPTP is the main wan, and try to failback
+#         logger -p 8.7 -t "pptp ip-up" "Under Failover mode, dont write to local \""
+#         route delete default gw $IF_GW dev $IFNAME
+#         return 0
+#      fi
+#   fi
+
+   # Write original DNS info to clr file on Russian mode
+   local RUSSIAN_MODE="$C_PPTP_RUSSIAN_MODE"
+   if [ "$RUSSIAN_MODE" != "0" ] ; then
+      echo "echo \"`cat $RESOLV_CONF`\" > $RESOLV_CONF" >> $PPTP_CLR
+   fi
+
+   # Set DNS info to the head of resovl.conf
+   sl_insert_dns_file $RESOLV_CONF $IF_DNS1 $IF_DNS2
+
+   # Remove all default gateway !
+   route delete default
+
+   # Set WAN PPTP as default gateway !
+   route add default gw $IF_GW
+
+   # Write to Local WAN CSID
+   write_local_cnt_info "$CNTTIME" "$IF_IP" "$IF_NM" "$IF_GW" "$IF_DNS1" "$IF_DNS2" "$IFNAME" $MULTIWAN
+   write_local_cnt_status "2" $MULTIWAN
+
+   exit 0
+}
+
+pptp_ip_down()
+{
+   logger -t "ip-down-pptp" "$*"
+   echo "ip-down-pptp: $*"
+   pptp_stop
+   [ $# -lt 2 ] && rm -f $RUNNING
+   exit 0
+}
+
+##################### main #####################
+
+case "$1" in
+   start) pptp_start; rm -f $RUNNING ;;
+   stop) pptp_stop; rm -f $RUNNING ;;
+   restart) pptp_stop; rm -f $RUNNING; pptp_start; rm -f $RUNNING ;;
+   config) print_pptp_config ;;
+   status) print_pptp_cnt_status ;;
+   ip-up) pptp_ip_up $1 $2 $3 $4 $5 $6 ;;
+   ip-down) pptp_ip_down $1 $2 $3 $4 $5 $6 ;;
+   *) usage ;;
+esac
+
+exit 0

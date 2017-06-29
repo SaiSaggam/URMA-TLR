@@ -1,0 +1,552 @@
+#!/bin/sh
+
+#. /tmp/lcs-pppoe-header
+. /usr/bin/lcs-pppoe-header 
+. /usr/bin/scriptlib
+
+PID_FILE="/var/run/lcs-pppoe.pid"
+IF_BR="`rdcsman $CSID_S_SYS_IF_BR0 str`" 
+[ "$IF_BR" = "" ] && IF_BR="br0" 
+LCS_CHK="`rdcsman $CSID_C_PPPOE_LCS_CHECK u8`"
+
+start() 
+{
+    if [ -e $IFACE_FILE ]; then
+        logger -p 8.7 -t lcs-pppoe "Connection already connected !"            
+        echo "Connection connected !"            
+        exit 1;
+    fi
+ 
+    local wan_type="`rdcsman $CSID_C_LOCAL_WANTYPE u32`"
+    if [ "$wan_type" != "64" ]; then
+        logger -p 8.7 -t lcs-pppoe "LCS PPPoE only start when Main WAN is PPPoE"            
+        echo "LCS PPPoE only start when Main WAN is PPPoE"            
+        exit 1;          
+    fi
+
+    local wan_pppoe_stat="`rdcsman $CSID_S_PPPOE_CNT_STATUS u32`"
+    if [ "$wan_pppoe_stat" = "$PPPOE_CNT_STATUS_CONNECTING" ]; then
+        logger -p 8.7 -t lcs-pppoe "WAN type PPPoE is connecting, wait for it ..."            
+        echo "WAN type PPPoE is connecting, wait for it ..."            
+        exit 1;          
+    fi
+
+    local ETH="`rdcsman $CSID_S_SYS_IF_WAN0 str`"  
+    [ "$ETH" = "" ] && ETH="eth2.2"
+    ifconfig $ETH up #mtu 1500
+
+    local USER="`rdcsman $CSID_C_PPPOE_LCS_USER str`"  
+    local PASSWD="`rdcsman $CSID_C_PPPOE_LCS_PASSWORD str`"  
+    if [ "$USER" = "" ] || [ "$PASSWD" = "" ]; then
+        logger -p 8.7 -t lcs-pppoe "No Username/Password in CSID !"            
+        echo "No Username/Password in CSID !"            
+        wrcsman "$CSID_S_PPPOE_LCS_CNT_STATUS 0" 
+        exit 1
+    fi            
+    [ -e $PAP_SECRETS ] && mv $PAP_SECRETS $PAP_SECRETS.lcs
+    [ -e $CHAP_SECRETS ] && mv $CHAP_SECRETS $CHAP_SECRETS.lcs
+    echo "\"$USER\" * \"$PASSWD\" *" > $PAP_SECRETS
+    echo "\"$USER\" * \"$PASSWD\" *" > $CHAP_SECRETS    
+
+    local DNS1="`rdcsman $CSID_C_PPPOE_LCS_IF_PRIDNS ipv4`"
+    local DNS2="`rdcsman $CSID_C_PPPOE_LCS_IF_SECDNS ipv4`"  
+    if [ "$DNS1" = "0.0.0.0" -a "$DNS2" = "0.0.0.0" ]; then
+        [ -e $PPP_DNS_FILE ] && cp $PPP_DNS_FILE $PPP_DNS_FILE.orig.lcs
+        PEERDNS="usepeerdns"
+    else
+        if [ "$LCS_CHK" = "0" ]; then
+            rm -f $DNS_FILE.lcs
+            if [ "$DNS1" != "0.0.0.0" ]; then
+                echo "nameserver $DNS1" >> $DNS_FILE.lcs
+                echo "nameserver $DNS1" >> $DNS_FILE
+            fi
+
+            if [ "$DNS2" != "0.0.0.0" ]; then
+                echo "nameserver $DNS2" >> $DNS_FILE.lcs
+                echo "nameserver $DNS2" >> $DNS_FILE
+            fi
+
+            awk '!x[$0]++' $DNS_FILE > $DNS_FILE.tmp
+            mv $DNS_FILE.tmp $DNS_FILE
+        fi
+    fi    
+            
+    local SERV_NAME="`rdcsman $CSID_C_PPPOE_LCS_SERVICENAME str`" 
+    if [ "$SERV_NAME" != "" ]; then
+        SERV_NAME="rp_pppoe_service $SERV_NAME"
+    fi
+
+    local MTU_SIZE="`rdcsman $CSID_C_PPPOE_LCS_MTU u32`" 
+    if [ "$MTU_SIZE" = "0" ] || [ "$MTU_SIZE" = "" ]; then
+        MTU_SIZE="mtu 1492 mru 1492"
+    else         
+        MTU_SIZE="mtu $MTU_SIZE mru $MTU_SIZE"
+    fi        
+
+    local LCP_INTERVAL="`rdcsman $CSID_C_PPPOE_LCS_KA_LCP_INTERVAL u32`"   
+    local LCP_FAILURE="`rdcsman $CSID_C_PPPOE_LCS_KA_LCP_TIMES u32`" 
+    if [ "$LCP_INTERVAL" = "0" ] || [ "$LCP_INTERVAL" = "" ] || 
+       [ "$LCP_FAILURE"  = "0" ] || [ "$LCP_FAILURE"  = "" ]; then
+        LCP_INTERVAL="lcp-echo-interval 30"
+        LCP_FAILURE="lcp-echo-failure 5"
+    else
+        LCP_INTERVAL="lcp-echo-interval $LCP_INTERVAL"
+        LCP_FAILURE="lcp-echo-failure $LCP_FAILURE"
+    fi        
+
+    local DEMAND=""
+    local cnt_type="`rdcsman $CSID_C_PPPOE_LCS_CNT_TYPE u8`"   
+    if [ "$cnt_type" = "0" ] || [ "$cnt_type" = "2" ] ; then
+        local idle_time=`rdcsman $CSID_C_PPPOE_LCS_IDLETIME u32`
+        if [ $idle_time -gt 0 ]; then
+            DEMAND="idle $idle_time"    
+        fi
+    fi
+
+    # Combine PPP options 
+    local PPP_OPTIONS=""
+    PPP_OPTIONS="$PPP_OPTIONS plugin $LINUX_PLUGIN"
+    PPP_OPTIONS="$PPP_OPTIONS nic-$ETH"
+    PPP_OPTIONS="$PPP_OPTIONS $SERV_NAME"
+    PPP_OPTIONS="$PPP_OPTIONS $ETH"
+    PPP_OPTIONS="$PPP_OPTIONS linkname lcs-pppoe" 
+    PPP_OPTIONS="$PPP_OPTIONS user $USER" 
+    PPP_OPTIONS="$PPP_OPTIONS hide-password" 
+    PPP_OPTIONS="$PPP_OPTIONS default-asyncmap"
+    PPP_OPTIONS="$PPP_OPTIONS ktune" 
+    PPP_OPTIONS="$PPP_OPTIONS debug" 
+    PPP_OPTIONS="$PPP_OPTIONS dump" 
+    PPP_OPTIONS="$PPP_OPTIONS noauth" 
+    PPP_OPTIONS="$PPP_OPTIONS nodetach" 
+    PPP_OPTIONS="$PPP_OPTIONS noaccomp" 
+    PPP_OPTIONS="$PPP_OPTIONS nodeflate" 
+    PPP_OPTIONS="$PPP_OPTIONS nopcomp" 
+    PPP_OPTIONS="$PPP_OPTIONS novj" 
+    PPP_OPTIONS="$PPP_OPTIONS novjccomp"
+    PPP_OPTIONS="$PPP_OPTIONS noccp"
+    PPP_OPTIONS="$PPP_OPTIONS nomppe"
+    PPP_OPTIONS="$PPP_OPTIONS nomppc"
+    PPP_OPTIONS="$PPP_OPTIONS noipdefault"
+    PPP_OPTIONS="$PPP_OPTIONS ipcp-accept-local" 
+    PPP_OPTIONS="$PPP_OPTIONS ipcp-accept-remote"
+    PPP_OPTIONS="$PPP_OPTIONS $PEERDNS" 
+    PPP_OPTIONS="$PPP_OPTIONS $MTU_SIZE" 
+    PPP_OPTIONS="$PPP_OPTIONS $DEMAND" 
+    PPP_OPTIONS="$PPP_OPTIONS $LCP_INTERVAL"
+    PPP_OPTIONS="$PPP_OPTIONS $LCP_FAILURE"
+    PPP_OPTIONS="$PPP_OPTIONS ip-up $IP_UP"
+    PPP_OPTIONS="$PPP_OPTIONS ip-down $IP_DOWN"
+
+    pppd $PPP_OPTIONS &
+    wrcsman "$CSID_S_PPPOE_LCS_CNT_STATUS 1" 
+    echo $! > $PID_FILE
+    sleep 1
+
+    local pid=0
+    local idx=0
+    while [ true ]; do
+        if [ -e $IFACE_FILE ]; then
+            echo "Success to connect to PPPoE Server $SERV_NAME"
+            break
+        fi
+
+        pid="`cat $PID_FILE`"
+        echo "Connecting ... $idx, PID: `ps | awk '{print $1}' | grep $pid`"            
+        if [ "$idx" = "10" ] || [ "`ps | awk '{print $1}' | grep $pid`" = "" ]; then
+            echo "Can't connect to PPPoE Server !"
+            wrcsman "$CSID_S_PPPOE_LCS_CNT_STATUS 0" 
+            [ -e $PAP_SECRETS.lcs ] && mv $PAP_SECRETS.lcs $PAP_SECRETS
+            [ -e $CHAP_SECRETS.lcs ] && mv $CHAP_SECRETS.lcs $CHAP_SECRETS
+            rm -f $PID_FILE
+            rm -f $IFACE_FILE 
+            break
+        fi
+        
+        idx=$((idx+1))
+        sleep 1
+    done  
+}
+
+stop()
+{
+    if [ -e $PID_FILE ]; then
+        kill `cat $PID_FILE`
+        rm -f $PID_FILE
+    fi
+    rm -f $IFACE_FILE 
+    return
+}
+
+setdns()
+{
+    dnrd -k 
+    rm -f $DNS_FILE.tmp   
+    if [ -e $DNS_FILE ]; then
+        local dns1="`rdcsman $CSID_S_PPPOE_LCS_IF_PRIDNS ipv4`"
+        if [ "$dns1" != "0.0.0.0" ]; then
+            echo "nameserver $dns1" >> $DNS_FILE
+        fi
+
+        local dns2="`rdcsman $CSID_S_PPPOE_LCS_IF_SECDNS ipv4`"
+        if [ "$dns2" != "0.0.0.0" ]; then
+            echo "nameserver $dns2" >> $DNS_FILE
+        fi
+
+        local dnslist="dnrd -u 0 -R /var/dnrd -l "
+        awk '!x[$0]++' $DNS_FILE > $DNS_FILE.tmp
+        for dns in `cat $DNS_FILE.tmp | awk '{print $2}'` ; 
+        do 
+            dnslist="$dnslist -s $dns"
+        done
+        dnslist="$dnslist >/dev/null 2>&1"
+
+        eval $dnslist
+        mv $DNS_FILE.tmp $DNS_FILE
+    else
+        local gw="`rdcsman $CSID_S_LOCAL_WAN_GW ipv4`"
+        if [ "$gw" != "0.0.0.0" ]; then
+            dnrd -l -m off -u 0 -R /var/dnrd -s $gw >/dev/null 2>&1
+        fi
+    fi
+}
+
+restore_dns()
+{
+    dnrd -k 
+    rm -f $DNS_FILE
+
+    local dns1="`rdcsman $CSID_S_LOCAL_WAN_PRIDNS ipv4`"
+    if [ "$dns1" != "0.0.0.0" ]; then
+        echo "nameserver $dns1" >> $DNS_FILE
+    fi
+
+    local dns2="`rdcsman $CSID_S_LOCAL_WAN_SECDNS ipv4`"
+    if [ "$dns2" != "0.0.0.0" ]; then
+        echo "nameserver $dns2" >> $DNS_FILE
+    fi          
+
+    awk '!x[$0]++' $DNS_FILE > $DNS_FILE.tmp
+    local dnslist="dnrd -u 0 -R /var/dnrd -l "
+    for dns in `cat $DNS_FILE.tmp | awk '{print $2}'` ; 
+    do 
+        dnslist="$dnslist -s $dns"
+    done
+    dnslist="$dnslist >/dev/null 2>&1"
+
+    eval $dnslist
+    mv $DNS_FILE.tmp $DNS_FILE
+}
+
+status()
+{
+    if [ ! -e $PID_FILE ]; then
+        echo "Status: No connect to LCS Server !"
+    else
+        echo "Status: Connected !"
+    fi
+
+    local iface="`cat $IFACE_FILE`"
+    if [ "$iface" != "" ]; then
+        echo "ifconfig: "
+        ifconfig $iface
+    fi
+    echo ""
+
+    echo "route: "
+    route
+    echo ""
+
+    echo "DNS:"
+    cat $DNS_FILE
+    echo ""
+
+    echo "IPtables: "
+    iptables -t nat -L -v
+    echo ""
+
+    return 
+}
+
+set_policy_route_rule()
+{
+    # Read policy route rules (0 ~ 7: static route, 8 ~ 15: policy route)
+    rm -f $PROUTE_RULE
+    local idx=8; 
+    while [ true ]; do
+        if [ $idx -ge $MAX_PRT ]; then
+            break;
+        fi
+
+        sl_get_csid $CSID_C_PPPOE_LCS_PRT_ADDR $idx csid_addr
+        prt_addr="`rdcsman $csid_addr str`"
+        if [ "$prt_addr" = "" ]; then
+            #logger -p 8.7 -t lcs-pppoe "Invalid Policy Route for rule $idx ($prt_addr)"            
+            #echo "Invalid Policy Route for rule $idx ($prt_addr)"            
+            idx=$((idx+1))
+            continue;
+        fi
+
+        sl_get_csid $CSID_C_PPPOE_LCS_PRT_ENABLE $idx csid_addr
+        prt_enable="`rdcsman $csid_addr u8`"
+        if [ "$prt_enable" = "0" ]; then 
+            idx=$((idx+1))
+            continue;
+        fi   
+
+        echo "$prt_addr" >> $PROUTE_RULE
+        idx=$((idx+1))
+    done
+}      
+
+chk_lcs_pppoe()
+{
+    local domain="$1"
+    local dns_server="$2"
+
+    local lcs_enable="`rdcsman $CSID_C_PPPOE_LCS_ENABLE u32`"    
+    if [ "$lcs_enable" != "1" ]; then
+        return 1;
+    fi        
+
+    local lcs_status="`rdcsman $CSID_S_PPPOE_LCS_CNT_STATUS u8`" 
+    local main_wan_status="`rdcsman $CSID_S_LOCAL_WAN_STATUS u8`" 
+
+    # Check whether if the domain is in policy rules 
+    [ ! -e $PROUTE_RULE ] && set_policy_route_rule;            
+    local is_prule="0"
+    for rule in `cat $PROUTE_RULE` ; do
+        if [ "$rule" != "" ] && [ "`echo $domain | grep $rule`" != "" ]; then
+            is_prule="1"
+            break
+        fi
+    done
+
+    local lcs_dns_serv="0"
+    for dns_addr in $CSID_S_PPPOE_LCS_IF_PRIDNS $CSID_S_PPPOE_LCS_IF_SECDNS; do
+        local tmp="`rdcsman $dns_addr ipv4`" 
+        [ "$tmp" = "" ] && continue
+        if [ "$tmp" = "$dns_server" ]; then
+            lcs_dns_serv="1"
+            break
+        fi
+    done  
+
+    #logger -p 8.7 "WAN: $main_wan_status, LCS: $lcs_status, Policy Rule: $is_prule, LCS DNS: $lcs_dns_serv" 
+    if [ "$is_prule" = "0" ]; then
+        if [ "$main_wan_status" = "$PPPOE_CNT_STATUS_CONNECT" ]; then
+            if [ "$lcs_dns_serv" = "0" ]; then
+                return 1;
+            else
+                return 0;
+            fi
+        else 
+            return 0;
+        fi
+    else     
+        if [ "$lcs_status" = "$PPPOE_CNT_STATUS_CONNECT" ]; then
+            if [ "$lcs_dns_serv" = "1" ]; then
+                return 1;
+            else
+                return 0;
+            fi
+        else 
+            return 0;
+        fi          
+    fi
+        
+    # Unknow condition, just forward the DNS query
+    return 1
+} 
+
+policy_route()
+{
+    local domain="$1"
+    local cnt_status="`rdcsman $CSID_S_PPPOE_LCS_CNT_STATUS u8`" 
+    if [ "$cnt_status" != "$PPPOE_CNT_STATUS_CONNECT" ]; then 
+        echo "Policy Route can't be set if LCS PPPoE don't connect ! "
+        logger -t lcs-pppoe "Policy Route can't be set if LCS PPPoE don't connect ! "
+        return;
+    fi  
+ 
+    # Check whether if the domain is in policy rules 
+    [ ! -e $PROUTE_RULE ] && set_policy_route_rule;
+    local rule_match="0"
+    for rule in `cat $PROUTE_RULE` ; do
+        if [ "$rule" != "" ] && [ "`echo $domain | grep $rule`" != "" ]; then
+            rule_match="1" # In policy rules. Don't relay the DNS query
+        fi
+    done  
+    if [ "$rule_match" = "0" ]; then 
+        return ;
+    fi
+
+    local iface="`rdcsman $CSID_S_PPPOE_LCS_IF_NAME str`" 
+    for dns_addr in $CSID_S_PPPOE_LCS_IF_PRIDNS $CSID_S_PPPOE_LCS_IF_SECDNS; do
+        local dns_serv="`rdcsman $dns_addr ipv4`" 
+        [ "$dns_serv" = "" ] && continue
+        for ipaddr in `dns-query -s $dns_serv -l $domain` ; do
+            [ "$ipaddr" = "" ] && continue
+            [ "`route | grep ${ipaddr%.*}.0 | grep $iface`" = "" ] && nat reset-icmp
+
+            logger -p 8.7 -t lcs-pppoe "Set Policy Route for $domain (${ipaddr%.*}.0/24) -> $iface"            
+            route add -net ${ipaddr%.*}.0/24 dev $iface >/dev/null 2>&1
+        done
+    done
+}
+
+domain_filter()
+{
+    [ -e $LCS_DM_FILE ] && sh $LCS_DM_FILE 
+    rm -f $LCS_DM_FILE
+
+    local lcs_enable="`rdcsman $CSID_C_PPPOE_LCS_ENABLE u32`"    
+    if [ "$lcs_enable" != "1" ]; then
+        echo "LCS PPPoE don't enable ! "
+        return;
+    fi
+
+    if [ ! -f /lib/ipt_domain.ko ] ; then 
+        logger -t "lcs-pppoe" "No ipt_domain.ko existed !"
+        echo "No ipt_domain.ko existed !"
+        return;
+    fi
+
+    if [ -z "`lsmod | grep ipt_domain`" ]; then
+        insmod /lib/ipt_domain.ko
+    fi
+
+    local do_filter="0"
+    local wan_status="`rdcsman $CSID_S_LOCAL_WAN_STATUS u8`" 
+    local main_wanif="`rdcsman $CSID_S_LOCAL_WAN_IF_NAME str`"
+    if [ "$wan_status" = "$PPPOE_CNT_STATUS_CONNECT" ] && [ "$main_wanif" != "" ] ; then 
+        iptables -N lcs_dmfilter > /dev/null 2>&1
+        iptables -I OUTPUT -o $main_wanif -j lcs_dmfilter
+        echo "iptables -D OUTPUT -o $main_wanif -j lcs_dmfilter" >> $LCS_DM_FILE
+        do_filter="1"
+    else        
+        echo "Main WAN don't connect ($wan_status) or No Main WAN Interface ($main_wanif)" 
+    fi
+
+    local lcs_status="`rdcsman $CSID_S_PPPOE_LCS_CNT_STATUS u8`" 
+    if [ "$lcs_status" != "$PPPOE_CNT_STATUS_CONNECT" ]; then 
+        iptables -N lcs_dmfilter > /dev/null 2>&1
+        iptables -I INPUT -i $IF_BR -j lcs_dmfilter
+        echo "iptables -D INPUT -i $IF_BR -j lcs_dmfilter" >> $LCS_DM_FILE
+        do_filter="1"
+    else
+        echo "LCS PPPoE is connected ! "            
+    fi
+
+    if [ "$do_filter" = "1" ]; then
+        [ ! -e $PROUTE_RULE ] && set_policy_route_rule;
+        for rule in `cat $PROUTE_RULE` ; do
+            [ "$rule" = "" ] && continue
+            iptables -A lcs_dmfilter -m domain --name "$rule" -j DROP
+            echo "iptables -D lcs_dmfilter -m domain --name \"$rule\" -j DROP" >> $LCS_DM_FILE
+        done  
+        echo "iptables -F lcs_dmfilter" >> $LCS_DM_FILE
+        echo "iptables -X lcs_dmfilter" >> $LCS_DM_FILE          
+    fi
+
+    echo "rmmod ipt_domain > /dev/null 2>&1" >> $LCS_DM_FILE
+}
+
+config()
+{
+    echo "LCS PPPoE Config:"    
+    echo "Enable      : `rdcsman $CSID_C_PPPOE_LCS_ENABLE u32`     "    
+    echo "LCS Server  : `rdcsman $CSID_C_PPPOE_LCS_SERVER str`     "    
+    echo "Username    : `rdcsman $CSID_C_PPPOE_LCS_USER str`       "    
+    echo "Password    : `rdcsman $CSID_C_PPPOE_LCS_PASSWORD str`   "    
+    echo "Service Name: `rdcsman $CSID_C_PPPOE_LCS_SERVICENAME str`"    
+    echo "DNS-1       : `rdcsman $CSID_C_PPPOE_LCS_IF_PRIDNS ipv4` "    
+    echo "DNS-2       : `rdcsman $CSID_C_PPPOE_LCS_IF_SECDNS ipv4` "    
+    echo "MTU         : `rdcsman $CSID_C_PPPOE_LCS_MTU u32`        "    
+    echo "CNT Type    : `rdcsman $CSID_C_PPPOE_LCS_CNT_TYPE u8`    "    
+    echo "Idle Time   : `rdcsman $CSID_C_PPPOE_LCS_IDLETIME u32`   "    
+    echo "LCP Interval: `rdcsman $CSID_C_PPPOE_LCS_KA_LCP_INTERVAL u32`"    
+    echo "LCP Failures: `rdcsman $CSID_C_PPPOE_LCS_KA_LCP_TIMES u32`   "    
+    echo "LCS Check   : `rdcsman $CSID_C_PPPOE_LCS_CHECK u8`       "    
+    echo "NAT Disable : `rdcsman $CSID_C_PPPOE_LCS_NAT_DISABLE u8` "    
+    echo ""
+
+    echo "LCS PPPoE Status:"    
+    echo "IP          : `rdcsman $CSID_S_PPPOE_LCS_IF_IP ipv4`    "    
+    echo "MASK        : `rdcsman $CSID_S_PPPOE_LCS_IF_NM ipv4`    "    
+    echo "Gateway     : `rdcsman $CSID_S_PPPOE_LCS_IF_GW ipv4`    "    
+    echo "DNS-1       : `rdcsman $CSID_S_PPPOE_LCS_IF_PRIDNS ipv4`"    
+    echo "DNS-2       : `rdcsman $CSID_S_PPPOE_LCS_IF_SECDNS ipv4`"    
+    echo "CNT Status  : `rdcsman $CSID_S_PPPOE_LCS_CNT_STATUS u8` "    
+    echo "CNT Time    : `rdcsman $CSID_S_PPPOE_LCS_CNT_TIME u32`  "    
+    echo "Altered     : `rdcsman $CSID_S_PPPOE_LCS_ALTERED u8`    "    
+    echo "AC Name     : `rdcsman $CSID_S_PPPOE_LCS_ACNAME str`    "    
+    echo ""
+
+    echo "LCS PPPoE Policy Routing:"    
+    local idx=0; 
+    while [ true ]; do
+        if [ $idx -gt $MAX_PRT ]; then
+            break;
+        fi
+
+        sl_get_csid $CSID_C_PPPOE_LCS_PRT_ADDR $idx csid_addr
+        prt_addr="`rdcsman $csid_addr str`"
+        if [ "$prt_addr" = "" ]; then
+            idx=$((idx+1))
+            continue;
+        fi
+
+        sl_get_csid $CSID_C_PPPOE_LCS_PRT_ADDR $idx csid_addr
+        sl_get_csid $CSID_C_PPPOE_LCS_PRT_ENABLE $idx csid_addr
+        prt_enable="`rdcsman $csid_addr u8`"
+        echo "PRT $idx : $prt_addr ($prt_enable)"
+
+        idx=$((idx+1))
+    done
+    echo ""
+}
+
+usage()
+{
+    echo "Usage: "
+    echo "  $0 start"
+    echo "  $0 stop"
+    echo "  $0 restart"
+    echo "  $0 setdns"    
+    echo "  $0 redns"    
+    echo "  $0 proute"    
+    echo "  $0 chkcon"    
+    echo "  $0 status"
+    echo "  $0 config"
+    echo ""
+}
+
+if [ "$1" = "start" ]; then
+    start;
+elif [ "$1" = "stop" ]; then
+    stop;
+elif [ "$1" = "restart" ]; then
+    stop; 
+    start;
+elif [ "$1" = "setdns" ]; then
+    setdns;
+elif [ "$1" = "redns" ]; then
+    restore_dns;
+elif [ "$1" = "chkcon" ]; then
+    chk_lcs_pppoe "$2" "$3";
+    echo $? 
+elif [ "$1" = "proute" ]; then
+    policy_route "$2" ;
+elif [ "$1" = "dmfilter" ]; then
+    domain_filter;
+elif [ "$1" = "status" ] || [ "$1" = "st" ]; then
+    status;
+elif [ "$1" = "config" ]; then
+    config;
+else
+    usage;
+fi    
+exit 0
+
+
+

@@ -1,0 +1,169 @@
+#body{
+    font-family:Arial;
+    font-size:12pt;
+    background-color:#EEEEEE;
+}
+
+/* CONTAINERS STYLE */
+
+.types_container {
+    border: 0px solid green;
+    padding-top: 1em;
+    padding-left: 1em;
+}
+
+.groups_container {
+    border: 0px solid green;
+    padding-top: 1em;
+    padding-left: 1em;
+}
+
+.tests_container {
+    border: 0px solid green;
+    padding-top: 1em;
+    padding-left: 1em;
+}
+
+.cases_container {
+    border: 0px solid green;
+    padding-top: 1em;
+    padding-left: 0em;
+    border-left: 1px solid #e0e0e0;
+    border-right: 1px solid #e0e0e0;
+}
+
+
+
+
+.test_types_container {
+    border: 0px solid red;
+    margin-bottom: 1em;
+}
+
+.test_group_container {
+    border: 0px solid red;
+    margin-bottom: 1em;
+}
+
+.test_name_container {
+    border: 0px solid red;
+}
+
+.test_case_container {
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+
+
+
+
+/* HEADERS STYLE */
+
+.test_descriptor_header_container {
+    border: 0px solid red;
+    background-color: #778899; /* #5F9EA0 */
+    color:white;
+    padding:0.3em;
+}
+
+.test_type_header_container {
+    background-color:teal;
+    color:white;
+    padding:0.3em;
+}
+
+.test_group_header_container {
+    background-color:teal;
+    color:white;
+    padding:0.1em;
+    padding-left:15px;
+}
+
+.test_name_header_container {
+    background-color:teal;
+    color:white;
+    padding:0.1em;
+    padding-left:30px;
+}
+
+
+.test_case_header_container {
+    padding-left:40px;
+}
+
+
+
+
+/* TEXT CONTAINER */
+.test_case_description_container {
+    padding-left:50px;
+    min-height: 2em;
+}
+
+.test_case_result_container {
+    padding-left:50px;
+}
+
+
+/* TEXT STYLE */
+
+.test_descriptor_header_text {
+    font-weight:normal;
+    font-size:12pt;
+}
+
+.test_type_header_text {
+    font-weight:bold;
+    font-size:16pt;
+}
+
+.test_group_header_text {
+    font-weight:bold;
+    font-size:14pt;
+}
+
+.test_name_header_text {
+    font-weight:bold;
+    font-size:12pt;
+}
+
+.test_case_header_text {
+    font-weight:bold;
+    font-size:11pt;
+}
+
+.test_case_description_text {
+    font-weight:bold;
+    font-size:10pt;
+}
+
+.test_case_result_text {
+        font-weight:bold;
+        color: green;
+        font-size:11pt;
+
+        /* CENTER ELEMENT */
+        display: table-cell;
+        vertical-align: middle;
+        text-align: center;
+}
+
+
+.test_case_result_text_red {
+        font-weight:bold;
+        color: red;
+        font-size:11pt;
+
+        /* CENTER ELEMENT */
+        display: table-cell;
+        vertical-align: middle;
+        text-align: center;
+}
+
+.footer_text {
+    font-size:10pt;
+    font-style:italic;
+    color: #b0b0b0;
+}

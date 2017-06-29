@@ -1,0 +1,3 @@
+
+config snmp_community snmp_community1
+  option access "read-only"

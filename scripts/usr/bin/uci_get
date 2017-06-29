@@ -1,0 +1,34 @@
+#!/bin/ash
+
+#set -x
+
+UCI_MODIFIED_DIR=/etc/config
+UCI_DEFAULT_DIR=/usr/config
+
+#UCI_MODIFIED_DIR=../
+#UCI_DEFAULT_DIR=../../../lib/config_mgr/uci_default
+
+format_err() {
+  echo "Syntax: uci_get <package> <section> <index> <option>"
+}
+
+if [ $# -ne 4 ]; then
+  echo "Invalid syntax"
+  format_err
+  exit 1
+else
+  i=1
+  value=$(uci -c $UCI_MODIFIED_DIR get $1.$2$3.$4 2> /dev/null)
+  if [ -z "$value" ]; then
+    value=$(uci -c $UCI_DEFAULT_DIR get $1.$2$i.$4 2> /dev/null)
+  fi
+
+#  if [ -z "$value" ]; then
+#    echo "Unable to get $1.$2$3.$4 value"
+#    echo "$1.$2$3.$4 may be empty"
+#  else
+#    echo $value
+#  fi
+  echo $value
+fi
+exit 0

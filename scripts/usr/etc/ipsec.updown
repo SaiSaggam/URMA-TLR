@@ -1,0 +1,19 @@
+#Called from Strongswan when a tunnel goes up/down
+# check out https://wiki.strongswan.org/projects/strongswan/repository/revisions/master/entry/src/_updown/_updown.in
+# for a description of the environment variables set up before the script is called.
+SENDMSG="/usr/bin/sendmsg"
+#get the IPsec instance from $PLUTO_CONNECTION. The value is a string in the form "ipsec<instance>"
+prefix="ipsec"
+instance=${PLUTO_CONNECTION#$prefix}
+
+# now send the appropriate event to the vpn monitor
+case "$PLUTO_VERB:$1" in
+    up-host:|up-client:)
+        $SENDMSG vpnmon $instance connected ipsec $instance
+        ;;
+    down-host:|down-client:)
+        $SENDMSG vpnmon $instance disconnected ipsec $instance
+        ;;
+esac
+
+

@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# 3g-ip-mode			To set the IP configuration of the interface for 3G/LTE WAN, called after the connection is established
+#
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+get_index "$1" "$2"
+
+local INF_NAME
+if [ "$3" != "" ]; then
+	INF_NAME="$3"
+else
+	local csid_index_3g=`expr ${Index_3G} + 1`
+	INF_NAME="`rdcsman 0x801e220${csid_index_3g} str`"
+fi
+
+get_config ${Index} ${Index_3G}
+
+local set_static_ip=0 to_set_ip to_set_gw
+
+if [ "${C_3G_MULTIWAN_IF_FIXED_IP}" != "" -a "${C_3G_MULTIWAN_IF_FIXED_IP}" != "0.0.0.0" ]; then
+	set_static_ip=1
+	to_set_ip=${C_3G_MULTIWAN_IF_FIXED_IP}
+else
+	to_set_ip=""
+fi
+
+if [ "${C_3G_MULTIWAN_IF_FIXED_GW}" != "" -a "${C_3G_MULTIWAN_IF_FIXED_GW}" != "0.0.0.0" ]; then
+	to_set_gw=${C_3G_MULTIWAN_IF_FIXED_GW}
+else
+	to_set_gw="`rdcsman 0x8055012${Index} ipv4`"
+fi
+
+# to set IP and netmask
+if [ ${set_static_ip} == 1 ]; then	
+	${IFCFG_PROG} ${INF_NAME} ${to_set_ip} netmask ${C_3G_MULTIWAN_IF_FIXED_NM}
+else
+	${IFCFG_PROG} ${INF_NAME} netmask ${C_3G_MULTIWAN_IF_FIXED_NM}
+fi
+
+# to set gateway
+route | grep "${INF_NAME}" | grep "0.0.0.0" | grep UG
+local RTN=$?
+if [ "${RTN}" -eq "1"  ]; then
+	route add default gw ${to_set_gw} dev ${INF_NAME}
+fi
+
+# to update CSID
+write_if_info "${to_set_ip}" "${C_3G_MULTIWAN_IF_FIXED_NM}" "${to_set_gw}" ${Index}
+
+return 0

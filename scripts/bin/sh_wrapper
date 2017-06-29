@@ -1,0 +1,22 @@
+#!/bin/sh
+
+umask u=rwx,g=rwx,o=rx
+
+# Check if it is a command (first argument is '-c')
+if [ -n "$1" -a "$1" == "-c" ]; then
+	[ -n "$2" ] && {
+		# Check if it is an SCP request (2nd argument starts with 'scp')
+		# or an SFT request (2nd argument is '/usr/libexec/sftp-server')
+		CMD=$(echo "$2" | awk -F '[;|&]' '{print $1}')
+		CMD_WORD=$(echo "$CMD" | cut -f1 -d" ")
+		[ "$CMD_WORD" == "scp" -o "$CMD_WORD" == "/usr/libexec/sftp-server" ] && {
+			/bin/ash -c "$CMD"
+
+			exit "$?"
+		}
+	}
+fi
+
+# We don't allow any argument for CLI right now
+#/usr/bin/cli "$@"
+/usr/bin/cli

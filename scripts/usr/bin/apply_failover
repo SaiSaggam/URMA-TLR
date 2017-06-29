@@ -1,0 +1,8 @@
+#!/bin/sh
+#echo "apply_failover $1 $2"
+result=`sendmsg ifman 1 update failover $2`
+if [ "$result" == "OK" ] ; then
+    exit 0
+else
+    exit 1
+fi

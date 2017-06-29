@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ "$2" != "" ]; then
+taskset -p $1 $2   
+else
+taskset -p $1 `pidof httpd`
+fi

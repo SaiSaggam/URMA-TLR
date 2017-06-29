@@ -1,0 +1,52 @@
+#!/bin/sh
+
+PIDFILE_PPPD="/var/run/ppp$2.pid"
+PID=`cat $PIDFILE_PPPD`
+
+PPTPC_ENABLE=`rdcsman 0x00051000 u8`
+PPTPC_CLI_ENABLE=`rdcsman 0x00051100 u8`
+
+
+#### main ####
+[ -z "$1" ] && usage
+case "$1" in
+
+# connect to remote pptp server
+  start)
+
+
+	if [ "$PPTPC_ENABLE" = "0" ] ; then
+    	echo "PPTP Client Not Enable..."
+		exit 1
+    else
+    	echo "Setting IPTables..."
+    	iptables -A INPUT -p 47 -j ACCEPT
+    	iptables -A INPUT -p tcp --dport 1723 -j ACCEPT
+
+    	echo 1 > /proc/fast_pptp
+    	echo 0 > /proc/hw_nat
+    	pptpc-action start
+    	pptpc-connect $2 1 $3&
+	fi
+
+    echo
+    ;;
+
+# disconnect from remote pptp server
+  stop)
+    echo "Killing pptp-connect ($PID, ppp$2.pid killed)"
+    kill $PID > /dev/null 2>&1
+    echo
+    ;;
+  *)
+    echo "Usage: $0 {start IP user|stop}"
+	echo "start: pptp-client start 192.168.122.60 test"
+	echo "stop: pptp-client stop 0"
+    exit 1
+esac
+
+exit 0
+
+
+	
+

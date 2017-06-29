@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<DeviceMetaData>
+	<dvVendorId>4261412873</dvVendorId>
+	<dmDeviceType>LR54W</dmDeviceType>
+	<dmProductId/>
+	<dmFirmwareId/>
+	<dmVersion>0</dmVersion>
+	<dmName>descriptor/ui</dmName>
+	<dmCompressed>false</dmCompressed>
+	<dmData>
+		<![CDATA[<ui>
+			<navigation>
+				<menu id="home" name="Home" page="home_page" required="true" />
+				<menu id="summary" name="Summary Dashboard" page="summary_dashboard" required="true" />
+				<menu id="configuration" name="Configuration" page="" dataRootDefault="settings" required="true">
+					<menu id="interfaces" name="Interfaces">
+						<menu id="eth_cfg" name="Ethernet" page="" data="" required="true">
+							<menu id="eth" name="Ethernet" page="default_properties_page" indexBy="eth" data="eth"></menu>
+						</menu>
+						<menu id="wifi_cfg" name="Wi-Fi" page="" data="" required="true">
+							<menu id="wifi_global" name="Global Wi-Fi Configuration" page="default_properties_page" data="wifi_global"></menu>
+							<menu id="wifi_24ghz_cfg" name="Wi-Fi (2.4 GHz)" page="" data="" required="true">
+								<menu id="wifi" name="Wi-Fi (2.4 GHz)" page="default_properties_page" indexBy="wifi" data="wifi"></menu>
+							</menu>
+							<menu id="wifi_5ghz_cfg" name="Wi-Fi (5 GHz)" page="" data="" required="true">
+								<menu id="wifi5g" name="Wi-Fi (5 GHz)" page="default_properties_page" indexBy="wifi5g" data="wifi5g"></menu>
+							</menu>	
+						</menu>
+                                          	<menu id="cellular_cfg" name="Cellular" page="" data="" required="true">
+							<menu id="cellular" name="Cellular" page="default_properties_page" indexBy="cellular" data="cellular"></menu>
+						</menu>
+						<menu id="serial_cfg" name="Serial" page="" data="" required="true">
+							<menu id="serial" name="Serial" page="default_properties_page" indexBy="serial" data="serial"></menu>
+						</menu>
+					</menu>
+					<menu id="lan_configuration" name="LAN Configuration">
+						<menu id="lan_cfg" name="LAN" page="" data="" required="true">
+							<menu id="lan" name="LAN" page="default_properties_page" indexBy="lan" data="lan"></menu>
+						</menu>
+						<menu id="dhcp_server_cfg" name="DHCP Server" page="" data="" required="true">
+							<menu id="dhcp_server" name="DHCP Server" page="default_properties_page" indexBy="dhcp_server" data="dhcp_server"></menu>
+						</menu>
+					</menu>
+					<menu id="wan_configuration" name="WAN Configuration">
+						<menu id="wan_cfg" name="WAN" page="" data="" required="true">
+							<menu id="wan" name="WAN" page="default_properties_page" indexBy="wan" data="wan"></menu>
+						</menu>
+					</menu>
+					<menu id="ip_routing" name="IP Routing">
+						<menu id="ip" name="Global IP Routing" page="default_properties_page" data="ip"></menu>
+						<menu id="route_cfg" name="Static Routes" page="" data="" required="true">
+							<menu id="route" name="Route" page="default_properties_page" indexBy="route" data="route"></menu>						
+						</menu>
+					</menu>
+					<menu id="vpn" name="Virtual Private Networking (VPN)">
+						<menu id="ipsec" name="IPsec" page="" data="" required="true">
+							<menu id="ipsec_cfg" name="IPsec Tunnels" page="" data="" required="true">
+								<menu id="ipsec" name="IPsec" page="default_properties_page" indexBy="ipsec" data="ipsec"></menu>
+							</menu>
+							<menu id="ipsec_failover_cfg" name="IPsec Failover" page="" data="" required="true">
+								<menu id="ipsec_failover" name="IPsec Failover" page="default_properties_page" indexBy="ipsec_failover" data="ipsec_failover"></menu>
+							</menu>
+						</menu>
+					</menu>
+					<menu id="security" name="Security">
+						<menu id="user" name="Users" page="" data="" required="true">
+							<menu id="user" name="User" page="default_properties_page" data="user" indexBy="user"></menu>
+						</menu>
+					</menu>
+					<menu id="remote_management" name="Remote Management">
+						<menu id="cloud" name="Remote Manager" page="default_properties_page" data="cloud"></menu>
+						<menu id="snmp_cfg" name="SNMP" page="" data="" required="true">
+							<menu id="snmp" name="SNMP" page="default_properties_page" data="snmp"></menu>
+							<menu id="snmp_community_cfg" name="SNMPv1/v2c Communities" page="" data="" required="true">
+								<menu id="snmp_community" name="SNMP Community" page="default_properties_page" data="snmp_community" indexBy="snmp_community"></menu>
+							</menu>
+							<menu id="snmp_user_cfg" name="SNMPv3 Users" page="" data="" required="true">
+								<menu id="snmp_user" name="SNMP User" page="default_properties_page" data="snmp_user" indexBy="snmp_user"></menu>
+							</menu>
+						</menu>
+					</menu>
+				</menu>
+				<menu id="management" name="Management" page="" data="" required="true">
+					<menu id="if_stats" name="Interface Status and Statistics" page="" data="" required="true">
+						<menu id="ethstat" name="Ethernet" page="" data="" required="true">
+							<menu id="eth_stats" name="Ethernet" dataRootDefault="state" page="default_properties_page" data="eth" indexBy="eth" readonly="true"></menu>
+						</menu>
+						<menu id="wifistat" name="Wi-Fi" page="" data="" required="true">
+							<menu id="wifi_24ghz_stats" name="Wi-Fi (2.4 GHz)" page="" data="" required="true">
+								<menu id="wifi_stats" name="Wi-Fi (2.4 GHz)" dataRootDefault="state" page="default_properties_page" data="wifi" indexBy="wifi" readonly="true"></menu>
+							</menu>
+							<menu id="wifi_5ghz_stats" name="Wi-Fi (5 GHz)" page="" data="" required="true">
+								<menu id="wifi5ghz_stats" name="Wi-Fi (5 GHz)" dataRootDefault="state" page="default_properties_page" data="wifi5g" indexBy="wifi5g" readonly="true"></menu>
+							</menu>
+						</menu>
+						<menu id="cellular_stats" name="Cellular" dataRootDefault="state" page="default_properties_page" data="cellular" readonly="true" required="true"></menu>
+					</menu>
+					<menu id="lanstat" name="LAN Status and Statistics" page="" data="" required="true">
+							<menu id="lan_stats" name="LAN" dataRootDefault="state" page="default_properties_page" data="lan" indexBy="lan" readonly="true"></menu>
+					</menu>
+					<menu id="ip_stats" name="IP Status and Statistics" page="" data="" required="true">
+						<menu id="ip_stats" name="IP Statistics" dataRootDefault="state" page="default_properties_page" data="ipstats" readonly="true"></menu>
+						<menu id="routetab" name="IP Routing Table" page="" data="">
+							<menu id="ip_routing" name="IP Route" dataRootDefault="state" page="default_properties_page" data="route" indexBy="route" readonly="true"></menu>
+						</menu>
+					</menu>
+					<menu id="vpn_stats" name="VPN Status and Statistics" page="" data="" required="true">
+						<menu id="ipsec_stats" name="IPsec Status and Statistics" page="" data="" required="true">
+							<menu id="ipsec_stats" name="IPsec" dataRootDefault="state" page="default_properties_page" data="ipsec" indexBy="ipsec" readonly="true"></menu>
+						</menu>
+					</menu>
+				</menu>
+				<menu id="administration" name="Administration" required="true">
+					<menu id="system" name="System Information" dataRootDefault="state" page="default_properties_page" data="system" readonly="true"></menu>
+					<menu id="file_mgmt" name="File Management" page="netos_file_mgmt_page" required="true"></menu>
+				</menu>
+				<menu id="connectionHistory" name="Connection History" page="conn_history" required="true" />
+			</navigation>
+		</ui>]]>	
+	</dmData>
+</DeviceMetaData>

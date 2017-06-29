@@ -1,0 +1,80 @@
+#!/bin/sh
+IWPRIV="/usr/sbin/iwpriv"
+IWCONF="/usr/sbin/iwconfig"
+CSID_S_WLANAP_RF_MUDULE_EXIST="0x8019b500"
+CSID_S_WLANAP2_RF_MUDULE_EXIST="0x8044b500"
+
+DEBUG=1
+DBG_WPS_INFO=/tmp/wifi_led_ctrl.flow
+
+dbg()
+{
+    local str="$1"
+    [ "$DEBUG" = "1" ] && echo "$str" >> $DBG_WPS_INFO
+}
+
+led_start()
+{
+	s=`$IWPRIV $1 | grep "Available"`
+
+	if [  X"$s" != X ] ; then
+	
+	if [ $3 -eq 0 ] ; then
+		gpio l $2 4000 0 1 0 4000
+	else
+		#gpio l $2 4000 0 1 0 4000
+		gpio l $2 $3 $3 4000 0 4000
+	fi
+	else                     
+		gpio l $2 0 4000 0 1 4000
+		dbg "led_stop $2"
+	fi
+}
+
+led_stop()
+{
+	gpio l $2 0 4000 0 1 4000
+	dbg "led_stop $2"
+}
+
+
+device_check()
+{
+	s=`$IWPRIV $1 | grep "Available"`
+
+	if [  X"$s" != X ] ; then
+		dbg "interface $1 active"
+	else                     
+		dbg "interface $1 unactive"
+		
+	if [ $2 -eq 2 ] ; then
+		wrcsman "$CSID_S_WLANAP2_RF_MUDULE_EXIST 99"
+		dbg "change csid $2 unactive"
+		
+		rm /etc/Wireless/RT2860AP/RT2860AP1.dat
+		cp /etc/Wireless/RT2860AP/RT2860AP2.dat /etc/Wireless/RT2860AP/RT2860AP1.dat
+	else
+		wrcsman "$CSID_S_WLANAP_RF_MUDULE_EXIST 99"
+		dbg "change csid $2 unactive"
+	fi
+	fi
+}
+
+## Main ##############
+case "$1" in
+	ledstart)
+		led_start $2 $3 $4
+		;;
+	
+	ledstop)
+		led_stop $2 $3
+		;;
+
+	devicecheck)
+		device_check $2 $3
+		;;
+		
+	*)
+		exit 1 ;;
+esac
+exit 0	

@@ -1,0 +1,67 @@
+@mixin button($bg-color, $border-color, $color) {
+  background: $bg-color;
+  border-color: $border-color;
+  color: $color;
+}
+@mixin button-hover($bg-color, $border-color, $color) {
+  background: $bg-color;
+  border-color: $border-color;
+  color: $color;
+  transition: all ease 1s;
+}
+@mixin button-colors-common {
+  @include button($primarycolor, $primarycolordark, $white);
+  &:hover {
+    @include button-hover($hover, $hover, $white);
+  }
+}
+@mixin button-colors-warning {
+  @include button($primarycolor, darken($error, 10%), $white);
+  &:hover {
+    @include button-hover(darken($error, 10%), $hover, $white);
+  }
+}
+@mixin button-colors-secondary {
+  @include button($dark-gray, transparent, $white);
+  &:hover {
+    @include button-hover(darken($dark-gray, 10%), transparent, $white);
+  }
+}
+@mixin button-no-background {
+  @include button(none, none, $link);
+  &:hover {
+    @include button-hover(none, none, $hover);
+  }
+}
+@mixin button-styles {
+  box-shadow: none;
+  color: $white;
+}
+@mixin link-hover {
+  color: $hover;
+  transition:all ease 1s;
+  text-decoration: none;
+}
+@mixin link-hover-warning {
+  color: darken($error, 10%);
+  transition:all ease 1s;
+  text-decoration: none;
+}
+@mixin box-shadow {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 2px rgba(0, 0, 0, .05);
+}
+@mixin invalid {
+  &.ng-invalid.submitted {
+    border: 1px solid $error;
+    &:focus {
+      border: 1px solid $error;
+      box-shadow: inset 0 1px 1px rgba(231, 76, 60,.075), 0 0 8px rgba(231, 76, 60, .6);
+    }
+  }
+}
+
+@mixin opacity($opacity) {
+  opacity: $opacity;
+  $opacity-ie: $opacity * 100;
+  filter: alpha(opacity=$opacity-ie); //IE8
+}

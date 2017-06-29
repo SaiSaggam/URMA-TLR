@@ -1,0 +1,61 @@
+#!/bin/sh
+
+prjroot=${0%/tools/*}
+
+#
+
+PRIV_TOOLS=${prjroot}/tools/priv/bin
+SRC_FILE=${1##*/}
+TMP_DIR=/tmp/corner-de-`whoami`${prjroot##~}/uyghur
+CSIDBASE=${prjroot}/rootfs/src/var/csidbase
+
+if [ ! -d ${TMP_DIR} ]; then
+	mkdir -p ${TMP_DIR}
+fi
+
+#
+
+ARG1=$1
+ARG2=$2
+
+while [ -n "$3" ]; do
+	case $3 in
+	-b)
+		UASO="-b";;
+	-f)
+		USCO="-f";;
+	*)
+        	echo "mkuo: unsupported option: $3"
+        	exit 9
+	esac
+	shift
+done
+
+# define Uyghur toolchain
+UTT="${PRIV_TOOLS}/utt ${UTTO} -d ${CSIDBASE}"
+USC="${PRIV_TOOLS}/usc ${USCO} -d ${CSIDBASE}"
+UAS="${PRIV_TOOLS}/uas ${UASO} -d ${CSIDBASE} -q"
+
+# define file parameters
+UTFILE=${ARG1}
+UMFILE=${TMP_DIR}/${SRC_FILE}.um
+USFILE=${TMP_DIR}/${SRC_FILE}.us
+UOFILE=${ARG2}
+
+# translating...
+
+#echo "${UTT} ${UTFILE} ${UMFILE} ..."
+${UTT} ${UTFILE} ${UMFILE}
+[ $? -ne 0 ] && exit 1
+
+#echo "${USC} ${UMFILE} ${USFILE} ..."
+${USC} ${UMFILE} ${USFILE}
+[ $? -ne 0 ] && exit 2
+
+#echo "${UAS} ${USFILE} ${UOFILE} ..."
+${UAS} ${USFILE} ${UOFILE}
+[ $? -ne 0 ] && exit 3
+
+#success
+exit 0
+

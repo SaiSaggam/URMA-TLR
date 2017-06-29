@@ -1,0 +1,242 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+UDHCPC="udhcpc"
+
+# Set Interface
+if [ "$2" != "" ]; then
+   ETH="$2"
+else
+   ETH="lte0"
+fi
+
+get_index "$3" "$4"
+FileNameCode="${ETH}"
+UDHCPC_PID_FILE="/var/run/udhcpc.${FileNameCode}.pid"
+PIDFILE_CONNECT="/var/run/udhcpc.${FileNameCode}.pid.connect"
+DEMAND_FILE="/var/run/udhcpc.${FileNameCode}.demand"
+UDHCPC_DEFAULT_SCRIPT="/usr/bin/dhcp.script"
+[ -f "/tmp/dhcp.script" ] && UDHCPC_DEFAULT_SCRIPT="/tmp/dhcp.script"
+HOSTNAME="`cat /etc/hostname`"
+if [ "${HOSTNAME}" == "" ]; then
+   HOSTNAME="Router"
+fi
+
+lteue_status() 
+{
+   get_general_config ${Index} ${Index_3G}
+   get_general_status ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   TIME=0
+   TIMEOUT=10
+   while [ true ] ; do 
+       sl_get_IP_NM_GW_in_ifconfig $ETH IF_IP IF_NM IF_GW
+       #echo "$0 : IF_IP=$IF_IP IF_NM=$IF_NM IF_GW=$IF_GW" 
+       if [ "${IF_IP}x" != "x" -a "${IF_NM}x" != "x" -a "${IF_GW}x" != "x" ] ; then    
+           return 0        
+       else            
+           sleep 1
+           TIME=$((TIME+1))
+           if [ $TIME -gt $TIMEOUT ] ; then
+               return 1    
+           fi          
+       fi
+    done
+}
+
+
+lteue_start()
+{
+    get_general_config ${Index} ${Index_3G}
+    get_general_status ${Index} ${Index_3G}
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+    get_3g_cnt_status ${Index} ${Index_3G}
+
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+    local DevModem1="${CSID_S_USB_MODEM1}"
+    local DevModem2="${CSID_S_USB_MODEM2}"
+
+    #kill `ps | grep udhcpc |grep $ETH| cut -dr -f1`
+    
+    ${ATCMD_PROG} ${DevModem2} ate1
+    sleep 2
+    ${ATCMD_PROG} ${DevModem2} at+cfun=?
+    sleep 2
+    ${ATCMD_PROG} ${DevModem2} at+cfun=1
+    sleep 2
+    ${ATCMD_PROG} ${DevModem2} at+cfun=1
+    sleep 3
+    ${ATCMD_PROG} ${DevModem2} at+cgatt=1
+    sleep 3
+    
+#   if [ -n "$CSID_C_3G_APN" ]; then
+#       send_ATcmd /dev/modem2 AT+CGDCONT=1,\"IP\",\"$CSID_C_3G_APN\"
+#        sleep 2
+#        send_ATcmd /dev/modem2 "AT!SCPROF=1,\"$Profile\",0,0,0,0"
+#   fi
+
+    if [ -n "$CSID_C_3G_USERNAME" -a -n "$CSID_C_3G_PASSWORD" ]; then
+        if [ $CSID_C_3G_MULTIWAN_AUTHTYPE -eq 2 ]; then
+            ${ATCMD_PROG} ${DevModem2} AT%PPPAUTH=1,$CSID_C_3G_MULTIWAN_AUTHTYPE,$CSID_C_3G_USERNAME,$CSID_C_3G_PASSWORD
+        else
+            ${ATCMD_PROG} ${DevModem2} AT%PPPAUTH=1,1,$CSID_C_3G_USERNAME,$CSID_C_3G_PASSWORD
+        fi
+    fi
+
+    write_error_code 0 ${Index} # clean error code
+    if [ $CSID_C_3G_MTU -eq 0 ] ; then
+        ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+    else
+        ${IFCFG_PROG} $ETH 0.0.0.0 mtu $CSID_C_3G_MTU up
+    fi
+    sleep 1 
+    
+    if [ "$CSID_S_LOCAL_MULTIWAN_CNT_FORCE" -eq 1 ] ; then
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+        #wrcsman "0x8001000e 0x00"
+#   elif [ "$CSID_S_LOCAL_MULTIWAN_CNT_FORCE" == "0" -a $WANTYPE = 16 ] ; then #3G on demand
+#       udhcpc-connect-lteue &
+#       $UDHCPC -n -i $ETH -p $UDHCPC_PID_FILE -s $UDHCPC_DEFAULT_SCRIPT 
+#   elif [ "$CSID_S_LOCAL_MULTIWAN_CNT_FORCE" == "2" -a $WANTYPE = 16 ] ; then #3G manually
+#       udhcpc-connect-lteue &
+#       $UDHCPC -n -i $ETH -p $UDHCPC_PID_FILE -s $UDHCPC_DEFAULT_SCRIPT 
+    else
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    fi
+    
+    get_cnt_status ${Index}
+    echo "Got DHCP IP: $CSID_S_USB_IF_IP"
+
+    return 0
+}
+
+
+lteue_stop()
+{
+    get_general_config ${Index} ${Index_3G}
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+
+    local DevModem1="${CSID_S_USB_MODEM1}"
+    local DevModem2="${CSID_S_USB_MODEM2}"
+
+    echo -e "stop" > /var/lteue_stop
+    rm -rf /tmp/lteue_dhcp_up
+    #kill `ps | grep udhcpc |grep ${ETH}| cut -dr -f1`
+
+    [ -f "$DEMAND_FILE" ] && rm -f $DEMAND_FILE
+
+    if [ -f "$PIDFILE_CONNECT" ] ; then
+        CONNECT_PID=`cat $PIDFILE_CONNECT`
+        kill -9 $CONNECT_PID > /dev/null 2>&1
+        rm -f $PIDFILE_CONNECT > /dev/null 2>&1 
+    fi      
+
+    if [ -f "$UDHCPC_PID_FILE" -a -r "$UDHCPC_PID_FILE" ] ; then
+        UDHCPC_PID=`cat $UDHCPC_PID_FILE`
+        rm -f $UDHCPC_PID_FILE
+        kill -9 $UDHCPC_PID > /dev/null 2>&1 || exit 1
+    fi
+
+    ${IFCFG_PROG} ${ETH} down
+    #ifconfig $ETH 0.0.0.0
+    #ifconfig $ETH down
+
+    clear_all_cnt_status ${Index}
+    write_cnt_status 0 ${Index}
+
+#    wrcsman "0x801e0500 0x00 && \
+#             0x80010007 0x00"
+#    wrcsman "0x801e0200 0x00 && \
+#            0x801e0300 0x00 && \
+#            0x801e0400 0x00 && \
+#            0x801e0500 0x00 && \
+#            0x801e0600 0x00 && \
+#            0x801e0700 0x00 && \
+#            0x801E0800 0x00 && \
+#            0x801E0900 0x00 && \
+#            0x801E1200 0x00 && \
+#            0x80010002 0x00 && \
+#            0x80010003 0x00 && \
+#            0x80010004 0x00 && \
+#            0x80010005 0x00 && \
+#            0x80010006 0x00 && \
+#            0x80010007 0x00"
+#    rmcsman "0x801e0100"
+    return 0
+}
+usage() 
+{
+    echo "$0 [start|stop|release|renew] [IFName] [index] [index_3g]"
+    exit 1
+}
+
+# ----------------- main --------------------
+
+[ -z "$1" ] && usage;
+
+case "$1" in
+
+    start)
+        pre_init
+        lteue_start     
+        #if [ $? == 1 ] ; then
+        #    logger -t "O3G/SCRIPT" -p 8.7 "connect fail!!\n"
+        #    ifconfig $ETH 0.0.0.0 
+        #    exit 1
+        #fi  
+        exit 0  
+        ;;
+    
+    stop)
+        lteue_stop
+        ;;
+    
+    release)
+        if [ -f "$UDHCPC_PID_FILE" -a -r "$UDHCPC_PID_FILE" ] ; then 
+            UDHCPC_PID=`cat $UDHCPC_PID_FILE`
+            kill -USR2 $UDHCPC_PID          
+        fi
+        write_dns_info "0.0.0.0" "" ${Index}
+        #wrcsman "0x801e0500 0x00 && \  #old
+        #        0x80010007 0x00"       #old 
+        exit 0      
+        ;;
+    
+    renew)
+        if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+            lteue_stop
+            lteue_start
+        elif [ -f "$UDHCPC_PID_FILE" -a -r "$UDHCPC_PID_FILE" ] ; then 
+            UDHCPC_PID=`cat $UDHCPC_PID_FILE`
+            kill -USR1 $UDHCPC_PID
+            lteue_status                         
+        else
+#oold           $UDHCPC -n -i $ETH -p $UDHCPC_PID_FILE -s $UDHCPC_DEFAULT_SCRIPT 
+#old            $UDHCPC -n -i $ETH -s $UDHCPC_DEFAULT_SCRIPT 
+            ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+
+        fi
+        
+        exit 0                                  
+        ;;
+    
+        
+    *)
+        usage;;
+
+
+esac
+
+exit 0
+ 

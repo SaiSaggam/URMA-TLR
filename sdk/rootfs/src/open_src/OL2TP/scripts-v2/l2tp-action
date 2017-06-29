@@ -1,0 +1,666 @@
+#!/bin/sh
+
+if [ -f "/tmp/l2tpc-customer" ]; then
+   . /tmp/l2tpc-customer
+elif [ -f "/usr/bin/l2tpc-customer" ]; then
+   . /usr/bin/l2tpc-customer
+fi
+
+usage() {
+   echo "$0 [start|stop|restart|config|status]"
+   echo "$0 [start|stop|restart|config|status] [MULTIWAN Index: 0~$((MAX_MULTIWAN-1))]"
+   echo "$0 [ppp-up|ppp-down] [PPP Arguments]"
+   exit 1
+}
+
+[ -z "$1" ] && usage
+
+if [ "$1" != "ip-up" ] && [ "$1" != "ip-down" ]; then
+   # Check if exist multiwan index
+   if [ -n "$2" ]; then
+      if [ $(($2)) -ge 0 ] && [ $(($2)) -lt $MAX_MULTIWAN ]; then
+         MULTIWAN="$2"
+      else
+         usage
+      fi
+   else
+      MULTIWAN=""
+   fi
+elif [ -n "$6" ]; then # For ip-up or ip-down
+   if [ "`echo $6 | cut -c 1-4`" == "l2tp" ]; then # Check if the prefix name is equal to "l2tp" from ipparam
+      MULTIWAN="`echo $6 | cut -c 5-`" # Get Multiwan index from ipparam
+      if [ -z "$MULTIWAN" ] || [ $((MULTIWAN)) -lt 0 ] || [ $((MULTIWAN)) -ge $MAX_MULTIWAN ]; then
+         MULTIWAN=""
+      fi
+   else
+      MULTIWAN=""
+   fi
+else
+   usage
+fi
+
+RUNNING="/var/run/l2tp-action-running"
+RESOLV_CONF="/etc/resolv.conf"
+L2TP_LINKNAME="l2tp$MULTIWAN" # Must pass to ipparam with the prefix name "l2tp" for getting multiwan index
+PPPD_AUTHFAILED_FILE="/var/run/ppp_auth_fail"
+PIDFILE_L2TP="/var/run/rp-$L2TP_LINKNAME.pid"
+PIDFILE_PPPD="/var/run/ppp-$L2TP_LINKNAME.pid"
+L2TP_CLR_PHASE1="/var/run/$L2TP_LINKNAME-phase1.clr"
+L2TP_CLR="/var/run/$L2TP_LINKNAME.clr"
+L2TP_CONFIG_FILE="/etc/l2tp/$L2TP_LINKNAME.conf"
+L2TP_RESULT_FILE="/var/run/$L2TP_LINKNAME-result"
+L2TP_SOCKET_FILE="/var/run/l2tpctrl$MULTIWAN"
+
+l2tp_stop() {
+   get_wantype_l2tp_config $MULTIWAN
+
+   get_wan_info $MULTIWAN
+   #local L2TP_LNSSERVER="$C_L2TP_LNS_SERVER"
+
+   # Get Domain name IP
+   #if [ -e "/usr/bin/getHostIP" ]; then
+   #   L2TP_LNSSERVER="`getHostIP $L2TP_LNSSERVER`"
+   #   [ "$L2TP_LNSSERVER" == "" ] && L2TP_LNSSERVER="$C_L2TP_LNS_SERVER"
+   #fi
+   #C_L2TP_LNS_SERVER_IP="$L2TP_LNSSERVER"
+
+   # Kill l2tp tunnel
+   if [ -e $L2TP_RESULT_FILE ] ; then
+      local l2tp_st=`awk '{print $1}' $L2TP_RESULT_FILE`
+      local l2tp_tun_id=`awk '{print $2}' $L2TP_RESULT_FILE`
+      local l2tp_lac_id=`awk '{print $3}' $L2TP_RESULT_FILE`
+      if [ "$l2tp_st" = "OK" ]; then
+         echo "L2TP start to disconnect! ( l2tp-control -s $L2TP_SOCKET_FILE \"stop-session $l2tp_tun_id $l2tp_lac_id\" )"
+         l2tp-control -s $L2TP_SOCKET_FILE "stop-session $l2tp_tun_id $l2tp_lac_id"
+         rm -f $L2TP_RESULT_FILE
+         echo "Stop L2TP Daemon (l2tp-control -s $L2TP_SOCKET_FILE \"exit\")"
+         l2tp-control -s $L2TP_SOCKET_FILE "exit"
+      fi
+   fi
+
+   # Clear L2TP status
+   [ -e $L2TP_CLR_PHASE1 ] && sh $L2TP_CLR_PHASE1
+   [ -e $L2TP_CLR ] && sh $L2TP_CLR
+   rm -rf /var/run/ppp_auth* $L2TP_CLR $L2TP_CLR_PHASE1 $PIDFILE_PPPD
+
+   clear_l2tp_cnt_info $MULTIWAN
+   clear_l2tp_cnt_status $MULTIWAN
+
+   if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+      clear_local_cnt_force_status $MULTIWAN
+   fi
+
+#   get_failover_config
+#
+#   LOADSHARING="$C_FAILOVER_LOADSHARING_ENABLE"
+#   SEAMLESS_MODE="$C_3G_FAILOVER_MODE"
+#   if [ -e /var/run/multiwan_enable ] ||
+#      [ "$LOADSHARING" == "1" ] ||
+#      [ "$SEAMLESS_MODE" == "1" ] ||
+#      [ -e /var/run/dont_update_wantype ]; then
+#      logger -p 8.7 -t "ip-down-l2tp" "Exit ip-down directly (Under LoadSharing, Seamless, MultiWAN)!\""
+#      rm -f /var/run/dont_update_wantype
+#      return 0 # may pppoe/l2tp/pppoe client -> do nothing
+#   fi
+#
+#   get_failover_cnt_status
+#
+#   # For failover status, do not set dns info and do not set default gw
+#   AUTOBAK_MODE="$S_3G_AUTOBAK_MODE"
+#   if [ "$AUTOBAK_MODE" == "1" ] ; then
+#      logger -p 8.7 -t "ip-down-l2tp" "Under Autoback mode, dont write to local \""
+#      return 0
+#   fi
+#
+#   FAILOVER_MODE="$S_FAILOVER_STATUS"
+#   if [ "$FAILOVER_MODE" == "1" ]; then
+#      get_failover_config
+#      FAILOVER_WANTYPE="$C_FAILOVER_WANTYPE"
+#      if [ $FAILOVER_WANTYPE -eq 8 ]; then # L2TP is the backup wan
+#         clear_failover_cnt_info
+#         clear_failover_cnt_status
+#      else  # L2TP is the main wan, and try to failback
+#         logger -p 8.7 -t "l2tp ip-down" "Under Failover mode, dont write to local \""
+#         return 0
+#      fi
+#   fi
+
+   # Recover wan interface default gateway on Russian mode
+   local RUSSIAN_MODE="$C_L2TP_RUSSIAN_MODE"
+   if [ "$RUSSIAN_MODE" != "0" ] ; then
+      local IF_GW=""
+      if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ] ; then
+         get_phase1_dhcp_status $MULTIWAN
+         IF_GW="$S_DHCP_CLI_IF_GW"
+      elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then
+         IF_GW="$C_L2TP_P1FIXED_GW"
+      fi
+
+      # TODO: Need consider autoback/failover/loadsharing !?
+      if [ "$IF_GW" != "" ] ; then
+         route delete default > /dev/null 2>&1
+         route add default gw $IF_GW > /dev/null 2>&1
+      fi
+   fi
+
+   clear_local_cnt_info $MULTIWAN
+   clear_local_cnt_status $MULTIWAN
+
+   return 0
+}
+
+l2tp_start_pre()
+{
+   # HW NAT may affect VPN throughput
+   [ "`lsmod | grep hw_nat`" != "" ] && rmmod hw_nat
+
+   # clear last ppp auth fail temp file
+   [ -e $L2TP_CLR_PHASE1 ] && sh $L2TP_CLR_PHASE1
+   [ -e $L2TP_CLR ] && sh $L2TP_CLR
+   rm -rf /var/run/ppp_auth* $L2TP_CLR $L2TP_CLR_PHASE1
+
+   clear_local_cnt_force_status $MULTIWAN
+}
+
+l2tp_phase1_start() {
+   get_wan_info $MULTIWAN
+
+   #local ETH="$S_SYS_IF_WAN0"
+
+   #check_exist_interface "$S_SYS_IF_WAN0"
+   #if [ "$?" == "0" ]; then
+   #   check_exist_interface "$S_SYS_IF_WAN1"
+   #   [ "$?" != "0" ] && ETH="$S_SYS_IF_WAN1"
+   #fi
+   
+   logger -t "l2tp" "S_SYS_IF_WAN = $S_SYS_IF_WAN, S_SYS_MULTIWAN_IF_WAN=$S_SYS_MULTIWAN_IF_WAN"    
+   local ETH="$S_SYS_IF_WAN"   
+   if [ -z "$MULTIWAN" ]; then 
+      check_exist_interface "$S_SYS_IF_WAN"
+	  ETH="$S_SYS_IF_WAN"
+   else
+      check_exist_interface "$S_SYS_MULTIWAN_IF_WAN"  
+      ETH="$S_SYS_MULTIWAN_IF_WAN"   	  
+   fi
+   
+   local IF_IP="0.0.0.0"
+   local IF_NM="0.0.0.0"
+   local IF_GW="0.0.0.0"
+   local IF_DNS1=""
+   local IF_DNS2=""
+
+   if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ]; then
+      udhcpc-action stop $MULTIWAN
+      udhcpc-action start $MULTIWAN
+      local RET="$?"
+      if [ "$RET" != "0" ]; then
+         echo "Can't get IP/GW form DHCP Server !"
+         logger -t "l2tp" "Can't get IP/GW form DHCP Server !"
+         return 1
+      fi
+      echo "udhcpc-action stop" >> $L2TP_CLR
+
+      get_phase1_dhcp_status $MULTIWAN
+      IF_GW="$S_DHCP_CLI_IF_GW"
+      IF_DNS1="$S_DHCP_CLI_IF_PRIDNS"
+      IF_DNS2="$S_DHCP_CLI_IF_SECDNS"
+   elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then
+      IF_IP="$C_L2TP_P1FIXED_IP"
+      IF_NM="$C_L2TP_P1FIXED_NM"
+      IF_GW="$C_L2TP_P1FIXED_GW"
+      IF_DNS1="$C_L2TP_P1FIXED_PRIDNS"
+      IF_DNS2="$C_L2TP_P1FIXED_SECDNS"
+
+      ifconfig $ETH $IF_IP netmask $IF_NM
+      echo "ifconfig $ETH 0.0.0.0" >> $L2TP_CLR
+   fi
+
+   if [ "$IF_DNS1" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS1
+      route add -host $IF_DNS1 gw $IF_GW dev $ETH
+      echo "route delete -host $IF_DNS1 gw $IF_GW dev $ETH" >> $L2TP_CLR_PHASE1
+      logger -t "l2tp" "route add -host $IF_DNS1 gw $IF_GW dev $ETH"	  
+   fi
+
+   if [ "$IF_DNS2" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS2
+      route add -host $IF_DNS2 gw $IF_GW dev $ETH
+      echo "route delete -host $IF_DNS2 gw $IF_GW dev $ETH" >> $L2TP_CLR_PHASE1
+      logger -t "l2tp" "route add -host $IF_DNS2 gw $IF_GW dev $ETH"		  
+   fi
+
+   return 0
+}
+
+russian_l2tp_phase1_start() {
+   get_wan_info $MULTIWAN
+
+   local ETH="$S_SYS_IF_WAN0"
+
+   check_exist_interface "$S_SYS_IF_WAN0"
+   if [ "$?" == "0" ]; then
+      check_exist_interface "$S_SYS_IF_WAN1"
+      [ "$?" != "0" ] && ETH="$S_SYS_IF_WAN1"
+   fi
+
+   local IF_IP="0.0.0.0"
+   local IF_NM="0.0.0.0"
+   local IF_GW="0.0.0.0"
+   local IF_DNS1=""
+   local IF_DNS2=""
+
+   if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ]; then
+      get_phase1_dhcp_status $MULTIWAN
+      [ "$S_DHCP_CLI_CNT_STATUS" != "2" ] && l2tp_ip_down "Phase 1 connect isn't ready !" # Phase 1 connection does not completed.
+      IF_GW="$S_DHCP_CLI_IF_GW"
+      IF_DNS1="$S_DHCP_CLI_IF_PRIDNS"
+      IF_DNS2="$S_DHCP_CLI_IF_SECDNS"
+   elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then # static
+      get_phase1_static_status $MULTIWAN
+      [ "$S_FIX_CNT_STATUS" != "2" ] && l2tp_ip_down "Phase 1 connect isn't ready !" # Phase 1 connection does not completed.
+
+      IF_GW="$C_L2TP_P1FIXED_GW"
+      IF_DNS1="$C_L2TP_P1FIXED_PRIDNS"
+      IF_DNS2="$C_L2TP_P1FIXED_SECDNS"
+   fi
+
+   if [ "$IF_DNS1" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS1
+      route add -host $IF_DNS1 gw $IF_GW dev $ETH
+      echo "route delete -host $IF_DNS1 gw $IF_GW dev $ETH" >> $L2TP_CLR_PHASE1
+   fi
+
+   if [ "$IF_DNS2" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ] && [ "$ETH" != "" ]; then
+      sl_append_dns_file "$RESOLV_CONF" $IF_DNS2
+      route add -host $IF_DNS2 gw $IF_GW dev $ETH
+      echo "route delete -host $IF_DNS2 gw $IF_GW dev $ETH" >> $L2TP_CLR_PHASE1
+   fi
+
+   return 0
+}
+
+set_l2tpserv_routing() {
+   get_wan_info $MULTIWAN
+
+   #local ETH="$S_SYS_IF_WAN0"
+
+   #check_exist_interface "$S_SYS_IF_WAN0"
+   #if [ "$?" == "0" ]; then
+   #   check_exist_interface "$S_SYS_IF_WAN1"
+   #   [ "$?" != "0" ] && ETH="$S_SYS_IF_WAN1"
+   #fi
+   
+   logger -t "l2tp" "S_SYS_IF_WAN = $S_SYS_IF_WAN, S_SYS_MULTIWAN_IF_WAN=$S_SYS_MULTIWAN_IF_WAN"    
+   local ETH="$S_SYS_IF_WAN"   
+   if [ -z "$MULTIWAN" ]; then 
+      check_exist_interface "$S_SYS_IF_WAN"
+	  ETH="$S_SYS_IF_WAN"
+   else
+      check_exist_interface "$S_SYS_MULTIWAN_IF_WAN"  
+      ETH="$S_SYS_MULTIWAN_IF_WAN"   	  
+   fi
+   
+   local L2TP_LNSSERVER="$C_L2TP_LNS_SERVER"
+
+   local p1wan_ip="`ifconfig $ETH |grep 'inet addr:'|cut -f2 -d:|awk '{print $1}'`"
+   local p1wan_nm="`ifconfig $ETH |grep 'inet addr:'|cut -f4 -d:`"
+   #echo "p1wan_ip: $p1wan_ip"
+   #echo "p1wan_nm: $p1wan_nm"
+
+   # Get Domain name IP
+   if [ -e "/usr/bin/getHostIP" ]; then
+      L2TP_LNSSERVER="`getHostIP $L2TP_LNSSERVER`"
+      [ "$L2TP_LNSSERVER" == "" ] && l2tp_ip_down "L2TP_LNSSERVER Connect fail!"
+   fi
+   C_L2TP_LNS_SERVER_IP="$L2TP_LNSSERVER"
+   # Check if string is empty (Avoid Syntax error)
+   if [ "`echo $p1wan_ip | cut -d "." -f1`" = "" ] || [ "`echo $p1wan_ip | cut -d "." -f2`" = "" ] ||
+      [ "`echo $p1wan_ip | cut -d "." -f3`" = "" ] || [ "`echo $p1wan_ip | cut -d "." -f4`" = "" ] ||
+      [ "`echo $p1wan_nm | cut -d "." -f1`" = "" ] || [ "`echo $p1wan_nm | cut -d "." -f2`" = "" ] ||
+      [ "`echo $p1wan_nm | cut -d "." -f3`" = "" ] || [ "`echo $p1wan_nm | cut -d "." -f4`" = "" ] ||
+      [ "`echo $L2TP_LNSSERVER | cut -d "." -f1`" = "" ] || [ "`echo $L2TP_LNSSERVER | cut -d "." -f2`" = "" ] ||
+      [ "`echo $L2TP_LNSSERVER | cut -d "." -f3`" = "" ] || [ "`echo $L2TP_LNSSERVER | cut -d "." -f4`" = "" ]; then
+      l2tp_ip_down "Connect fail!"
+   fi
+
+   local ip1_1=$((`echo $p1wan_ip| cut -d "." -f1` & `echo $p1wan_nm| cut -d "." -f1`))
+   local ip1_2=$((`echo $p1wan_ip| cut -d "." -f2` & `echo $p1wan_nm| cut -d "." -f2`))
+   local ip1_3=$((`echo $p1wan_ip| cut -d "." -f3` & `echo $p1wan_nm| cut -d "." -f3`))
+   local ip1_4=$((`echo $p1wan_ip| cut -d "." -f4` & `echo $p1wan_nm| cut -d "." -f4`))
+
+   local ip2_1=$((`echo $L2TP_LNSSERVER | cut -d "." -f1` & `echo $p1wan_nm | cut -d "." -f1`))
+   local ip2_2=$((`echo $L2TP_LNSSERVER | cut -d "." -f2` & `echo $p1wan_nm | cut -d "." -f2`))
+   local ip2_3=$((`echo $L2TP_LNSSERVER | cut -d "." -f3` & `echo $p1wan_nm | cut -d "." -f3`))
+   local ip2_4=$((`echo $L2TP_LNSSERVER | cut -d "." -f4` & `echo $p1wan_nm | cut -d "." -f4`))
+
+   #logger -t "l2tp" "ip1_1 = $ip1_1, ip1_2 = $ip1_2, ip1_3 = $ip1_3, ip1_4 = $ip1_4" 
+   #logger -t "l2tp" "ip2_1 = $ip2_1, ip2_2 = $ip2_2, ip2_3 = $ip2_3, ip2_4 = $ip2_4"   
+   if [ "$ip1_1" == "$ip2_1" ] && [ "$ip1_2" == "$ip2_2" ] &&
+      [ "$ip1_3" == "$ip2_3" ] && [ "$ip1_4" == "$ip2_4" ]; then
+      echo "Server is in the same subnet, don't set routing."
+   else
+      local IF_GW=""
+      if [ "$C_PHASE1_TYPE_STR" == "DYNAMIC" ] ; then
+         get_phase1_dhcp_status $MULTIWAN
+         IF_GW="$S_DHCP_CLI_IF_GW"
+      elif [ "$C_PHASE1_TYPE_STR" == "STATIC" ] ; then
+         IF_GW="$C_L2TP_P1FIXED_GW"
+      fi
+
+      echo "Server is in the different subnet, set routing for the server."
+      route add -host $L2TP_LNSSERVER gw $IF_GW dev $ETH
+      echo "route delete -host $L2TP_LNSSERVER gw $IF_GW dev $ETH" >> $L2TP_CLR
+	  logger -t "l2tp" "route add -host $L2TP_LNSSERVER gw $IF_GW dev $ETH"	  
+   fi
+
+   return 0
+}
+
+l2tp_start() {
+   # Make sure only one script running.
+   local MaxWaitTime="120"
+   local TimeCounter="1"
+   while [ $TimeCounter -le $MaxWaitTime ];
+   do
+     [ ! -f "$RUNNING" ] && break
+     echo "File $RUNNING exists. Max Waiting Time: $TimeCounter/$MaxWaitTime"
+     sleep 1
+     TimeCounter="$((TimeCounter+1))"
+   done
+   echo 1 > $RUNNING
+
+   get_local_cnt_force_status $MULTIWAN
+
+   local CNT_FORCE="$S_LOCAL_WAN_CNT_FORCE"
+   if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+      l2tp_stop $MULTIWAN
+   fi
+
+   # Check for pidfile
+   if [ -r "$PIDFILE_PPPD" ] ; then
+      PID=`cat "$PIDFILE_PPPD"`
+      echo "$0: There already seems to be a L2TP connection up (PID $PID)" >& 2
+	   logger -t "l2tp" "$0: There already seems to be a L2TP connection up (PID $PID)"  	  
+      return 0
+   fi
+
+   get_wantype_l2tp_config $MULTIWAN
+
+   # Check Server
+   local L2TP_LNSSERVER="$C_L2TP_LNS_SERVER"
+   if [ "$L2TP_LNSSERVER" == "" ]; then
+      l2tp_ip_down "No Peer IP/Domain for L2TP client !"
+      logger -t "l2tp" "No Peer IP/Domain for L2TP client !"  	  
+      return 1
+   fi
+ 
+   l2tp_start_pre
+   local RUSSIAN_MODE="$C_L2TP_RUSSIAN_MODE"
+   if [ "$RUSSIAN_MODE" != "0" ]; then
+      russian_l2tp_phase1_start
+   else
+      l2tp_phase1_start
+   fi
+
+   echo "$0: Start L2TP session to $C_L2TP_LNS_SERVER ... "
+   logger -t "l2tp" "$0: Start L2TP session to $C_L2TP_LNS_SERVER ... "   
+   set_l2tpserv_routing
+   gen_wantype_l2tp_options
+
+   if [ -r "$PIDFILE_L2TP" ] ; then
+      echo "Stop L2TP Daemon (l2tp-control -s $L2TP_SOCKET_FILE \"exit\")"
+      l2tp-control -s $L2TP_SOCKET_FILE "exit" &
+      sleep 1
+   fi
+   echo "Start L2TP Daemon (l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TP_CONFIG_FILE)"
+   l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TP_CONFIG_FILE &
+   sleep 1
+   echo "L2TP start to connect! ( l2tp-control -s $L2TP_SOCKET_FILE \"start-session $C_L2TP_LNS_SERVER_IP\" )"
+   l2tp-control -s $L2TP_SOCKET_FILE "start-session $C_L2TP_LNS_SERVER_IP" > $L2TP_RESULT_FILE &
+   sleep 2
+
+   local l2tp_st="`awk '{print $1}' $L2TP_RESULT_FILE`"
+   if [ "$l2tp_st" != "OK" ]; then
+      l2tp_ip_down "Fail to setup L2TP tunnel (`cat $L2TP_RESULT_FILE`)"
+   fi
+
+   # Monitor connection
+   local MAX_TIMEOUT=30
+   local retry=0
+   local l2tp_status=0
+   while [ true ]; do
+      if [ -f "$PIDFILE_PPPD" ] ; then
+         sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+         if [ $? = 0 ]; then
+            get_l2tp_cnt_status $MULTIWAN
+            l2tp_status="$S_L2TP_CNT_STATUS"
+         fi
+      fi
+
+      if [ "$l2tp_status" == "2" ]; then
+         logger -t "l2tp" "Link is up and running on interface $PPP_IF (PID: $PPP_PID)"
+         echo "l2tp-status: Link is up and running on interface $PPP_IF"
+         if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+            write_local_cnt_force_status "0" $MULTIWAN
+         fi
+         break;
+      elif [ -f "$PPPD_AUTHFAILED_FILE" ] ; then
+         write_l2tp_cnt_status "6" $MULTIWAN
+         write_local_cnt_status "6" $MULTIWAN
+         if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+            write_local_cnt_force_status "0" $MULTIWAN
+         fi
+         l2tp_ip_down "Authentication fail!"
+      else
+         if [ "$PPP_PID" != "" ]; then
+            kill -0 $PPP_PID 2>/dev/null
+            if [ "$?" != "0" ]; then
+               if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+                  write_local_cnt_force_status "0" $MULTIWAN
+               fi
+               l2tp_ip_down "Connect fail!"
+            fi
+         fi
+
+         if [ $retry -gt $MAX_TIMEOUT ] ; then
+            if [ -n "$CNT_FORCE" ] && [ "$CNT_FORCE" != "0" ] ; then
+               write_local_cnt_force_status "0" $MULTIWAN
+            fi
+            l2tp_ip_down "Connect L2TP tunnel Timeout !"
+         else
+            echo "L2TP connecting ... (Retry: $retry, Status: $l2tp_status)"
+            retry=$(($retry+1))
+         fi
+       fi
+       sleep 1
+   done
+}
+
+print_l2tp_config() {
+   get_wantype_l2tp_config $MULTIWAN
+
+   echo "C_L2TP_CNTTYPE                : $C_L2TP_CNTTYPE"
+   echo "C_L2TP_CNTTYPE_UI             : $C_L2TP_CNTTYPE_UI"
+   echo "C_L2TP_NAT_DISABLE            : $C_L2TP_NAT_DISABLE"
+   if [ -n "$C_L2TP_RUSSIAN_MODE_SUPPORT" ] && [ "$C_L2TP_RUSSIAN_MODE_SUPPORT" != "0" ]; then
+      echo "C_L2TP_RUSSIAN_MODE           : $C_L2TP_RUSSIAN_MODE"
+   else
+      echo "C_L2TP_RUSSIAN_MODE           : No Support"
+   fi
+   echo "C_L2TP_PHASE1_TYPE            : $C_L2TP_PHASE1_TYPE ($C_PHASE1_TYPE_STR)"
+   echo "C_L2TP_P1FIXED_IP             : $C_L2TP_P1FIXED_IP"
+   echo "C_L2TP_P1FIXED_NM             : $C_L2TP_P1FIXED_NM"
+   echo "C_L2TP_P1FIXED_GW             : $C_L2TP_P1FIXED_GW"
+   echo "C_L2TP_P1FIXED_PRIDNS         : $C_L2TP_P1FIXED_PRIDNS"
+   echo "C_L2TP_P1FIXED_SECDNS         : $C_L2TP_P1FIXED_SECDNS"
+   echo "C_L2TP_LNS_SERVER             : $C_L2TP_LNS_SERVER"
+   #echo "C_L2TP_AUTHTYPE               : $C_L2TP_AUTHTYPE"
+   echo "C_L2TP_USER                   : $C_L2TP_USER"
+   echo "C_L2TP_PASS                   : $C_L2TP_PASS"
+   echo "C_L2TP_MTU                    : $C_L2TP_MTU"
+   echo "C_L2TP_IDLETIME               : $C_L2TP_IDLETIME"
+   echo "C_L2TP_ENABLE_MPPE            : $C_L2TP_ENABLE_MPPE"
+   echo "C_L2TP_ENABLE_MPPE_40         : $C_L2TP_ENABLE_MPPE_40"
+   echo "C_L2TP_ENABLE_MPPE_56         : $C_L2TP_ENABLE_MPPE_56"
+   echo "C_L2TP_ENABLE_MPPE_128        : $C_L2TP_ENABLE_MPPE_128"
+   echo "C_L2TP_PRIDNS                 : $C_L2TP_PRIDNS"
+   echo "C_L2TP_SECDNS                 : $C_L2TP_SECDNS"
+
+   get_failover_config
+
+   echo "C_FAILOVER_LOADSHARING_ENABLE : $C_FAILOVER_LOADSHARING_ENABLE"
+   echo "C_3G_FAILOVER_MODE            : $C_3G_FAILOVER_MODE"
+   echo "C_FAILOVER_WANTYPE            : $C_FAILOVER_WANTYPE"
+   echo "C_3G_AUTOBAK_ENABLE           : $C_3G_AUTOBAK_ENABLE"
+}
+
+print_l2tp_cnt_status() {
+   get_l2tp_cnt_info $MULTIWAN
+   get_l2tp_cnt_status $MULTIWAN
+
+   echo "S_L2TP_CNT_TIME               : $S_L2TP_CNT_TIME"
+   echo "S_L2TP_IF_IP                  : $S_L2TP_IF_IP"
+   echo "S_L2TP_IF_NM                  : $S_L2TP_IF_NM"
+   echo "S_L2TP_IF_GW                  : $S_L2TP_IF_GW"
+   echo "S_L2TP_IF_PRIDNS              : $S_L2TP_IF_PRIDNS"
+   echo "S_L2TP_IF_SECDNS              : $S_L2TP_IF_SECDNS"
+   echo "S_L2TP_IF_NAME                : $S_L2TP_IF_NAME"
+   echo "S_L2TP_CNT_STATUS             : $S_L2TP_CNT_STATUS"
+
+   get_local_cnt_info $MULTIWAN
+   get_local_cnt_status $MULTIWAN
+
+   echo "S_LOCAL_CNT_TIME              : $S_LOCAL_CNT_TIME"
+   echo "S_LOCAL_WAN_IP                : $S_LOCAL_WAN_IP"
+   echo "S_LOCAL_WAN_NM                : $S_LOCAL_WAN_NM"
+   echo "S_LOCAL_WAN_GW                : $S_LOCAL_WAN_GW"
+   echo "S_LOCAL_WAN_PRIDNS            : $S_LOCAL_WAN_PRIDNS"
+   echo "S_LOCAL_WAN_SECDNS            : $S_LOCAL_WAN_SECDNS"
+   echo "S_LOCAL_WAN_IF_NAME           : $S_LOCAL_WAN_IF_NAME"
+   echo "S_LOCAL_WAN_STATUS            : $S_LOCAL_WAN_STATUS"
+
+   get_failover_cnt_info
+   get_failover_cnt_status
+
+   echo "S_FAILOVER_CNT_TIME           : $S_FAILOVER_CNT_TIME"
+   echo "S_FAILOVER_WAN_IP             : $S_FAILOVER_WAN_IP"
+   echo "S_FAILOVER_WAN_NM             : $S_FAILOVER_WAN_NM"
+   echo "S_FAILOVER_WAN_GW             : $S_FAILOVER_WAN_GW"
+   echo "S_FAILOVER_WAN_PRIDNS         : $S_FAILOVER_WAN_PRIDNS"
+   echo "S_FAILOVER_WAN_SECDNS         : $S_FAILOVER_WAN_SECDNS"
+   echo "S_FAILOVER_WAN_IF_NAME        : $S_FAILOVER_WAN_IF_NAME"
+   echo "S_FAILOVER_STATUS             : $S_FAILOVER_STATUS"
+
+   echo "S_3G_AUTOBAK_MODE             : $S_3G_AUTOBAK_MODE"
+   echo "S_3G_AUTOBAK_STATUS           : $S_3G_AUTOBAK_STATUS"
+}
+
+# $1 interface-name   e.g. ppp0, ppp1 ...etc
+# $2 tty-device       e.g. /dev/modem ...
+# $3 speed
+# $4 local-IP-address
+# $5 remote-IP-address
+# $6 ipparam          e.g. extra parameters
+l2tp_ip_up()
+{
+   get_wantype_l2tp_config $MULTIWAN
+
+   logger -t "ip-up-l2tp" "$*"
+   echo "ip-up-l2tp: $*"
+   [ -f $L2TP_CLR_PHASE1 ] && sh $L2TP_CLR_PHASE1
+   rm -rf /var/run/ppp_auth* $L2TP_CLR_PHASE1
+
+   # L2TP DNS info.
+   IF_DNS1="$C_L2TP_PRIDNS"
+   IF_DNS2="$C_L2TP_SECDNS"
+   if [ "$IF_DNS1" == "0.0.0.0" ] && [ "$IF_DNS2" == "0.0.0.0" ] ; then
+      sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+   fi
+
+   #L2TP interface info.
+   IFNAME="$2"
+   ifconfig $IFNAME txqueuelen 1000
+   sl_get_IP_NM_GW_in_ifconfig $IFNAME IF_IP IF_NM IF_GW
+   sl_get_uptime CNTTIME
+   write_l2tp_cnt_info "$CNTTIME" "$IF_IP" "$IF_NM" "$IF_GW" "$IF_DNS1" "$IF_DNS2" "$IFNAME" $MULTIWAN
+   write_l2tp_cnt_status "2" $MULTIWAN
+#   get_failover_config
+#
+#   LOADSHARING="$C_FAILOVER_LOADSHARING_ENABLE"
+#   SEAMLESS_MODE="$C_3G_FAILOVER_MODE"
+#   if [ -e /var/run/multiwan_enable ] ||
+#      [ "$LOADSHARING" == "1" ] ||
+#      [ "$SEAMLESS_MODE" == "1" ] ||
+#      [ -e /var/run/dont_update_wantype ]; then
+#      logger -p 8.7 -t "ip-up-l2tp" "Exit ip-up directly (Under LoadSharing, Seamless, MultiWAN)!\""
+#      rm -f /var/run/dont_update_wantype
+#      return 0 # may pptp/l2tp/pppoe client -> do nothing
+#   fi
+#
+#   # Autoback
+#   AUTOBAK_MODE="$S_3G_AUTOBAK_MODE"
+#   if [ "$AUTOBAK_MODE" == "1" ] ; then
+#      logger -p 8.7 -t "l2tp ip-up" "Under Autoback mode, dont write to local \""
+#      route delete default gw $IF_GW dev $IFNAME
+#      return 0;
+#   fi
+#
+#   FAILOVER_MODE="$S_FAILOVER_STATUS"
+#   if [ "$FAILOVER_MODE" == "1" ]; then
+#      get_failover_config
+#      FAILOVER_WANTYPE="$C_FAILOVER_WANTYPE"
+#      if [ $FAILOVER_WANTYPE -eq 8 ]; then  # L2TP is the backup wan
+#         write_failover_cnt_info "$CNTTIME" "$IF_IP" "$IF_NM" "$IF_GW" "$IF_DNS1" "$IF_DNS2" "$IFNAME"
+#         write_failover_cnt_status "2"
+#      else  # L2TP is the main wan, and try to failback
+#         logger -p 8.7 -t "l2tp ip-up" "Under Failover mode, dont write to local \""
+#         route delete default gw $IF_GW dev $IFNAME
+#         return 0
+#      fi
+#   fi
+
+   # Write original DNS info to clr file on Russian mode
+   local RUSSIAN_MODE="$C_L2TP_RUSSIAN_MODE"
+   if [ "$RUSSIAN_MODE" != "0" ] ; then
+      echo "echo \"`cat $RESOLV_CONF`\" > $RESOLV_CONF" >> $L2TP_CLR
+   fi
+
+   # Set DNS info to the head of resovl.conf
+   sl_insert_dns_file $RESOLV_CONF $IF_DNS1 $IF_DNS2
+
+   # Remove all default gateway !
+   route delete default
+
+   # Set WAN L2TP as default gateway !
+   route add default gw $IF_GW
+
+   # Write to Local WAN CSID
+   write_local_cnt_info "$CNTTIME" "$IF_IP" "$IF_NM" "$IF_GW" "$IF_DNS1" "$IF_DNS2" "$IFNAME" $MULTIWAN
+   write_local_cnt_status "2" $MULTIWAN
+
+   exit 0
+}
+
+l2tp_ip_down()
+{
+   logger -t "ip-down-l2tp" "$*"
+   echo "ip-down-l2tp: $*"
+   l2tp_stop
+   [ $# -lt 2 ] && rm -f $RUNNING
+   exit 0
+}
+
+##################### main #####################
+
+case "$1" in
+   start) l2tp_start; rm -f $RUNNING ;;
+   stop) l2tp_stop; rm -f $RUNNING ;;
+   restart) l2tp_stop; rm -f $RUNNING ; l2tp_start; rm -f $RUNNING ;;
+   config) print_l2tp_config ;;
+   status) print_l2tp_cnt_status ;;
+   ip-up) l2tp_ip_up $1 $2 $3 $4 $5 $6 ;;
+   ip-down) l2tp_ip_down $1 $2 $3 $4 $5 $6 ;;
+   *) usage ;;
+esac
+
+exit 0

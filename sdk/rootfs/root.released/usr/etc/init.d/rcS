@@ -1,0 +1,41 @@
+#!/bin/sh
+
+START_KILL="$1"
+# export quietboot="$(ubootenv -p std_bootarg | sed -n -e /quiet/c\yes)"
+export quietboot="$(sed -n -e /quiet/c\yes /proc/cmdline)"
+
+# Either specify K on the command line or you get start by default.
+[ "$START_KILL" == "K" ] || START_KILL="S"
+
+# Run all init scripts in /etc/init.d
+# executing them in numerical order.
+#
+for i in /usr/etc/init.d/${START_KILL}??* ;do
+
+    # Ignore dangling symlinks (if any), missing or not executable.
+    [ ! -f "$i" -o ! -x "$i" ] && continue
+
+    case "$i" in
+        *-bg.sh)
+            # Source shell script in background.
+            (
+                trap - INT QUIT TSTP
+                set start
+                . $i &
+            )
+            ;;
+        *.sh)
+            # Source shell script for speed.
+            (
+                trap - INT QUIT TSTP
+                set start
+                . $i
+            )
+            ;;
+        *)
+            # No sh extension, so fork subprocess.
+            $i start
+            ;;
+    esac
+done
+

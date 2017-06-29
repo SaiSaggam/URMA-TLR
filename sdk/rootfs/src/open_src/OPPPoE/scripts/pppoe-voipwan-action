@@ -1,0 +1,317 @@
+#!/bin/sh
+# Paths to programs
+
+RUNNING="/var/run/pppoe-voipwan-action-running"
+# Make sure only one default script running.
+while :
+do
+    if [ ! -f "$RUNNING" ] ; then
+        break
+    fi
+
+	if [ "$1" == "addroute" ] ; then
+		break;
+	fi
+
+    echo "exist $RUNNING"
+    sleep 1
+done
+echo 1 > $RUNNING
+
+# Check if exist multiwan index
+VOIPWAN=$2
+
+if [ -n "$VOIPWAN" ] ; then
+	TMP1=`rdcsman 0x8000F231 str`
+	#TMP2 PVID of VoIPWAN
+	TMP2=`rdcsman 0x0093202$VOIPWAN u8` 
+	ETH="$TMP1.$TMP2"
+	TMP1=$((VOIPWAN+1))
+	CNTFORCE=0
+fi
+
+#ORG_CNT_TYPE=`rdcsman 0x80040900 u16`
+usage () {
+        echo "$0 [start|stop|restart|status]"
+		rm $RUNNING
+        exit 1
+}
+
+regenerateConfig () {
+	if [ -n "$VOIPWAN" ] ; then
+        uvm /usr/uo/pap-secrets.uo 2 $VOIPWAN $VOIPWAN >> /etc/ppp/pap-secrets 
+		uvm /usr/uo/chap-secrets.uo 2 $VOIPWAN $VOIPWAN >> /etc/ppp/chap-secrets            
+        sl_uniq_file /etc/ppp/pap-secrets
+        sl_uniq_file /etc/ppp/chap-secrets
+    
+		uvm /usr/uo/pppoe-voipwan.conf.uo 2 $VOIPWAN $VOIPWAN > /etc/ppp/pppoe-voipwan.conf
+	fi
+	chmod 600 /etc/ppp/*-secrets
+}
+
+
+# main ##########################################################
+
+[ -z "$1" ] && usage 
+
+case "$1" in
+    start)
+		regenerateConfig
+
+		if [ -n "$VOIPWAN" ] ; then
+		 	echo -n "Bringing up PPPoE link"
+			pppoe-voipwan-start $VOIPWAN
+			if [ $? = 0 ] ; then
+				rm $RUNNING
+				PHONE1_VOIPWAN_NUM=`rdcsman 0x002f0010 u8`
+				PHONE2_VOIPWAN_NUM=`rdcsman 0x002f0011 u8`
+            	FXS1UBOUND=`rdcsman 0x00230060 u8`
+            	FXS2UBOUND=`rdcsman 0x00230131 u8`
+            	if [ $FXS1UBOUND -eq 0 ] ; then
+                SIP_REG1=`rdcsman 0x00230020 str`
+            	else 
+                SIP_REG1=`rdcsman 0x00230070 str`
+            	fi
+
+            	if [ $FXS2UBOUND -eq 0 ] ; then
+                SIP_REG2=`rdcsman 0x00230111 str`
+            	else 
+                SIP_REG2=`rdcsman 0x00230130 str`
+            	fi
+
+				IF_GW=`rdcsman 0x8001024$VOIPWAN ipv4`
+				. /usr/bin/scriptlib
+				PIDFILE_PPPD="/var/run/ppp-pppoeVOIPWAN$VOIPWAN.pid"
+				sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+				#kill default gw
+				route del -net 0.0.0.0 dev $PPP_IF
+
+                PDNS=`rdcsman 0x8001025$VOIPWAN ipv4`
+	            SDNS=`rdcsman 0x8001026$VOIPWAN ipv4`
+
+				ETH=$PPP_IF
+               	#add routing
+                route add -net $PDNS netmask 255.255.255.255 gw $IF_GW dev $ETH
+                route add -net $SDNS netmask 255.255.255.255 gw $IF_GW dev $ETH				
+				if [ $VOIPWAN -eq 0 ] ; then
+					if [ $PHONE1_VOIPWAN_NUM -eq 1 ] ; then # 0: NAT WAN, 1~16: VOIP WAN 1~16
+						if [ -n "$SIP_REG1" ] ; then
+                            SIP_REG1_IP=`dns-query -I $ETH -s $PDNS $SIP_REG1`
+                            if [ -z "$SIP_REG1_IP" ] ; then
+                                SIP_REG1_IP=`dns-query -I $ETH -s $SDNS $SIP_REG1`
+                              	if [ -z "$SIP_REG1_IP" ] ; then
+                                   SIP_REG1_IP=$SIP_REG1
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x002300b0 \"$SIP_REG1_IP"`
+							route add -net $SIP_REG1_IP  netmask 255.255.255.255 gw  $IF_GW dev $PPP_IF
+						fi
+					fi
+					if [ $PHONE2_VOIPWAN_NUM -eq 1 ] ; then
+						if [ -n "$SIP_REG2" ] ; then
+                           SIP_REG2_IP=`dns-query -I $ETH -s $PDNS $SIP_REG2`
+                           if [ -z "$SIP_REG2_IP" ] ; then
+                           		SIP_REG2_IP=`dns-query -I $ETH -s $SDNS $SIP_REG2`
+                                if [ -z "$SIP_REG2_IP" ] ; then
+                                     SIP_REG2_IP=$SIP_REG2
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x00230150 \"$SIP_REG2_IP"`
+							route add -net $SIP_REG2_IP  netmask 255.255.255.255 gw $IF_GW dev $PPP_IF
+						fi
+					fi
+				elif [ $VOIPWAN -eq 1 ] ; then
+					if [ $PHONE1_VOIPWAN_NUM -eq 2 ] ; then # 0: NAT WAN, 1~16: VOIP WAN 1~16
+						if [ -n "$SIP_REG1" ] ; then
+                            SIP_REG1_IP=`dns-query -I $ETH -s $PDNS $SIP_REG1`
+                            if [ -z "$SIP_REG1_IP" ] ; then
+                                SIP_REG1_IP=`dns-query -I $ETH -s $SDNS $SIP_REG1`
+                                if [ -z "$SIP_REG1_IP" ] ; then
+                                   SIP_REG1_IP=$SIP_REG1
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x002300b0 \"$SIP_REG1_IP"`
+							route add -net $SIP_REG1_IP  netmask 255.255.255.255 gw $IF_GW dev $PPP_IF
+						fi
+					fi
+					if [ $PHONE2_VOIPWAN_NUM -eq 2 ] ; then
+						if [ -n "$SIP_REG2" ] ; then
+                           SIP_REG2_IP=`dns-query -I $ETH -s $PDNS $SIP_REG2`
+                           if [ -z "$SIP_REG2_IP" ] ; then
+                                SIP_REG2_IP=`dns-query -I $ETH -s $SDNS $SIP_REG2`
+                                if [ -z "$SIP_REG2_IP" ] ; then
+                                     SIP_REG2_IP=$SIP_REG2
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x00230150 \"$SIP_REG2_IP"`
+							route add -net $SIP_REG2_IP  netmask 255.255.255.255 gw $IF_GW  dev $PPP_IF
+						fi
+					fi
+				fi
+
+            	#del routing
+            	route del -net $PDNS netmask 255.255.255.255 dev $ETH
+            	route del -net $SDNS netmask 255.255.255.255 dev $ETH
+				exit 0
+			else
+				wrcsman "0x8004071$TMP1 0x03 && \
+						 0x8001027$VOIPWAN 0x03"			
+				rm $RUNNING
+				exit 1
+			fi
+		fi
+    	;;
+
+    stop)
+		regenerateConfig
+
+	    echo -n "Shutting down PPPoE link"
+		if [ -n "$VOIPWAN" ] ; then
+			pppoe-voipwan-stop $VOIPWAN > /dev/null 2>&1
+			RET=$?
+		
+			wrcsman "0x8004021$TMP1 0x00 && \
+					 0x8004031$TMP1 0x00 && \
+					 0x8004041$TMP1 0x00 && \
+					 0x8004051$TMP1 0x00 && \
+					 0x8004061$TMP1 0x00 && \
+					 0x8004071$TMP1 0x00 && \
+					 0x8001022$VOIPWAN 0x00 && \
+					 0x8001023$VOIPWAN 0x00 && \
+					 0x8001024$VOIPWAN 0x00 && \
+					 0x8001025$VOIPWAN 0x00 && \
+					 0x8001026$VOIPWAN 0x00 && \
+					 0x8001027$VOIPWAN 0x00"
+
+		fi
+		
+		ifconfig $ETH 0.0.0.0
+		rm $RUNNING
+		exit $RET
+			
+        ;;
+
+    restart)
+		rm $RUNNING
+		if [ -n "$VOIPWAN" ] ; then
+			$0 stop $VOIPWAN
+			$0 start $VOIPWAN
+		fi
+		;;
+
+    status)
+		regenerateConfig
+
+		if [ -n "$VOIPWAN" ] ; then
+			pppoe-voipwan-status $VOIPWAN
+		fi
+		;;
+	addroute)
+        if [ -n "$VOIPWAN" ] ; then
+			rm $RUNNING
+            PHONE1_VOIPWAN_NUM=`rdcsman 0x002f0010 u8`
+            PHONE2_VOIPWAN_NUM=`rdcsman 0x002f0011 u8`
+
+            FXS1UBOUND=`rdcsman 0x00230060 u8`
+            FXS2UBOUND=`rdcsman 0x00230131 u8`
+            if [ $FXS1UBOUND -eq 0 ] ; then
+                SIP_REG1=`rdcsman 0x00230020 str`
+            else 
+                SIP_REG1=`rdcsman 0x00230070 str`
+            fi
+
+            if [ $FXS2UBOUND -eq 0 ] ; then
+                SIP_REG2=`rdcsman 0x00230111 str`
+            else 
+                SIP_REG2=`rdcsman 0x00230130 str`
+            fi
+            IF_GW=`rdcsman 0x8001024$VOIPWAN ipv4`
+            . /usr/bin/scriptlib
+            PIDFILE_PPPD="/var/run/ppp-pppoeVOIPWAN$VOIPWAN.pid"
+            sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+			#kill default gw
+			route del -net 0.0.0.0 dev $PPP_IF
+
+            PDNS=`rdcsman 0x8001025$VOIPWAN ipv4`
+            SDNS=`rdcsman 0x8001026$VOIPWAN ipv4`
+
+			ETH=$PPP_IF
+            #add routing
+            route add -net $PDNS netmask 255.255.255.255 gw $IF_GW dev $ETH
+            route add -net $SDNS netmask 255.255.255.255 gw $IF_GW dev $ETH
+
+            if [ $VOIPWAN -eq 0 ] ; then
+                    if [ $PHONE1_VOIPWAN_NUM -eq 1 ] ; then # 0: NAT WAN, 1~16: VOIP WAN 1~16
+                        if [ -n "$SIP_REG1" ] ; then
+                            SIP_REG1_IP=`dns-query -I $ETH -s $PDNS $SIP_REG1`
+                            if [ -z "$SIP_REG1_IP" ] ; then
+                                SIP_REG1_IP=`dns-query -I $ETH -s $SDNS $SIP_REG1`
+                                if [ -z "$SIP_REG1_IP" ] ; then
+                                   SIP_REG1_IP=$SIP_REG1
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x002300b0 \"$SIP_REG1_IP"`
+                            route add -net $SIP_REG1_IP  netmask 255.255.255.255 gw  $IF_GW dev $PPP_IF
+                        fi
+                    fi
+                    if [ $PHONE2_VOIPWAN_NUM -eq 1 ] ; then
+                        if [ -n "$SIP_REG2" ] ; then
+                           SIP_REG2_IP=`dns-query -I $ETH -s $PDNS $SIP_REG2`
+                           if [ -z "$SIP_REG2_IP" ] ; then
+                                SIP_REG2_IP=`dns-query -I $ETH -s $SDNS $SIP_REG2`
+                                if [ -z "$SIP_REG2_IP" ] ; then
+                                     SIP_REG2_IP=$SIP_REG2
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x00230150 \"$SIP_REG2_IP"`
+                            route add -net $SIP_REG2_IP  netmask 255.255.255.255 gw $IF_GW dev $PPP_IF
+                        fi
+                    fi
+            elif [ $VOIPWAN -eq 1 ] ; then
+                    if [ $PHONE1_VOIPWAN_NUM -eq 2 ] ; then # 0: NAT WAN, 1~16: VOIP WAN 1~16
+                        if [ -n "$SIP_REG1" ] ; then
+                            SIP_REG1_IP=`dns-query -I $ETH -s $PDNS $SIP_REG1`
+                            if [ -z "$SIP_REG1_IP" ] ; then
+                                SIP_REG1_IP=`dns-query -I $ETH -s $SDNS $SIP_REG1`
+                                if [ -z "$SIP_REG1_IP" ] ; then
+                                   SIP_REG1_IP=$SIP_REG1
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x002300b0 \"$SIP_REG1_IP"`
+                            route add -net $SIP_REG1_IP  netmask 255.255.255.255 gw $IF_GW dev $PPP_IF
+                        fi
+                    fi
+                    if [ $PHONE2_VOIPWAN_NUM -eq 2 ] ; then
+                        if [ -n "$SIP_REG2" ] ; then
+                           SIP_REG2_IP=`dns-query -I $ETH -s $PDNS $SIP_REG2`
+                           if [ -z "$SIP_REG2_IP" ] ; then
+                                SIP_REG2_IP=`dns-query -I $ETH -s $SDNS $SIP_REG2`
+                                if [ -z "$SIP_REG2_IP" ] ; then
+                                     SIP_REG2_IP=$SIP_REG2
+                                fi
+                            fi
+                            WSIP=`wrcsman "0x00230150 \"$SIP_REG2_IP"`
+                            route add -net $SIP_REG2_IP  netmask 255.255.255.255 gw $IF_GW  dev $PPP_IF
+                        fi
+                    fi
+                fi
+
+                #del routing
+                route del -net $PDNS netmask 255.255.255.255 dev $ETH
+                route del -net $SDNS netmask 255.255.255.255 dev $ETH
+
+                exit 0
+            else
+                wrcsman "0x8004071$TMP1 0x03 && \
+                         0x8001027$VOIPWAN 0x03"
+                rm $RUNNING
+                exit 1
+            fi
+        ;;		
+    *)
+        usage
+        ;;
+esac
+
+rm $RUNNING
+exit 0

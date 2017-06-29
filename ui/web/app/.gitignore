@@ -1,0 +1,20 @@
+# OS files
+.DS_Store
+
+# IDE files
+.idea/
+*.*~
+
+# Generated files from tooling, builds, etc.
+.build
+.build
+
+# node_modules directories and symbolic link files
+node_modules/
+node_modules
+*.log
+tests/nightwatch/logs
+tests/nightwatch/reports
+tests/spacejam/reports
+tests/nightwatch/screenshots
+tests/nightwatch/backups

@@ -1,0 +1,88 @@
+#!/bin/sh
+# ===========================
+#  MAL Daemon Process CONFIG
+# ===========================
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+Index="$2"
+Index_3G="$3"
+
+idx_3g="`printf "%x" $((${Index_3G}))`"
+idx_3g=`expr $idx_3g + 1` 
+
+#get_index "$2" "$3"
+get_usb_status ${Index}
+
+echo "O3G/script: start get Index_3G=$Index_3G(3G$idx_3g) usb=$Index"
+
+MAL_CONFIG="/etc/mal$Index.cfg"
+
+write_conf() {
+   echo $1 >> ${MAL_CONFIG}
+}
+
+start(){
+    rm -f ${MAL_CONFIG}
+
+    logger -t "O3G/usblist" "Create mal config for [3G$idx_3g]"
+    echo "O3G/usblist: Create mal config for [3G$idx_3g]"
+
+    # MAL Daemon Process log
+    write_conf "LOG_FILE_MALD = \"/tmp/mald_$idx_3g.log\";"
+    write_conf "LOG_LEVEL_MALD = \"0x00FF10FF\";"
+    write_conf "LOG_FILE_MAX_SIZE_MALD = \"0x00100000\";"
+
+    write_conf "LOG_FILE_COMPRESSED_MALD = \"/tmp/maldlog_$idx_3g.gz\";"
+    write_conf "LOG_FILE_COMPRESSED_MAX_SIZE_MALD = \"0x00A00000\";"
+
+    # MAL Library log, file path should be different from LOG_FILE_MALD
+    write_conf "LOG_FILE_MAL = \"/tmp/libmal_$idx_3g.log\";"
+    write_conf "LOG_LEVEL_MAL = \"0x00FF10FF\";"
+    write_conf "LOG_FILE_MAX_SIZE_MAL = \"0x00100000\";"
+    write_conf "LOG_FILE_COMPRESSED_MAL = \"/tmp/libmal_$idx_3g.gz\";"
+    write_conf "LOG_FILE_COMPRESSED_MAX_SIZE_MAL = \"0x00A00000\";"
+
+    # MAL socket path and device setting
+    write_conf "SOCKET = \"/tmp/api-2-mald_$idx_3g\";"
+
+    # Set port for multiplex only
+    # port = 3;  
+    write_conf "DEVICE_NUMBER = 3;"
+    write_conf "DEVICE_INFO ="
+    write_conf "{"
+    write_conf "   DEVICE = ("
+    write_conf "   { path  = \"/dev/$CSID_S_USB_QMI_NODE1\"; },"
+    write_conf "   { path  = \"/dev/$CSID_S_USB_QMI_NODE2\"; },"
+    write_conf "   { path  = \"/dev/$CSID_S_USB_QMI_NODE3\"; }"
+    write_conf "   );"
+    write_conf "};"
+    
+    write_conf "DEVICE_TYPE = 0;"
+    write_conf "DEVICE_PREFIX = \"rmnet_usb\";"
+    write_conf "DEVICE_INTERFACE = 1;"
+    write_conf "DEVICE_PACKET = 9;"
+    
+    write_conf "MAL_PID = \"/var/run/mald_pid_$Index\""
+    return 0;
+}
+
+usage() {
+    echo "$0 [OPTION:start|stop|config] [Index_usb] [Index_3G]"
+    exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+   start)        start ;;
+   stop)         stop ;;
+   config)       show_config ;;
+   *)            usage;;
+esac
+
+exit 0 
+
+ 

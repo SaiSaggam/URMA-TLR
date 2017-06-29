@@ -1,0 +1,18 @@
+.group {
+  margin-bottom: ($spacing-unit*2);
+  margin-top: ($spacing-unit);
+  border-bottom: 1px solid $light-gray;
+}
+.toggle-group {
+  max-height: 0;
+  overflow: hidden;
+  transition:all ease 0.5s;
+  &.open {
+    max-height: 999px;
+  }
+}
+.toggle-link {
+  i {
+    margin-left: $spacing-unit;
+  }
+}

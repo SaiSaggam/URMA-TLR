@@ -1,0 +1,5 @@
+sshd:*:115:115:sshd:/var/empty:/bin/false
+nobody:*:65534:65534:nobody:/var:/bin/false
+username:x:1000:1000:username,,,:/home/digi/user:/bin/sh_wrapper
+user1:x:2001:2000:Linux User,,,:/home/digi/user:/bin/sh_wrapper
+user2:x:2002:2000:Linux User,,,:/home/digi/user:/bin/sh_wrapper

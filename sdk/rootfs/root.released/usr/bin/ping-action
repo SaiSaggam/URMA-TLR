@@ -1,0 +1,73 @@
+#!/bin/ash
+
+case "$1" in
+
+	start)
+		TARGET=`rdcsman 0x00150080 str` #For Netcomm Model
+		if [ -z "$TARGET" ] ; then
+			TARGET=`rdcsman 0x80150005 str` #For AMIT Model
+		fi
+
+		#For AMIT Model
+		IF_TYPE="`rdcsman 0x80150104 u32`" # Interface Type (LAN or WAN)
+		IF_IDX="`rdcsman 0x80150105 u32`"  # Interface Index (Pair with IF_TYPE)
+
+		IF_NAME=""
+		if [ -n "$IF_TYPE" ] && [ -n "$IF_IDX" ]; then
+			if [ $IF_TYPE -eq 1 ]; then # LAN Group
+				if [ $IF_IDX -eq 1 ]; then # LAN1
+					IF_NAME="`rdcsman 0x8000F301 str`"  # S_SYS_IF_BR0
+				elif [ $IF_IDX -ge 2 ] && [ $IF_IDX -le 4 ]; then # LAN2 ~ LAN4 (VLAN1 ~ VLAN3)
+					ADDR_IDX="`printf %x $((IF_IDX-2))`"
+					IF_NAME="`rdcsman 0x009300c$ADDR_IDX str`"  # C_VLAN_SVR_IFNAME[0] ~ C_VLAN_SVR_IFNAME[3]
+				fi
+			elif [ $IF_TYPE -eq 2 ]; then # WAN Group
+                ADDR_IDX="`printf %x $((IF_IDX-1))`"
+                WAN_IDX="`rdcsman 0x0001060$ADDR_IDX u32`" # C_LOCAL_WAN1_INDEX[0~15]
+
+				# Interface mapping
+				if [ $WAN_IDX -eq 99 ] || [ $WAN_IDX -eq 0 ]; then
+					IF_NAME="`rdcsman 0x8001000b str`" # S_LOCAL_WAN_IF_NAME
+				elif [ $WAN_IDX -ge 1 ] && [ $WAN_IDX -le 16 ]; then
+					ADDR_IDX="`printf %x $((WAN_IDX-1))`"
+					IF_NAME="`rdcsman 0x8001019$ADDR_IDX str`" # S_LOCAL_MULTIWAN_IF_NAME[$WAN_IDX - 1]
+				fi
+			fi
+		fi
+
+		IF_ARGS=""
+		if [ -n "$IF_NAME" ]; then
+			# Interface binding for specific interface option on ping test.
+			IF_ARGS="-n $IF_NAME"
+		fi
+
+		# not Auto but no IF -> no interface
+		if [ -z "$IF_ARGS" ] && [ $IF_TYPE -ne 0 ]; then
+			logger -t "ping" "No interface, ping fail..."
+			echo "No interface, ping fail..." > /var/run/ping_result
+		else
+			logger -t "ping" "ping -c 4 \"$TARGET\" $IF_ARGS > /var/run/ping_result  &"
+			ping -c 4 "$TARGET" $IF_ARGS > /var/run/ping_result  &
+			PID=$!
+			wrcsman "0x80150003 $PID && 0x80150004 1"		
+		fi		
+		;;
+		
+	status)
+		PID=`rdcsman 0x80150003 u32`
+		if [ ! -d "/proc/$PID" ] ; then
+			wrcsman "0x80150004 0"
+		fi	
+		;;
+	
+	show)	
+		cat /var/run/ping_result
+		;;
+	
+	*)
+		exit 1
+		;;
+esac
+
+exit 0
+

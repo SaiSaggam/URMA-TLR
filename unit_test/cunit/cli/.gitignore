@@ -1,0 +1,6 @@
+/utest
+*.o
+*.xml
+/timetest
+/time_test
+/parsetest

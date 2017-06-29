@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#copy /proc/uptime to a file in /var/network/uptimes
+if [ "$IFACE" != "" ]; then
+    cp /proc/uptime /var/network/uptimes/$IFACE || true
+fi
+

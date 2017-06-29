@@ -1,0 +1,451 @@
+<sci_reply version="1.0">
+<send_message>
+<device id="00000000-00000000-0040FFFF-FF0F424C">
+<rci_reply version="1.1">
+<query_descriptor>
+<descriptor element="query_setting" desc="Retrieve device configuration" format="all_settings_groups" bin_id="1">
+  <attr name="source" type="enum" desc="Source of settings returned" bin_id="0" default="current">
+<value value="current" desc="Current settings" bin_id="0"/>
+<value value="stored" desc="Settings stored in flash" bin_id="1"/>
+<value value="defaults" desc="Device defaults" bin_id="2"/>
+</attr>
+<attr name="compare_to" type="enum" desc="Return only differences from this source" bin_id="1" default="none">
+<value value="none" desc="Return all settings" bin_id="0"/>
+<value value="current" desc="Current settings" bin_id="1"/>
+<value value="stored" desc="Settings stored in flash" bin_id="2"/>
+<value value="defaults" desc="Device defaults" bin_id="3"/>
+</attr>
+<format_define name="all_settings_groups">
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+<descriptor element="system" desc="System:System configuration" bin_id="0">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="prompt" desc="CLI prompt" type="string" access="read_write" max="16" bin_id="0"/>
+<element name="timeout" desc="CLI timeout" type="int32" access="read_write" min="60" max="3600" bin_id="1"/>
+<element name="loglevel" desc="Set the system logging level" type="enum" access="read_write" bin_id="2">
+<value value="emerg" desc="Emergency" bin_id="0"/>
+<value value="alert" desc="Alert" bin_id="1"/>
+<value value="crit" desc="Critical" bin_id="2"/>
+<value value="err" desc="Error" bin_id="3"/>
+<value value="warning" desc="Warning" bin_id="4"/>
+<value value="notice" desc="Informational" bin_id="5"/>
+<value value="info" desc="Informational" bin_id="6"/>
+<value value="debug" desc="Debugging" bin_id="7"/>
+</element>
+<element name="name" desc="Name of this unit" type="string" access="read_write" max="255" bin_id="3"/>
+<element name="location" desc="Location of this unit" type="string" access="read_write" max="255" bin_id="4"/>
+<element name="contact" desc="Contact for this unit" type="string" access="read_write" max="255" bin_id="5"/>
+<element name="page" desc="CLI page size" type="uint32" access="read_write" min="0" max="100" bin_id="6"/>
+<element name="device_specific_passwords" desc="Enable device specific passwords" type="on_off" access="read_write" bin_id="7"/>
+<element name="description" desc="Description of this unit" type="string" access="read_write" max="255" bin_id="8"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="eth" desc="Ethernet interface:Ethernet interface configuration" bin_id="1">
+<attr name="index" desc="item number" type="int32" min="1" max="4"/>
+<element name="state" desc="Enable or disable Ethernet interface" type="enum" access="read_write" bin_id="0">
+<value value="off" desc="Disable" bin_id="0"/>
+<value value="on" desc="Enable" bin_id="1"/>
+<value value="on_demand" desc="Enable on demand" bin_id="2"/>
+</element>
+<element name="description" desc="Ethernet interface description" type="string" access="read_write" max="63" bin_id="1"/>
+<element name="dhcp" desc="Obtain an IP address automatically" type="on_off" access="read_write" bin_id="2"/>
+<element name="ip_address" desc="Ethernet interface IPv4 address" type="ipv4" access="read_write" bin_id="3"/>
+<element name="mask" desc="Ethernet interface IPv4 subnet mask" type="ipv4" access="read_write" bin_id="4"/>
+<element name="dns1" desc="Preferred DNS server" type="ipv4" access="read_write" bin_id="5"/>
+<element name="dns2" desc="Alternate DNS server" type="ipv4" access="read_write" bin_id="6"/>
+<element name="duplex" desc="Ethernet interface duplex mode" type="enum" access="read_write" bin_id="7">
+<value value="auto" desc="Automatic" bin_id="0"/>
+<value value="full" desc="Full" bin_id="1"/>
+<value value="half" desc="Half" bin_id="2"/>
+</element>
+<element name="speed" desc="Ethernet interface speed" type="enum" access="read_write" bin_id="8">
+<value value="auto" desc="Automatic" bin_id="0"/>
+<value value="10" desc="10Mbps" bin_id="1"/>
+<value value="100" desc="100Mbps" bin_id="2"/>
+<value value="1000" desc="1000Mbps" bin_id="3"/>
+</element>
+<element name="mtu" desc="Ethernet interface MTU" type="uint32" access="read_write" min="64" max="1500" bin_id="9"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="dsl" desc="DSL interface:Configures the DSL interface." bin_id="2">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="state" desc="Enables or disables the DSL interface" type="enum" access="read_write" bin_id="0">
+<value value="off" desc="Disable" bin_id="0"/>
+<value value="on" desc="Enable" bin_id="1"/>
+<value value="on_demand" desc="Enables DSL interface as on-demand" bin_id="2"/>
+</element>
+<element name="description" desc="DSL interface description" type="string" access="read_write" max="63" bin_id="1"/>
+<element name="mode" desc="DSL line mode" type="enum" access="read_write" bin_id="2">
+<value value="auto" desc="Auto" bin_id="0"/>
+<value value="adsl2_plus" desc="ADSL2+" bin_id="1"/>
+<value value="adsl2" desc="ADSL2" bin_id="2"/>
+<value value="gdmt" desc="G.dmt" bin_id="3"/>
+<value value="glite" desc="G.lite" bin_id="4"/>
+</element>
+<element name="vpi" desc="VPI for the DSL interface" type="uint32" access="read_write" min="0" max="255" bin_id="3"/>
+<element name="vci" desc="VCI for the DSL interface" type="uint32" access="read_write" min="17" max="65535" bin_id="4"/>
+<element name="encapsulation" desc="Encapsulation used on the DSL interface" type="enum" access="read_write" bin_id="5">
+<value value="pppoa_vcmux" desc="PPPoA, VC-Mux" bin_id="0"/>
+<value value="pppoa_llc" desc="PPPoA, LLC" bin_id="1"/>
+<value value="pppoe_vcmux" desc="PPPoE, VC-Mux" bin_id="2"/>
+<value value="pppoe_llc" desc="PPPoE, LLC" bin_id="3"/>
+</element>
+<element name="ppp_username" desc="PPP username for the DSL interface" type="string" access="read_write" max="63" bin_id="6"/>
+<element name="ppp_password" desc="PPP password for the DSL interface" type="password" access="write_only" max="128" bin_id="7"/>
+<element name="mtu" desc="MTU for this DSL interface" type="uint32" access="read_write" min="128" max="1500" bin_id="8"/>
+<element name="nat" desc="Enable or disable NAT on this interface" type="on_off" access="read_write" bin_id="9"/>
+<element name="delay_up" desc="Delay the DSL interface from coming up" type="uint32" access="read_write" min="0" max="60" bin_id="10"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="cellular" desc="Cellular interface:Configures a cellular interface." bin_id="3">
+<attr name="index" desc="item number" type="int32" min="1" max="2"/>
+<element name="state" desc="Enable or disable the cellular interface" type="enum" access="read_write" bin_id="0">
+<value value="off" desc="Disable" bin_id="0"/>
+<value value="on" desc="Enable" bin_id="1"/>
+<value value="on_demand" desc="Enable on demand" bin_id="2"/>
+</element>
+<element name="description" desc="Cellular interface description" type="string" access="read_write" max="63" bin_id="1"/>
+<element name="apn" desc="Cellular interface APN" type="string" access="read_write" max="63" bin_id="2"/>
+<element name="apn_username" desc="Cellular interface APN username" type="string" access="read_write" max="63" bin_id="3"/>
+<element name="apn_password" desc="Cellular interface APN password" type="password" access="write_only" max="128" bin_id="4"/>
+<element name="preferred_mode" desc="Preferred mode for cellular interface." type="enum" access="read_write" bin_id="5">
+<value value="auto" desc="Auto" bin_id="0"/>
+<value value="3g" desc="3G" bin_id="1"/>
+<value value="2g" desc="2G" bin_id="2"/>
+</element>
+<element name="nat" desc="Cellular interface source NAT" type="on_off" access="read_write" bin_id="6"/>
+<element name="connection_attempts" desc="Attempt count to establish connection" type="uint32" access="read_write" min="10" max="50" bin_id="7"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="serial" desc="Configures serial interface:Configures serial interface" bin_id="4">
+<attr name="index" desc="item number" type="int32" min="1" max="4"/>
+<element name="state" desc="Enables or disables serial interface" type="on_off" access="read_write" bin_id="0"/>
+<element name="descr" desc="Description" type="string" access="read_write" max="63" bin_id="1"/>
+<element name="baud" desc="Serial interface baud rate" type="enum" access="read_write" bin_id="2">
+<value value="110" desc="110" bin_id="0"/>
+<value value="300" desc="300" bin_id="1"/>
+<value value="600" desc="600" bin_id="2"/>
+<value value="1200" desc="1200" bin_id="3"/>
+<value value="2400" desc="2400" bin_id="4"/>
+<value value="4800" desc="4800" bin_id="5"/>
+<value value="9600" desc="9600" bin_id="6"/>
+<value value="19200" desc="19200" bin_id="7"/>
+<value value="38400" desc="38400" bin_id="8"/>
+<value value="57600" desc="57600" bin_id="9"/>
+<value value="115200" desc="115200" bin_id="10"/>
+<value value="230400" desc="230400" bin_id="11"/>
+<value value="460800" desc="460800" bin_id="12"/>
+<value value="921600" desc="921600" bin_id="13"/>
+</element>
+<element name="databits" desc="Serial interface data bits" type="enum" access="read_write" bin_id="3">
+<value value="8" desc="8 Data bits" bin_id="0"/>
+<value value="7" desc="7 Data bits" bin_id="1"/>
+</element>
+<element name="parity" desc="Serial interface parity" type="enum" access="read_write" bin_id="4">
+<value value="none" desc="none" bin_id="0"/>
+<value value="odd" desc="Odd" bin_id="1"/>
+<value value="even" desc="Even" bin_id="2"/>
+</element>
+<element name="stopbits" desc="Serial interface stop bits" type="enum" access="read_write" bin_id="5">
+<value value="1" desc="1" bin_id="0"/>
+<value value="2" desc="2" bin_id="1"/>
+</element>
+<element name="flowcontrol" desc="Serial interface flow control" type="enum" access="read_write" bin_id="6">
+<value value="none" desc="None" bin_id="0"/>
+<value value="software" desc="Software" bin_id="1"/>
+<value value="hardware" desc="Hardware" bin_id="2"/>
+</element>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="bridge" desc="Bridge interface:Configures a bridge interface." bin_id="5">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="state" desc="Enables a bridge interface" type="on_off" access="read_write" bin_id="0"/>
+<element name="description" desc="Descriptive name for the bridge" type="string" access="read_write" max="63" bin_id="1"/>
+<element name="mtu" desc="Maximum Transmission Unit" type="uint32" access="read_write" min="128" max="1500" bin_id="2"/>
+<element name="interfaces" desc="Member interfaces for bridge" type="string" access="read_write" bin_id="3"/>
+<element name="ip_address" desc="IPv4 address" type="ipv4" access="read_write" bin_id="4"/>
+<element name="mask" desc="IPv4 subnet mask" type="ipv4" access="read_write" bin_id="5"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="route" desc="Static route:Static routing configuration" bin_id="6">
+<attr name="index" desc="item number" type="int32" min="1" max="32"/>
+<element name="destination" desc="Destination IP network for the route" type="ipv4" access="read_write" bin_id="0"/>
+<element name="mask" desc="Destination IP netmask for the route" type="ipv4" access="read_write" bin_id="1"/>
+<element name="gateway" desc="Gateway to use for the route" type="ipv4" access="read_write" bin_id="2"/>
+<element name="metric" desc="Metric for the route" type="uint32" access="read_write" min="0" max="255" bin_id="3"/>
+<element name="interface" desc="Name of the interface to route packets" type="enum" access="read_write" bin_id="4">
+<value value="none" desc="None" bin_id="0"/>
+<value value="eth1" desc="Ethernet 1" bin_id="1"/>
+<value value="eth2" desc="Ethernet 2" bin_id="2"/>
+<value value="eth3" desc="Ethernet 3" bin_id="3"/>
+<value value="eth4" desc="Ethernet 4" bin_id="4"/>
+<value value="dsl" desc="DSL" bin_id="5"/>
+<value value="cellular1" desc="Cellular 1" bin_id="6"/>
+<value value="cellular2" desc="Cellular 2" bin_id="7"/>
+</element>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="defroute" desc="Default route:Default routing configuration" bin_id="7">
+<attr name="index" desc="item number" type="int32" min="1" max="5"/>
+<element name="gateway" desc="Gateway for this default route" type="ipv4" access="read_write" bin_id="0"/>
+<element name="interface" desc="Name of the interface to route packets" type="enum" access="read_write" bin_id="1">
+<value value="none" desc="None" bin_id="0"/>
+<value value="eth1" desc="Ethernet 1" bin_id="1"/>
+<value value="eth2" desc="Ethernet 2" bin_id="2"/>
+<value value="eth3" desc="Ethernet 3" bin_id="3"/>
+<value value="eth4" desc="Ethernet 4" bin_id="4"/>
+<value value="dsl" desc="DSL" bin_id="5"/>
+<value value="cellular1" desc="Cellular 1" bin_id="6"/>
+<value value="cellular2" desc="Cellular 2" bin_id="7"/>
+</element>
+<element name="metric" desc="Metric for this default static route" type="uint32" access="read_write" min="0" max="255" bin_id="2"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="user" desc="User:User management" bin_id="8">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="name" desc="User name" type="string" access="read_write" max="32" bin_id="0"/>
+<element name="password" desc="User password" type="password" access="write_only" max="128" bin_id="1"/>
+<element name="access" desc="User access level" type="enum" access="read_write" bin_id="2">
+<value value="read_only" desc="Read-only" bin_id="0"/>
+<value value="read_write" desc="Read-write" bin_id="1"/>
+<value value="super" desc="Super" bin_id="2"/>
+</element>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="ip" desc="IP:IP configuration" bin_id="9">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="admin_conn" desc="Admin distance for connected routes" type="uint32" access="read_write" min="0" max="255" bin_id="0"/>
+<element name="admin_static" desc="Admin distance for static routes" type="uint32" access="read_write" min="0" max="255" bin_id="1"/>
+<element name="hostname" desc="Device IP hostname configuration" type="string" access="read_write" max="63" bin_id="2"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="ssh" desc="SSH:SSH configuration" bin_id="10">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="server" desc="Enable or disable the SSH server" type="enum" access="read_write" bin_id="0">
+<value value="enabled" desc="enabled" bin_id="0"/>
+<value value="disabled" desc="disabled" bin_id="1"/>
+</element>
+<element name="port" desc="SSH Server port" type="uint32" access="read_write" min="1" max="65535" bin_id="1"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="cloud" desc="Cloud:Remote Manager configuration" bin_id="11">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="state" desc="Enable or disable" type="on_off" access="read_write" bin_id="0"/>
+<element name="server" desc="Remote Manager server" type="fqdnv6" access="read_write" bin_id="1"/>
+<element name="reconnect" desc="Auto reconnect time" type="uint32" access="read_write" min="0" max="3600" bin_id="2"/>
+<element name="keepalive" desc="Keepalive time in seconds" type="uint32" access="read_write" min="10" max="7200" bin_id="3"/>
+<element name="keepalive_cellular" desc="Keepalive time for cellular" type="uint32" access="read_write" min="10" max="7200" bin_id="4"/>
+<element name="keepalive_count" desc="Max keepalive miss count" type="uint32" access="read_write" min="0" max="10" bin_id="5"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="failover" desc="Failover:Failover configuration" bin_id="12">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="state" desc="Enable or disable failover configuration" type="on_off" access="read_write" bin_id="0"/>
+<element name="from" desc="Failover from interface" type="enum" access="read_write" bin_id="1">
+<value value="none" desc="None" bin_id="0"/>
+<value value="eth1" desc="Ethernet 1" bin_id="1"/>
+<value value="eth2" desc="Ethernet 2" bin_id="2"/>
+<value value="eth3" desc="Ethernet 3" bin_id="3"/>
+<value value="eth4" desc="Ethernet 4" bin_id="4"/>
+<value value="dsl" desc="DSL" bin_id="5"/>
+<value value="cellular1" desc="Cellular 1" bin_id="6"/>
+<value value="cellular2" desc="Cellular 2" bin_id="7"/>
+</element>
+<element name="to" desc="Failover to interface" type="enum" access="read_write" bin_id="2">
+<value value="none" desc="None" bin_id="0"/>
+<value value="eth1" desc="Ethernet 1" bin_id="1"/>
+<value value="eth2" desc="Ethernet 2" bin_id="2"/>
+<value value="eth3" desc="Ethernet 3" bin_id="3"/>
+<value value="eth4" desc="Ethernet 4" bin_id="4"/>
+<value value="dsl" desc="DSL" bin_id="5"/>
+<value value="cellular1" desc="Cellular 1" bin_id="6"/>
+<value value="cellular2" desc="Cellular 2" bin_id="7"/>
+</element>
+<element name="use" desc="Failover detection method" type="enum" access="read_write" bin_id="3">
+<value value="ping" desc="Ping" bin_id="0"/>
+<value value="passive" desc="Passive" bin_id="1"/>
+</element>
+<element name="timeout" desc="Failover after this number of seconds" type="uint32" access="read_write" min="10" max="3600" bin_id="4"/>
+<element name="probe_host" desc="Probe this IPv4 device" type="fqdnv6" access="read_write" bin_id="5"/>
+<element name="probe_interval" desc="Interval in seconds to send probe packet" type="uint32" access="read_write" min="1" max="3600" bin_id="6"/>
+<element name="probe_size" desc="Probe packet size in bytes" type="uint32" access="read_write" min="64" max="1500" bin_id="7"/>
+<element name="alternate_after" desc="Time before starting alternate probe" type="uint32" access="read_write" min="0" max="3600" bin_id="8"/>
+<element name="alternate_probe_host" desc="IPv4 alternate probe address" type="fqdnv6" access="read_write" bin_id="9"/>
+<element name="switch_primary_up" desc="Primary up time switch back interval" type="uint32" access="read_write" min="0" max="3600" bin_id="10"/>
+<element name="switch_after" desc="Failover to Primary switch back time" type="uint32" access="read_write" min="0" max="86400" bin_id="11"/>
+<element name="probe_timeout" desc="Probe packet timeout period" type="uint32" access="read_write" min="1" max="60" bin_id="12"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="ipsec" desc="IPsec:IPsec tunnel configuration" bin_id="13">
+<attr name="index" desc="item number" type="int32" min="1" max="32"/>
+<element name="state" desc="Enable or disable IPsec tunnel" type="enum" access="read_write" bin_id="0">
+<value value="off" desc="Disable" bin_id="0"/>
+<value value="on" desc="Enable" bin_id="1"/>
+<value value="on_demand" desc="Enable on demand" bin_id="2"/>
+</element>
+<element name="description" desc="Description for IPsec tunnel" type="string" access="read_write" max="255" bin_id="1"/>
+<element name="peer" desc="Remote peer for this IPsec tunnel" type="fqdnv6" access="read_write" bin_id="2"/>
+<element name="local_network" desc="Local network for this IPsec tunnel" type="ipv4" access="read_write" bin_id="3"/>
+<element name="local_netmask" desc="Local network mask for this IPsec tunnel" type="ipv4" access="read_write" bin_id="4"/>
+<element name="remote_network" desc="Remote network for this IPsec tunnel" type="ipv4" access="read_write" bin_id="5"/>
+<element name="remote_netmask" desc="Remote network mask for this tunnel" type="ipv4" access="read_write" bin_id="6"/>
+<element name="esp_authentication" desc="ESP authentication type for IPsec tunnel" type="string" access="read_write" bin_id="7"/>
+<element name="esp_encryption" desc="ESP encryption type for IPsec tunnel" type="string" access="read_write" bin_id="8"/>
+<element name="esp_diffie_hellman" desc="ESP Diffie Hellman group for IPsec" type="string" access="read_write" bin_id="9"/>
+<element name="auth_by" desc="Authentication type for IPsec tunnel" type="string" access="read_write" bin_id="10"/>
+<element name="psk" desc="Preshared shared key for IPsec tunnel" type="password" access="write_only" max="128" bin_id="11"/>
+<element name="local_id" desc="Local ID used for this IPsec tunnel" type="string" access="read_write" max="31" bin_id="12"/>
+<element name="remote_id" desc="Remote ID used for this IPsec tunnel" type="string" access="read_write" max="31" bin_id="13"/>
+<element name="lifetime" desc="Seconds before IPsec is renegotiated" type="uint32" access="read_write" min="60" max="86400" bin_id="14"/>
+<element name="lifebytes" desc="Sent bytes before IPsec is renegotiated" type="uint32" access="read_write" min="0" max="4000000000" bin_id="15"/>
+<element name="margintime" desc="seconds before limit to renegotiate" type="uint32" access="read_write" min="1" max="3600" bin_id="16"/>
+<element name="marginbytes" desc="Sent bytes before limit to renegotiate" type="uint32" access="read_write" min="0" max="1000000000" bin_id="17"/>
+<element name="random" desc="Percentage to randomize limits" type="uint32" access="read_write" min="0" max="200" bin_id="18"/>
+<element name="ike" desc="IKE version to use for this IPsec tunnel" type="uint32" access="read_write" min="1" max="2" bin_id="19"/>
+<element name="ike_mode" desc="IKEv1 mode to use for this IPsec tunnel" type="enum" access="read_write" bin_id="20">
+<value value="main" desc="IKEv1 mode main" bin_id="0"/>
+<value value="aggressive" desc="IKEv1 mode aggressive" bin_id="1"/>
+</element>
+<element name="ike_encryption" desc="IKE encryption type for IPsec tunnel" type="string" access="read_write" bin_id="21"/>
+<element name="ike_authentication" desc="IKE authentication type for IPsec tunnel" type="string" access="read_write" bin_id="22"/>
+<element name="ike_diffie_hellman" desc="IKE Diffie Hellman group for IPsec" type="string" access="read_write" bin_id="23"/>
+<element name="ike_lifetime" desc="Key lifetime in seconds" type="uint32" access="read_write" min="180" max="4294967295" bin_id="24"/>
+<element name="ike_tries" desc="Number of attempts to negotiate" type="uint32" access="read_write" min="0" max="100" bin_id="25"/>
+<element name="dpddelay" desc="Dead peer detect transmit delay" type="uint32" access="read_write" min="1" max="3600" bin_id="26"/>
+<element name="dpdtimeout" desc="Dead peer detect timeout in seconds" type="uint32" access="read_write" min="1" max="3600" bin_id="27"/>
+<element name="dpd" desc="Enable or disable dead peer detection" type="on_off" access="read_write" bin_id="28"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="snmp" desc="SNMP:Configures SNMP management" bin_id="14">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="v1" desc="Enables or disables SNMPv1 support" type="on_off" access="read_write" bin_id="0"/>
+<element name="v2c" desc="Enables or disables SNMPv2c support" type="on_off" access="read_write" bin_id="1"/>
+<element name="v3" desc="Enables or disables SNMPv3 support" type="on_off" access="read_write" bin_id="2"/>
+<element name="port" desc="Port to listen on for SNMP packets" type="uint32" access="read_write" min="0" max="65535" bin_id="3"/>
+<element name="authentication_traps" desc="Enables SNMP authentication traps" type="on_off" access="read_write" bin_id="4"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="snmp_community" desc="SNMP communities:Configures SNMPv1/v2c communities." bin_id="15">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="community" desc="SNMPv1/v2c community name" type="password" access="write_only" max="128" bin_id="0"/>
+<element name="access" desc="SNMPv1/v2c community access level" type="enum" access="read_write" bin_id="1">
+<value value="read_only" desc="Read-only" bin_id="0"/>
+<value value="read_write" desc="Read-write" bin_id="1"/>
+</element>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="snmp_user" desc="SNMP users:Configures SNMPv3 users." bin_id="16">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="user" desc="SNMPv3 user name" type="string" access="read_write" max="32" bin_id="0"/>
+<element name="authentication" desc="SNMPv3 authentication type" type="enum" access="read_write" bin_id="1">
+<value value="none" desc="None" bin_id="0"/>
+<value value="md5" desc="MD5" bin_id="1"/>
+<value value="sha1" desc="SHA1" bin_id="2"/>
+</element>
+<element name="privacy" desc="SNMPv3 privacy type" type="enum" access="read_write" bin_id="2">
+<value value="none" desc="None" bin_id="0"/>
+<value value="aes" desc="AES" bin_id="1"/>
+<value value="des" desc="DES" bin_id="2"/>
+</element>
+<element name="access" desc="SNMPv3 user access level" type="enum" access="read_write" bin_id="3">
+<value value="read_only" desc="Read-only" bin_id="0"/>
+<value value="read_write" desc="Read-write" bin_id="1"/>
+</element>
+<element name="authentication_password" desc="SNMPv3 authentication password" type="password" access="write_only" min="8" max="64" bin_id="4"/>
+<element name="privacy_password" desc="SNMPv3 privacy password" type="password" access="write_only" min="8" max="64" bin_id="5"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="ipsec_failover" desc="IPsec Failover:IPsec Failover Configuration" bin_id="17">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="state" desc="Enable or disable the IPsec failover" type="on_off" access="read_write" bin_id="0"/>
+<element name="from" desc="IPsec tunnel to failover from" type="uint32" access="read_write" min="1" max="32" bin_id="1"/>
+<element name="to" desc="IPsec tunnel to failover to" type="uint32" access="read_write" min="1" max="32" bin_id="2"/>
+<element name="timeout" desc="Failover after this number of seconds" type="uint32" access="read_write" min="10" max="3600" bin_id="3"/>
+<element name="probe_host" desc="Probe this IPv4 device" type="fqdnv6" access="read_write" bin_id="4"/>
+<element name="probe_interval" desc="Interval in seconds to send probe packet" type="uint32" access="read_write" min="1" max="3600" bin_id="5"/>
+<element name="probe_size" desc="Probe packet size in bytes" type="uint32" access="read_write" min="64" max="1500" bin_id="6"/>
+<element name="probe_timeout" desc="Probe packet timeout period" type="uint32" access="read_write" min="1" max="60" bin_id="7"/>
+<element name="switch_primary_up" desc="Primary up time switch back interval" type="uint32" access="read_write" min="0" max="3600" bin_id="8"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="dhcp_server" desc="DHCP server configuration:DHCP server configuration" bin_id="18">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="state" desc="Enable or disable this DHCP server" type="on_off" access="read_write" bin_id="0"/>
+<element name="ip_address_start" desc="IP address pool start" type="ipv4" access="read_write" bin_id="1"/>
+<element name="ip_address_end" desc="IP address pool end" type="ipv4" access="read_write" bin_id="2"/>
+<element name="netmask" desc="IP network mask to be given to clients" type="ipv4" access="read_write" bin_id="3"/>
+<element name="gateway" desc="IP gateway to be given to clients" type="ipv4" access="read_write" bin_id="4"/>
+<element name="dns1" desc="Preferred DNS server address" type="ipv4" access="read_write" bin_id="5"/>
+<element name="dns2" desc="Alternate DNS server address" type="ipv4" access="read_write" bin_id="6"/>
+<element name="lease_time" desc="IP address lease time in minutes" type="uint32" access="read_write" min="2" max="10080" bin_id="7"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="wan" desc="WAN configuration:WAN configuration" bin_id="19">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="interface" desc="WAN interface" type="enum" access="read_write" bin_id="0">
+<value value="none" desc="None" bin_id="0"/>
+<value value="eth1" desc="Ethernet 1" bin_id="1"/>
+<value value="eth2" desc="Ethernet 2" bin_id="2"/>
+<value value="eth3" desc="Ethernet 3" bin_id="3"/>
+<value value="eth4" desc="Ethernet 4" bin_id="4"/>
+<value value="dsl" desc="DSL" bin_id="5"/>
+<value value="cellular1" desc="Cellular 1" bin_id="6"/>
+<value value="cellular2" desc="Cellular 2" bin_id="7"/>
+</element>
+<element name="timeout" desc="Interface timeout in seconds" type="uint32" access="read_write" min="10" max="3600" bin_id="1"/>
+<element name="probe_host" desc="Probe this IPv4 device" type="fqdnv6" access="read_write" bin_id="2"/>
+<element name="probe_timeout" desc="Probe packet timeout in seconds" type="uint32" access="read_write" min="1" max="60" bin_id="3"/>
+<element name="probe_interval" desc="Interval in seconds to send probe packet" type="uint32" access="read_write" min="1" max="3600" bin_id="4"/>
+<element name="probe_size" desc="Enable routes after this period" type="uint32" access="read_write" min="64" max="1500" bin_id="5"/>
+<element name="activate_after" desc="Enable routes after this period" type="uint32" access="read_write" min="0" max="3600" bin_id="6"/>
+<element name="try_after" desc="Try to bring interface after this period" type="uint32" access="read_write" min="0" max="3600" bin_id="7"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+</format_define>
+</descriptor>
+</query_descriptor>
+</rci_reply>
+</device>
+</send_message>
+</sci_reply>

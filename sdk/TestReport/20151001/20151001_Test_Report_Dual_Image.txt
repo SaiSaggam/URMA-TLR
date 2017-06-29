@@ -1,0 +1,154 @@
+==========
+Pre-condition
+==========
+Step1.
+Remove old command 'amit_change_boot', and add new command 'amit_bootbit' into SDK.
+
+Step2.
+Replace the libupgbuf.so with the newest one.
+Make sure the amit_ftpd is not the STATIC-LINKed version.
+
+Step3.
+Build new FW.
+
+Step4.
+Power on the DUT, and make sure the bootbit is '0'.
+
+Step5.
+Enter recovery mode and upgrade the latest bootloader: BOOT-BRUH0.1001-0930-1701.bin
+
+Step6.
+Upgrade the FW you built in Step1.
+
+
+
+==========
+Test 1.
+Purpose: check the command 'amit_bootbit' is ok
+==========
+Step1.
+Execute 'amit_bootbit', you can see the usage description.
+
+Step2.
+Execute 'amit_bootbit g', you can see the current setting of bootbit.
+
+Step3.
+Execute 'amit_bootbit s 0' or 'amit_bootbit s 1', you can set the bootbit.
+Check the result with 'amit_bootbit g'.
+
+Result:
+----------
+# amit_bootbit
+Usage: amit_bootbit [g|s 0/1]
+
+g: Get bootbit value.
+s 0/1: Set bootbit, 0:Kernel/RootFS1 1:Kernel/RootFS2.
+#
+# amit_bootbit g
+0
+# amit_bootbit s 1
+# amit_bootbit g
+1
+# amit_bootbit s 0
+# amit_bootbit g
+0
+#
+-----------
+
+
+=========
+Test 2.
+Purpose: check the bootbit is working in bootloader
+=========
+Step1.
+Reboot the DUT, you would see this message on console:
+------------
+.found, csid[0x230]=0(len:1)
+FW: choose partition#1
+boot from FW1, FW1(0x60010), FW2(0x4DC0010)
+------------
+That means the new bootloader is used.
+
+Step2.
+Start 'amit_ftpd &'.
+
+Step3.
+PC use ftp client to upgrade FW, you should see these messages:
+-----------
+DUAL IMAGE: k1=0x60000, f1=0x2A0000, k2=0x4DC0000, f2=0x5000000
+DUAL IMAGE: sec_id=0x04, data offset is set to 0x4DC0000
+DUAL IMAGE: sec_id=0x08, data offset is set to 0x5000000
+-----------
+That means the FW will be wrote into partition#2.
+
+Step4.
+After upgrade process is done, DO NOT type 'bye' command in PC side.
+Execute 'amit_bootbit s 1' to change the bootbit, and execute 'amit_bootbit g' to confirm the change.
+
+Step5.
+Reboot, and check the messages while booting.
+You should see this:
+------------
+FW: choose partition#2
+------------
+That means the bootbit is working and system starts with FW partition#2.
+
+
+
+
+==========
+Test 3.
+Purpose: Destory the working FW partition to see if the bootloader could jump to another partition.
+==========
+Step1.
+Assume the current FW partition is #2.
+Execute 'eraseall /dev/mtd4' to destroy Kernel#2.
+-------------
+# eraseall /dev/mtd4
+Erased 2304 Kibyte @ 0 -- 100% complete.
+-------------
+
+Step2.
+Make sure the bootbit is '1'
+-------------
+# amit_bootbit g
+1
+-------------
+
+Step3.
+Reboot the DUT.
+
+Step4.
+You should see these messages:
+-------------
+.found, csid[0x230]=1(len:1)
+FW: choose partition#1
+boot from FW1, FW1(0x60010), FW2(0x0)
+-------------
+The bootbit(csid=0x230) is 0x01, means we want to boot from FW2.
+But the bootloader found that the Kernel2 is gone, so the bootloader choose partition#1 to start up.
+
+
+=========
+Test 4.
+Purpose: Check the upgrade library could upload into correct partition if the expected boot-up partition is gone.
+=========
+Step1.
+Continue with Test 3.
+The bootbit should be '1', but the system boot up with partition#1.
+
+Step2.
+Start 'amit_ftpd &'.
+
+Step3.
+Use ftp client to upgrade FW.
+You should see following messages:
+------------
+DUAL IMAGE: k1=0x60000, f1=0x2A0000, k2=0x4DC0000, f2=0x5000000
+DUAL IMAGE: sec_id=0x04, data offset is set to 0x4DC0000
+DUAL IMAGE: sec_id=0x08, data offset is set to 0x5000000
+------------
+That means, though the bootbit is set to '1', the upgrade library still wrote the FW into partition#2, because we are in partition#1.
+The upgrade library always upgrades FW into the partition that we are not using.
+
+

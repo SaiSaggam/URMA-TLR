@@ -1,0 +1,3 @@
+[submodule "cc_testharness"]
+	path = cc_testharness
+	url = ../../cc/cc_testharness.git

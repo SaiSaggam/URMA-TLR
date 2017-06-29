@@ -1,0 +1,52 @@
+==========
+Pre-condition
+==========
+Step1.
+Renew libamitodm.so in /rootfs/root.released/lib
+Put odmtest in /rootfs/root.released/usr/sbin
+
+Step2.
+Build new FW.
+
+Step3.
+Upgrade device and reboot.
+
+
+==========
+Test 1.
+Purpose: check the new function 'get_odm_SN()'
+==========
+Step1.
+Execute 'odmtest'
+
+Step2.
+If you test this command on spin-3 board, you can see the result as bellow:
+get_odm_ECN: ret=13, ECN=[200909100001]
+get_odm_PV: ret=1, PV=[1]
+get_odm_ModelName: ret=18, ModelName=[WiFi Access Point]
+get_odm_EIDRule: ret=2, EIDRule=[1e04]
+get_odm_DefIP: ret=4, DefIP=[192.168.123.254]
+get_odm_ROMID: ret=13, ROMID=[DGI6E4006001]
+get_odm_FMID: ret=2, FMID=[6e40]
+get_odm_SN: ret=8 , Serial Number=[LR123456]
+get_odm_MAC: ret=6, MAC=[00:50:18:11:22:33]
+get_valid_MAC(0): ret=6, MAC=[00:50:18:11:22:33]
+get_valid_MAC(1): ret=6, MAC=[00:50:18:11:22:34]
+get_valid_MAC(7): ret=6, MAC=[00:50:18:11:22:3A]
+
+
+Step3.
+If you test this command on spin-2 board, you would see this:
+get_odm_ECN: ret=13, ECN=[200909100001]
+get_odm_PV: ret=1, PV=[1]
+get_odm_ModelName: ret=18, ModelName=[WiFi Access Point]
+get_odm_EIDRule: ret=2, EIDRule=[1e04]
+get_odm_DefIP: ret=4, DefIP=[192.168.123.254]
+get_odm_ROMID: ret=13, ROMID=[DGI6E4006001]
+get_odm_FMID: ret=2, FMID=[6e40]
+ODMtest: Serial Number get failed. <-- We did NOT write serial number on spin-2.
+get_odm_MAC: ret=6, MAC=[00:50:18:11:22:33]
+get_valid_MAC(0): ret=6, MAC=[00:50:18:11:22:33]
+get_valid_MAC(1): ret=6, MAC=[00:50:18:11:22:34]
+get_valid_MAC(7): ret=6, MAC=[00:50:18:11:22:3A]
+

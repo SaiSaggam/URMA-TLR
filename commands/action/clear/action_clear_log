@@ -1,0 +1,17 @@
+#!/bin/sh
+
+format_err() {
+  echo "Syntax: clear log"
+}
+
+if [ $# -ne 4 ]; then
+  format_err
+  exit 1
+else
+  rm -rf /home/digi/user/tlr.log
+  killall -HUP rsyslogd
+  logger -p user.info "Event log cleared by $4"
+fi
+
+exit 0
+

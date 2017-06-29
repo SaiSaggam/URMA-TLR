@@ -1,0 +1,112 @@
+.device-main-container {
+  border-left: 1px solid $light-gray;
+}
+.config-nav-main {
+  background: $dark-gray;
+  color: $white;
+  a {
+    color: $white;
+    &.active {
+      i {
+        color: $link;
+      }
+      span {
+        color: lighten($link, 15%);
+      }
+    }
+  }
+  ul {
+    padding: 0;
+  }
+  li {
+    a {
+      display: block;
+      padding: ($spacing-unit/2) $spacing-unit;
+      text-align: center;
+    }
+    div {
+      &.collapsed {
+        display: none;
+        height: 0;
+      }
+    }
+  }
+  &.open {
+    li {
+      a {
+        text-align: left;
+      }
+    }
+  }
+}
+.config-nav-settings {
+  margin-top: 2px;
+  background: lighten($light-gray, 10%);
+  box-shadow: 0px 2px 2px $light-gray;
+}
+.main-menu-image {
+  i {
+    font-size: 1.3em !important;
+  }
+}
+.expando {
+  height: 1em;
+  width: 1em;
+  display: inline-block;
+}
+.main-menu-toggle {
+  height: 1.5em;
+  padding: ($spacing-unit/2) ($spacing-unit/2);
+  margin-bottom: 4px;
+  a {
+    float: right;
+  }
+}
+.config-nav-main-listitem-first,
+.config-nav-main-listitem-second,
+.config-nav-main-listitem-third {
+  white-space: nowrap;
+  > ul {
+    display: none;
+    height: 0;
+  }
+  &.open > ul {
+    display: block;
+    height: auto;
+  }
+}
+.config-nav-main-listitem-first {
+  font-size: 1em !important;
+  > a {
+    .main-menu-label {
+      padding-left: ($spacing-unit/2);
+    }
+  }
+  &.open > a {
+    background: darken($dark-gray, 5%);
+  }
+  &.collapsed > ul {
+    display: none;
+  }
+}
+.config-nav-main-listitem-second {
+  font-size: 0.85em !important;
+  background: lighten($dark-gray, 7%);
+  a {
+    color: $white;
+    padding: 2px $spacing-unit 2px ($spacing-unit*2) !important;
+  }
+  &:first-child {
+    padding-top: 5px;
+  }
+  &:last-child {
+    padding-bottom: 10px;
+  }
+}
+
+.config-nav-main-listitem-third {
+  a {
+    color: $white;
+    padding: 2px $spacing-unit 2px ($spacing-unit*3) !important;
+  }
+}

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE project>
+<project basedir="." default="dist" name="ConfigGenerator">
+	<property name="version" value="1.1.1"/>
+	<property name="build.dir" location="build"/>
+	<property name="class.dir" location="${build.dir}/classes"/>
+	<property name="dist.dir" location="dist"/>
+	<property name="src.dir" location="src"/>
+	<property name="jar" value="json-simple-${version}.jar"/>
+
+	<target name="clean">
+		<delete file="${dist.dir}/${jar}"/>
+		<delete dir="${build.dir}"/>
+	</target>
+
+	<target name="init" depends="clean">
+		<mkdir dir="${build.dir}"/>
+	</target>
+
+	<target name="compile" depends="init">
+		<mkdir dir="${class.dir}"/>
+		<javac srcdir="${src.dir}" destdir="${class.dir}" includeantruntime="false" target="1.2" source="1.2"/>
+	</target>
+
+	<target name="jar" depends="compile">
+		<!-- <jar destfile="${build.dir}/${jar}" basedir="${class.dir}" includes="**/*.class"> -->
+		<jar destfile="${build.dir}/${jar}">
+			<fileset dir="${class.dir}"/>
+			<manifest>
+				<attribute name="Bundle-Name" value="JSON.simple"/>
+				<attribute name="Bundle-SymbolicName" value="com.googlecode.json-simple.json-simple"/>
+				<attribute name="Bundle-Version" value="${version}"/>
+				<attribute name="Bundle-License" value="http://www.apache.org/licenses/LICENSE-2.0.txt"/>
+				<attribute name="Bundle-Description" value="A simple Java toolkit for JSON"/>
+				<attribute name="Export-Package" value="org.json.simple, org.json.simple.parser"/>
+				<!-- <attribute name="Main-Class" value="org.json.simple.JSONObject"/>
+				<attribute name="Implementation-Vendor" value="Digi International"/>
+				<attribute name="Implementation-Title" value="JSON Generator"/>
+				<attribute name="Implementation-Version" value="${version}"/>
+				<attribute name="Sealed" value="true"/> -->
+			</manifest>
+		</jar>
+	</target>
+
+	<target name="dist" depends="jar">
+		<mkdir dir="${dist.dir}"/>
+		<copy file="${build.dir}/${jar}" todir="${dist.dir}"/>
+	</target>
+</project>

@@ -1,0 +1,111 @@
+# Comply with RDS/00008: OASIS Makefile Conventions
+
+ifdef TARGET
+    TARGET_PREFIX = $(TARGET)-
+endif
+
+ifndef CROSS_COMPILE
+    CROSS_COMPILE = $(TARGET_PREFIX)
+    CC = $(CROSS_COMPILE)gcc
+	CXX = $(CROSS_COMPILE)g++
+ 	LD = $(CROSS_COMPILE)ld
+	AR = $(CROSS_COMPILE)ar
+	AS = $(CROSS_COMPILE)as
+	RANLIB = $(CROSS_COMPILE)ranlib
+    STRIP = $(CROSS_COMPILE)strip
+endif
+
+# Openswan used flags
+CFLAGS+=-I$(COMPO_BASE)/include
+LDFLAGS+=-L$(COMPO_BASE)/$(TARGET)-lib
+	
+#ifeq (${TARGET}, mipsel-linux-uclibc)
+	STRIP_TAG=MIPS
+#endif
+    
+ifeq ($(IPT_VER), ) 
+SRC=src
+IPT4_BIN=iptables
+IPT6_BIN=ip6tables
+else
+SRC=src-$(IPT_VER)
+IPT4_BIN=iptables-multi
+IPT6_BIN=ip6tables-multi
+endif
+
+DESTDIR=$(COMPO_BASE)/open_src/OIPTables142/install
+QOS_EXTRA=n
+
+ifeq ($(QOS), y) 
+QOS_EXTRA=n
+endif
+
+ifeq ($(CL_QOS), y) 
+QOS_EXTRA=y
+endif
+
+ifeq ($(SMART_QOS), y)
+QOS_EXTRA=y
+endif
+
+all: precheck compile 
+
+compile:
+	@if [ ! -e $(SRC)/Makefile ]; then \
+		cd $(SRC);./configure --prefix=/ --host=$(TARGET) --with-kernel=$(KERNEL_DIR) \
+			--with-xtlibdir=/lib/iptables ; \
+	fi;
+	@rm -rf $(DESTDIR) ; mkdir -p $(DESTDIR)
+	@make -C $(SRC) ; make install -C $(SRC) DESTDIR=$(DESTDIR)
+	@$(STRIP) $(DESTDIR)/sbin/*
+	@$(STRIP) $(DESTDIR)/lib/*.so*
+	@$(STRIP) $(DESTDIR)/lib/iptables/*.so*
+
+install: postcheck
+	@cp -af $(DESTDIR)/sbin/$(IPT4_BIN)							$(INSTALL_ROOT)/usr/sbin/iptables
+	@cp -af $(DESTDIR)/lib/libxtables.so* 						$(INSTALL_ROOT)/lib
+	@-cp -af $(DESTDIR)/lib/libip4tc*.so* 						$(INSTALL_ROOT)/lib > /dev/null 2>&1
+	@mkdir -p $(DESTDIR)/lib/iptables
+	@cp -af $(DESTDIR)/lib/iptables/libipt_DNAT.so 	        $(INSTALL_ROOT)/lib/iptables
+	@cp -af $(DESTDIR)/lib/iptables/libipt_MASQUERADE.so     $(INSTALL_ROOT)/lib/iptables
+	@cp -af $(DESTDIR)/lib/iptables/libxt_standard.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -af $(DESTDIR)/lib/iptables/libxt_udp.so 		    $(INSTALL_ROOT)/lib/iptables
+	@cp -af $(DESTDIR)/lib/iptables/libxt_tcp.so 		    $(INSTALL_ROOT)/lib/iptables
+	@cp -af $(DESTDIR)/lib/iptables/libxt_TCPMSS.so			$(INSTALL_ROOT)/lib/iptables
+
+precheck:
+	@echo ""
+	@echo "Build $(shell basename `pwd`) for $(PROJECT_NAME) ($(PROJECT_CUSTOMER))"
+ifeq ($(PROJECT_CUSTOMER), ) 
+	@echo ""
+	@echo "No specify PROJECT_CUSTOMER in Makefile. "
+	@echo "Maybe you should update the components Makefile of the Project"
+	@echo ""
+	@exit 1
+endif 
+
+postcheck:                                   
+	@echo ""
+	@echo "Install $(shell basename `pwd`) to $(INSTALL_ROOT)" 
+ifeq ($(INSTALL_ROOT), ) 
+	@echo ""
+	@echo "No specify INSTALL_ROOT in Makefile. "
+	@echo "Maybe you should update the components Makefile of the Project"
+	@echo ""
+	@exit 1
+endif  
+
+clean:
+	rm -rf $(DESTDIR)
+	if [ -e $(SRC)/Makefile ]; then make -C $(SRC) clean; fi;
+
+distclean:
+	rm -rf $(DESTDIR)
+	if [ -e $(SRC)/Makefile ]; then make -C $(SRC) distclean; fi;
+
+
+.PHONY: all clean
+
+export CC CXX LD AR AS RANLIB STRIP CFLAGS LDFLAGS 
+
+

@@ -1,0 +1,231 @@
+#!/bin/bash
+#
+# Script for converting Strongswan UCI configuration to native format
+#
+
+export UCI_CONFIG_DIR="/home/digi"
+
+CONFIGFILE="/etc/ipsec.conf"
+SECRETFILE="/etc/ipsec.secrets"
+
+. /lib/functions.sh
+. /lib/config/uci.sh
+
+
+# Default Values
+default_state="off"
+default_local="%any"
+default_peer=""
+default_local_network=""
+default_local_netmask=""
+default_remote_network=""
+default_remote_netmask=""
+default_esp_authentication="sha1"
+default_esp_encryption="aes128"
+default_esp_diffie_hellman="modp1024"
+default_auth_by="psk"
+default_local_id=""
+default_local_psk=""
+default_remote_id=""
+default_remote_psk=""
+default_ike="1"
+default_ike_mode="main"
+default_ike_encryption="aes128"
+default_ike_authentication="sha1"
+default_ike_diffie_hellman="modp1024"
+default_ike_lifetime="3600"
+default_ike_tries="3"
+default_lifebytes="1m"
+default_margintime="540"
+default_marginbytes="100k"
+default_random="100"
+default_dpddelay="30"
+default_dpdtimeout="150"
+default_dpdaction="none"
+
+ipsec_tun_config() {
+	
+	local cfg="$1"
+	echo >> $CONFIGFILE
+	config_get state $cfg state $default_state
+
+	if [ "$state" == "off" ]; then
+		#state is off, not need to write config
+		return 0
+	else
+		#state is on, write config
+		echo "conn $section" >> $CONFIGFILE
+		echo " auto=start " >> $CONFIGFILE
+		#######Write local#######
+		config_get local $cfg local $default_local
+		if [ -n "$local" ]; then
+		 echo " left=$local " >> $CONFIGFILE
+		fi
+		#######Write peer#######
+		config_get peer $cfg peer $default_peer
+		if [ -n "$peer" ]; then
+		 echo " right=$peer " >> $CONFIGFILE
+		fi
+		
+		#######Write remote_network & remote_netmask#######
+		config_get remote_network $cfg remote_network $default_remote_network
+		config_get remote_netmask $cfg remote_netmask $default_remote_netmask
+		if [ -n "$remote_network" ] && [ -n "$remote_netmask" ]; then
+		 echo " rightsubnet=$remote_network/$remote_netmask " >> $CONFIGFILE
+		fi
+		
+		#######Write local_network & local_netmask#######
+		config_get local_network $cfg local_network $default_local_network
+		config_get local_netmask $cfg local_netmask $default_local_netmask
+		if [ -n "$local_network" ] && [ -n "$local_netmask" ]; then
+		  
+		 echo " leftsubnet=$local_network/$local_netmask " >> $CONFIGFILE
+		fi
+		
+		#######Write phase2 encryption & authentication#######
+		config_get esp_authentication $cfg esp_authentication $default_esp_authentication
+		config_get esp_encryption $cfg esp_encryption $default_esp_encryption
+		config_get esp_diffie_hellman $cfg esp_diffie_hellman $default_esp_diffie_hellman
+		echo " esp=$esp_encryption"-"$esp_authentication"-"$esp_diffie_hellman! " >> $CONFIGFILE
+		
+		#######Write authby#######
+		config_get auth_by $cfg auth_by $default_auth_by
+		echo " authby=$auth_by " >> $CONFIGFILE
+		
+		#######Write local_id & remote_id#######
+		config_get local_id $cfg local_id $default_local_id
+		config_get remote_id $cfg remote_id $default_remote_id
+		config_get local_psk $cfg local_psk $default_local_psk
+		config_get remote_psk $cfg remote_psk $default_remote_psk
+		if [ -n "$local_id" ]; then
+		 echo " leftid=$local_id " >> $CONFIGFILE
+		  #######Write local_psk#######
+		  config_get local_psk $cfg local_psk $default_local_psk
+		  if [ -n "$local_psk" ]; then
+		    echo " \"$local_id\" : PSK \"$local_psk\" " >> $SECRETFILE
+		  fi
+		else
+		    if [ -n "$local_psk" ]; then
+		    echo "%any : PSK \"$local_psk\" " >> $SECRETFILE
+		  fi
+		fi
+		
+		if [ -n "$remote_id" ]; then
+		 echo " rightid=$remote_id " >> $CONFIGFILE
+		  #######Write remote_psk#######
+		  config_get remote_psk $cfg remote_psk $default_remote_psk
+		  if [ -n "$remote_psk" ]; then
+		    echo " \"$remote_id\" : PSK \"$remote_psk\" " >> $SECRETFILE
+		  fi
+		else
+		    if [ -n "$remote_psk" ]; then
+		    echo "$peer : PSK \"$remote_psk\" " >> $SECRETFILE
+		  fi
+		fi
+		
+		#######Write ike version#######
+		config_get ike $cfg ike $default_ike
+		if [ "$ike" = "1" ]; then
+		 echo " keyexchange=ikev1 " >> $CONFIGFILE
+		elif [ "$ike" = "2" ]; then
+		 echo " keyexchange=ikev2 " >> $CONFIGFILE
+        else
+		 echo " keyexchange=ike" >> $CONFIGFILE
+		fi
+		
+		#######Write ike mode#######
+		config_get ike_mode $cfg ike_mode $default_ike_mode
+		if [ "$ike_mode" = "main" ]; then
+		 echo " aggressive=no " >> $CONFIGFILE
+		else
+		 echo " aggressive=yes " >> $CONFIGFILE
+		fi
+		
+		#######Write phase1 encryption & authentication#######
+		config_get ike_authentication $cfg ike_authentication $default_ike_authentication
+		config_get ike_encryption $cfg ike_encryption $default_ike_encryption
+		config_get ike_diffie_hellman $cfg ike_diffie_hellman $ike_diffie_hellman
+		echo " ike=$ike_encryption-$ike_authentication-$ike_diffie_hellman! " >> $CONFIGFILE
+		
+		#######Write ike lifetime & tries & bytes#######
+		config_get ike_lifetime $cfg ike_lifetime $default_ike_lifetime
+		echo " ikelifetime=$ike_lifetime"s" " >> $CONFIGFILE
+		config_get ike_tries $cfg ike_tries $default_ike_tries
+		echo " keyingtries=$ike_tries " >> $CONFIGFILE
+		#######Write ike lifebytes#######
+		config_get lifebytes $cfg lifebytes $default_lifebytes
+		m_count="`echo "$lifebytes" | grep -c m`"
+		if [ "$m_count" = "0" ]; then
+		 #units is not m
+		 k_count="`echo "$lifebytes" | grep -c k`"
+		 if [ "$k_count" = "0" ]; then
+		 #units is not m and k
+		 echo " lifebytes=$lifebytes " >> $CONFIGFILE
+		 else
+		 #units is k
+		 lifebytes_value="`echo "$lifebytes" |  cut -d 'k' -f 1`"
+		 echo " lifebytes=$lifebytes_value"000" " >> $CONFIGFILE
+		 fi
+		else
+		 #units is m
+		 lifebytes_value="`echo "$lifebytes" |  cut -d 'm' -f 1`"
+		 echo " lifebytes=$lifebytes_value"000000" " >> $CONFIGFILE
+		fi
+		
+		#######Write margin time & bytes#######
+		config_get margintime $cfg margintime $default_margintime
+		echo " margintime=$margintime"s" " >> $CONFIGFILE
+		config_get marginbytes $cfg marginbytes $default_marginbytes
+		m_count="`echo "$marginbytes" | grep -c m`"
+		if [ "$m_count" = "0" ]; then
+		 #units is not m
+		 k_count="`echo "$marginbytes" | grep -c k`"
+		 if [ "$k_count" = "0" ]; then
+		 #units is not m and k
+		 echo " marginbytes=$marginbytes " >> $CONFIGFILE
+		 else
+		 #units is k
+		 marginbytes_value="`echo "$marginbytes" |  cut -d 'k' -f 1`"
+		 echo " marginbytes=$marginbytes_value"000" " >> $CONFIGFILE
+		 fi
+		else
+		 #units is m
+		 marginbytes_value="`echo "$marginbytes" |  cut -d 'm' -f 1`"
+		 echo " marginbytes=$marginbytes_value"000000" " >> $CONFIGFILE
+		fi
+		
+		#######Write random#######
+		config_get random $cfg random $default_random
+		echo " rekeyfuzz=$random"%" " >> $CONFIGFILE
+		
+		#######Write dpd parameters#######
+		config_get dpdaction $cfg dpdaction $default_dpdaction
+		echo " dpdaction=$dpdaction " >> $CONFIGFILE
+		config_get dpddelay $cfg dpddelay $default_dpddelay
+		echo " dpddelay=$dpddelay"s" " >> $CONFIGFILE
+		config_get dpdtimeout $cfg dpdtimeout $default_dpdtimeout
+		echo " dpdtimeout=$dpdtimeout"s" " >> $CONFIGFILE
+		
+		#######Write tunnel config ending mark#######
+		echo >> $CONFIGFILE
+		echo "###conn_$section"_"config_end###" >> $CONFIGFILE
+	fi
+		
+}
+
+#
+# Starts here
+#
+
+[ -f "$CONFIGFILE" ] && rm -f "$CONFIGFILE"
+[ -f "$SECRETFILE" ] && rm -f "$SECRETFILE"
+config_load ipsec
+
+echo "# Global IPsec configuration" >> $CONFIGFILE
+echo "config setup" >> $CONFIGFILE
+echo >> $CONFIGFILE
+
+# each tunnel config
+config_foreach ipsec_tun_config ipsec
+
+echo >> $CONFIGFILE

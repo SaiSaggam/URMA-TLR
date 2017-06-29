@@ -1,0 +1,263 @@
+# ------------------------------------------------------------------
+#
+#    Copyright (C) 2002-2005 Novell/SUSE
+#    Copyright (C) 2010 Canonical, Ltd.
+#
+#    This program is free software; you can redistribute it and/or
+#    modify it under the terms of version 2 of the GNU General Public 
+#    License published by the Free Software Foundation.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, contact Novell, Inc.
+# ------------------------------------------------------------------
+# Make.rules - common make targets and variables for building the SHASS
+# product.
+#
+# NOTES:
+#   - must define the package NAME before including this file.
+#   - After checking in to cvs, you'll need to delele the hardlinked
+#     Make.rules files that already exist in the individual application
+#     directories
+
+DISTRIBUTION=AppArmor
+VERSION=$(shell cat common/Version)
+
+AWK:=$(shell which awk)
+ifndef AWK
+$(error awk utility required for build but not available)
+endif
+
+# Convenience functions
+pathsearch = $(firstword $(wildcard $(addsuffix /$(1),$(subst :, ,$(PATH)))))
+map = $(foreach a,$(2),$(call $(1),$(a)))
+
+# OVERRIDABLE variables
+# Set these variables before including Make.rules to change its behavior
+#   SPECFILE - for packages that have a non-standard specfile name
+#   EXTERNAL_PACKAGE - for packages that have upstream versions that
+#   	we're locally modifying (e.g. imnxcerttool/gnutls).
+#
+# use 'make BUILDIR=/some/where/else/' to override the /usr/src/redhat
+# location -- it *should* pick out the right thing to do based on the
+# .rpmmacros file, but you can still use BUILDDIR to override that.
+TESTBUILDDIR=$(shell [ -f ${HOME}/.rpmmacros ] && awk '/^%_topdir/ {print $$2}' ${HOME}/.rpmmacros)
+ifndef BUILDDIR
+BUILDDIR=$(shell if [ -d "${TESTBUILDDIR}" ] ; then \
+		    echo ${TESTBUILDDIR} | sed "s^/$$^^" ; \
+		  elif [ -d "/usr/src/redhat" ] ; then \
+		    echo "/usr/src/redhat" ; \
+		  elif [ -d "/usr/src/packages" ] ; then \
+		    echo "/usr/src/packages" ; \
+		  else \
+		    echo "/tmp/${NAME}"  ; \
+		  fi ;)
+endif
+ifndef DISTRO
+DISTRO=$(shell if [ -f /etc/slackware-version ] ; then \
+		  echo slackware ; \
+	       elif [ -f /etc/debian_version ] ; then \
+	       	  echo debian ;\
+	       elif which rpm > /dev/null ; then \
+	         if [ "$(rpm --eval '0%{?suse_version}')" != "0" ] ; then \
+	             echo suse ;\
+	         elif [ "$(rpm --eval '%{_host_vendor}')" = redhat ] ; then \
+	            echo rhel4 ;\
+	         elif [ "$(rpm --eval '0%{?fedora}')" != "0" ] ; then \
+	            echo rhel4 ;\
+	         else \
+	            echo unknown ;\
+	         fi ;\
+	       else \
+	          echo unknown ;\
+	       fi)
+endif
+RPMARG=--define "_topdir $(BUILDDIR:/=)" \
+        --define "vendor NOVELL, Inc." \
+	--define "distribution ${DISTRIBUTION}" \
+	--define "debug_package %{nil}" \
+	--define "immunix_version ${VERSION}" \
+	$(shell [ -d ${BUILDDIR}/BUILDROOT ] && echo --define \"buildroot $(BUILDDIR:/=)/BUILDROOT\") \
+	$(shell [ -n "${DISTRO}" ] && echo --define \"distro ${DISTRO}\")
+
+REPO_VERSION_CMD=([ -x /usr/bin/bzr ] && /usr/bin/bzr version-info . 2> /dev/null || awk '{ print "revno: "$2 }' common/.stamp_rev) | awk '/^revno:/ { print $2 }'
+
+ifdef EXTERNAL_PACKAGE
+RPMARG+=--define "_sourcedir $(shell pwd)"
+endif
+
+ifndef SPECFILE
+SPECFILE        = $(NAME).spec
+endif
+RELEASE_DIR	= $(NAME)-$(VERSION)
+TAR		= /bin/tar czvp -h --exclude .svn --exclude .bzr --exclude .bzrignore --exclude ${RELEASE_DIR}/${RELEASE_DIR} $(shell test -f ${NAME}.exclude && echo "-X ${NAME}.exclude")
+LDCONFIG	= /sbin/ldconfig
+
+RPMSUBDIRS=SOURCES SPECS BUILD BUILDROOT SRPMS RPMS/i386 RPMS/i586 \
+        RPMS/i686 RPMS/athlon RPMS/noarch RPMS/x86_64
+BUILDRPMSUBDIRS=$(foreach subdir, $(RPMSUBDIRS), $(BUILDDIR:/=)/$(subdir))
+
+ifdef EXTERNAL_PACKAGE
+.PHONY: rpm
+rpm: clean $(BUILDRPMSUBDIRS)
+	rpmbuild -ba ${RPMARG} ${SPECFILE}
+
+else
+.PHONY: rpm
+rpm: clean $(BUILDRPMSUBDIRS)
+	__REPO_VERSION=`$(value REPO_VERSION_CMD)` ; \
+	__TARBALL=$(NAME)-$(VERSION)-$${__REPO_VERSION}.tar.gz ; \
+	make $${__TARBALL} ; \
+	cp $${__TARBALL} $(BUILDDIR)/SOURCES/
+	cp ${SPECFILE} $(BUILDDIR)/SPECS/
+	rpmbuild -ba ${RPMARG} ${SPECFILE}
+
+.PHONY: ${SPECFILE}
+${SPECFILE}: ${SPECFILE}.in
+	__REPO_VERSION=`$(value REPO_VERSION_CMD)` ; \
+	sed -e "s/@@immunix_version@@/${VERSION}/g" \
+	    -e "s/@@repo_version@@/$${__REPO_VERSION}/g" $< > $@
+
+%.tar.gz: clean ${SPECFILE}
+	-rm -rf $(RELEASE_DIR)
+	mkdir $(RELEASE_DIR)
+	$(TAR) --exclude $@ . | tar xz -C $(RELEASE_DIR)
+	$(TAR) --exclude $@ -f $@ $(RELEASE_DIR)
+	rm -rf $(RELEASE_DIR)
+
+ifndef OVERRIDE_TARBALL
+.PHONY: tarball
+tarball: clean $(TARBALL)
+endif
+
+endif
+
+ifndef PYTHON_VERSIONS
+PYTHON_VERSIONS = $(call map, pathsearch, python2 python3)
+endif
+
+ifndef PYTHON
+PYTHON = $(firstword ${PYTHON_VERSIONS})
+endif
+
+#Helper function to be used with $(call pyalldo, run_test_with_all.py)
+pyalldo=set -e; $(foreach py, $(PYTHON_VERSIONS), $(py) $(1);)
+
+.PHONY: version
+.SILENT: version
+version:
+	 rpm -q --define "_sourcedir ." ${RPMARG} --specfile ${SPECFILE}
+
+.PHONY: repo_version
+.SILENT: repo_version
+repo_version:
+	 $(value REPO_VERSION_CMD)
+
+
+.PHONY: build_dir 
+build_dir: $(BUILDRPMSUBDIRS)
+
+$(BUILDRPMSUBDIRS):
+	mkdir -p $(BUILDRPMSUBDIRS)
+
+.PHONY: _clean
+.SILENT: _clean
+_clean:
+	-rm -f ${NAME}-${VERSION}-*.tar.gz
+	-rm -f ${MANPAGES} *.[0-9].gz ${HTMLMANPAGES} pod2htm*.tmp
+
+# =====================
+# generate list of capabilities based on
+# /usr/include/linux/capabilities.h for use in multiple locations in
+# the source tree
+# =====================
+
+# emits defined capabilities in a simple list, e.g. "CAP_NAME CAP_NAME2"
+CAPABILITIES=$(shell echo "\#include <linux/capability.h>" | cpp -dM $(CFLAGS) | LC_ALL=C sed -n -e '/CAP_EMPTY_SET/d' -e 's/^\#define[ \t]\+CAP_\([A-Z0-9_]\+\)[ \t]\+\([0-9xa-f]\+\)\(.*\)$$/CAP_\1/p' | sort)
+
+.PHONY: list_capabilities
+list_capabilities: /usr/include/linux/capability.h
+	@echo "$(CAPABILITIES)"
+
+# =====================
+# generate list of network protocols based on
+# sys/socket.h for use in multiple locations in
+# the source tree
+# =====================
+
+# These are the families that it doesn't make sense for apparmor
+# to mediate. We use PF_ here since that is what is required in
+# bits/socket.h, but we will rewrite these as AF_.
+
+FILTER_FAMILIES=PF_UNSPEC PF_UNIX PF_LOCAL PF_NETLINK
+
+__FILTER=$(shell echo $(strip $(FILTER_FAMILIES)) | sed -e 's/ /\\\|/g')
+
+# emits the AF names in a "AF_NAME NUMBER," pattern
+AF_NAMES=$(shell echo "\#include <sys/socket.h>" | cpp -dM | LC_ALL=C sed -n -e '/$(__FILTER)/d' -e 's/^\#define[ \t]\+PF_\([A-Z0-9_]\+\)[ \t]\+\([0-9]\+\).*$$/AF_\1 \2,/p' | sort -n -k2)
+
+.PHONY: list_af_names
+list_af_names:
+	@echo "$(AF_NAMES)"
+
+# =====================
+# manpages
+# =====================
+
+POD2MAN                         = /usr/bin/pod2man
+POD2HTML                        = /usr/bin/pod2html
+MANDIR                          = /usr/share/man
+DOCDIR                          = /usr/share/doc/${NAME}-${VERSION}
+
+# get list of directory numbers based on definition of MANPAGES variable
+MANDIRS=$(sort $(foreach dir, 1 2 3 4 5 6 7 8, $(patsubst %.${dir}, ${dir}, $(filter %.${dir}, ${MANPAGES}))))
+HTMLMANPAGES=$(foreach manpage, ${MANPAGES}, ${manpage}.html)
+
+.PHONY: install_manpages
+install_manpages: $(MANPAGES)
+	$(foreach dir, ${MANDIRS}, \
+	     install -d ${DESTDIR}/${MANDIR}/man${dir} ; \
+	     install -m 644 $(filter %.${dir}, ${MANPAGES}) ${DESTDIR}/${MANDIR}/man${dir}; \
+	)
+
+MAN_RELEASE="AppArmor ${VERSION}"
+
+%.1 %.2 %.3 %.4 %.5 %.6 %.7 %.8: %.pod
+	$(POD2MAN) $< --release=$(MAN_RELEASE) --center=AppArmor --stderr --section=$(subst .,,$(suffix $@)) > $@
+
+%.1.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+%.2.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+%.3.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+%.4.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+%.5.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+%.6.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+%.7.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+%.8.html: %.pod
+	$(POD2HTML) --header --css apparmor.css --infile=$< --outfile=$@
+
+A2PS_ARGS=-Ec -g --line-numbers=1
+ENSCRIPT_ARGS=-C -2jGr -f Courier6 -E
+%.c.ps: %.c
+	#a2ps ${A2PS_ARGS} $< -o $@
+	enscript ${ENSCRIPT_ARGS} -o $@ $<
+
+%.pm.ps: %.pm
+	enscript ${ENSCRIPT_ARGS} -o $@ $<

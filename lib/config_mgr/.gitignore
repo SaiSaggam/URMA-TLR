@@ -1,0 +1,14 @@
+config_mgr
+*~
+*.o
+*.d
+*.so
+config_def.h
+config_table.c
+config_table.h
+config_valid.c
+uci_default/
+uci_modified/
+mib_default/
+json_default/
+reference_docs/

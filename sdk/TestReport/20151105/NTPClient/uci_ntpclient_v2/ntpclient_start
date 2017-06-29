@@ -1,0 +1,21 @@
+#!/bin/sh
+filename="/home/digi/uci/ntpclient_operation"
+tmpname="/home/digi/uci/tmp"
+
+cd /home/digi/uci
+./ntpclient_convert
+
+exec < $filename
+
+while read line
+do
+        $line > $tmpname
+
+        if [ -s $tmpname ]; then
+                echo "sync success"
+                break
+        else
+                echo "sync failed"
+        fi
+        rm -f $tmpname
+done

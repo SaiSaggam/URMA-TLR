@@ -1,0 +1,21 @@
+#!/bin/sh
+#echo apply_snmp_community "$@"
+
+# Skip SNMP init script at startup since apply_snmp runs it.
+while [ $# -gt  1 ]
+do
+    key="$1"
+    case $key in
+        -u)
+            username="$2"
+            shift
+        ;;
+        *)
+        ;;
+    esac
+    shift
+done
+
+if [ "$username" != "boot" ]; then
+    /usr/etc/init.d/init_snmp.sh reload
+fi

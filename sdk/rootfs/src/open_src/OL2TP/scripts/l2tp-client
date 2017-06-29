@@ -1,0 +1,99 @@
+#!/bin/sh
+
+PIDFILE_PPPD="/var/run/ppp$2.pid"
+PID=`cat $PIDFILE_PPPD`
+
+
+#### main ####
+[ -z "$1" ] && usage
+case "$1" in
+  start)
+    #CSID_C_L2TP_CLI_ACTIVE
+    wrcsman "0x00061a00 0x01"
+
+	# Check if enable VPN-L2TP Client
+    e=`rdcsman 0x00061000 u8`
+    if [ $e = "1" ] ; then
+        echo " L2TPClient Enabled ..... [WAITING]"
+    else
+        echo " L2TPClient Not enabled ..... [WARNING]"
+        exit
+    fi
+
+	# Set L2TP connect status
+  	wrcsman "0x80060700 0x01"
+	L2TP_CNT=`rdcsman 0x80060700 u16`	
+	echo "l2tp-client, line 11: set L2TP_CNT=$L2TP_CNT"
+	# Set WAN CNT FORCE
+	wrcsman "0x8001000E 0x01"
+	CNT_FORCE=`rdcsman 0x8001000E u16`
+    echo "l2tp-client, line 15: set CNT_FORCE=$L2TP_CNT"
+	# Set fast_l2tp and hw_nat
+	echo 1 > /proc/fast_l2tp
+	echo 0 > /proc/hw_nat
+
+	# Parse UI Setting
+    i=0
+    while [ $i != 20 ]; do
+        if [ $i -lt 10 ] ; then
+            L2TPC_CLI_ENABLE=`rdcsman 0x0006110$i u8`
+            if [ $L2TPC_CLI_ENABLE -eq 1 ] ; then
+                # connect type, 0x00061700, on demand=0, auto=1, manual=2
+                CONNECT_TYPE=`rdcsman 0x0006170$i u8`
+                # auto type
+                if [ $CONNECT_TYPE -eq 1 ] ; then
+                    echo "l2tp-client, line 38: PPP Connectting"
+                    USER=`rdcsman 0x0006140$i str`
+					PASSWORD=`rdcsman 0x0006150$i str`
+                    PEERIP=`rdcsman 0x0006130$i ipv4`
+                    echo "l2tp-client, line 42: l2tp-action start $PEERIP $USER $PASSWORD"
+    				l2tp-action start $PEERIP $USER $PASSWORD
+                fi
+            fi
+        fi
+        if [ $i -ge 10 ] ; then
+            L2TPC_CLI_ENABLE=`rdcsman 0x000611$i u8`
+            if [ $L2TPC_CLI_ENABLE -eq 1 ] ; then
+                # connect type, 0x00051700, on demand=0, auto=1, manual=2
+                CONNECT_TYPE=`rdcsman 0x000617$i u8`
+                # auto type
+                if [ $CONNECT_TYPE -eq 1 ] ; then
+                    echo "l2tp-client, line 54: PPP Connectting"
+                    USER=`rdcsman 0x000614$i str`
+                    PASSWORD=`rdcsman 0x000615$i str`
+                    PEERIP=`rdcsman 0x000613$i ipv4`
+                    echo "l2tp-client, line 58: l2tp-action start $PEERIP $USER $PASSWORD"
+                    l2tp-action start $PEERIP $USER $PASSWORD
+                fi
+            fi
+        fi
+        i=`expr $i + 1`
+    done
+
+    echo
+    ;;
+
+  stop)
+    #clear show connect status test
+    wrcsman "0x00061303 0x00"
+    wrcsman "0x00061304 0x00"
+
+    l2tp-action stop
+    echo 0 > /proc/fast_l2tp
+    echo 1 > /proc/hw_nat
+
+    echo "Killing l2tp-connect ($PID, ppp$2.pid killed)"
+    kill $PID > /dev/null 2>&1
+
+    echo
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    #echo "start: pptp-client start 192.168.122.60 test"
+    exit 1
+esac
+
+exit 0
+
+
+

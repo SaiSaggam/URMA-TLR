@@ -1,0 +1,151 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{E813E46F-65A2-4BC2-94FA-EB785A3A199B}</ProjectGuid>
+    <RootNamespace>idigi</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\</IntDir>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>../../../../../public/step/platforms/windows;../../../../../public/include/;../../../../../private/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>../../../../../public/step/platforms/windows;../../../../../public/include/;../../../../../private/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\application.c" />
+    <ClCompile Include="..\config.c" />
+    <ClCompile Include="..\debug.c" />
+    <ClCompile Include="..\..\..\..\..\private\connector_api.c" />
+    <ClCompile Include="..\main.c" />
+    <ClCompile Include="..\network.c" />
+    <ClCompile Include="..\os.c" />
+    <ClCompile Include="..\status.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\private\bele.h" />
+    <ClInclude Include="..\..\..\..\private\chk_config.h" />
+    <ClInclude Include="..\..\..\..\private\debug.h" />
+    <ClInclude Include="..\..\..\..\private\ei_packet.h" />
+    <ClInclude Include="..\..\..\..\public\include\connector_api.h" />
+    <ClInclude Include="..\..\..\..\private\connector_cc.h" />
+    <ClInclude Include="..\connector_config.h" />
+    <ClInclude Include="..\..\..\..\public\include\connector_debug.h" />
+    <ClInclude Include="..\..\..\..\private\connector_def.h" />
+    <ClInclude Include="..\..\..\..\private\connector_ds.h" />
+    <ClInclude Include="..\..\..\..\private\connector_ds_legacy.h" />
+    <ClInclude Include="..\..\..\..\private\connector_edp.h" />
+    <ClInclude Include="..\..\..\..\private\connector_edp_def.h" />
+    <ClInclude Include="..\..\..\..\private\connector_edp_util.h" />
+    <ClInclude Include="..\..\..\..\private\connector_fs.h" />
+    <ClInclude Include="..\..\..\..\private\connector_fw.h" />
+    <ClInclude Include="..\..\..\..\private\connector_info.h" />
+    <ClInclude Include="..\..\..\..\private\connector_msg.h" />
+    <ClInclude Include="..\..\..\..\public\include\connector_remote.h" />
+    <ClInclude Include="..\..\..\..\private\connector_sm.h" />
+    <ClInclude Include="..\..\..\..\private\connector_sm_cmd.h" />
+    <ClInclude Include="..\..\..\..\private\connector_sm_def.h" />
+    <ClInclude Include="..\..\..\..\private\connector_sm_recv.h" />
+    <ClInclude Include="..\..\..\..\private\connector_sm_send.h" />
+    <ClInclude Include="..\..\..\..\private\connector_sm_session.h" />
+    <ClInclude Include="..\..\..\..\private\connector_sm_utils.h" />
+    <ClInclude Include="..\..\..\..\private\connector_static_buffer.h" />
+    <ClInclude Include="..\..\..\..\private\connector_tcp_close.h" />
+    <ClInclude Include="..\..\..\..\private\connector_tcp_open.h" />
+    <ClInclude Include="..\..\..\..\private\connector_tcp_recv.h" />
+    <ClInclude Include="..\..\..\..\private\connector_tcp_send.h" />
+    <ClInclude Include="..\..\..\..\public\include\connector_types.h" />
+    <ClInclude Include="..\..\..\..\private\layer.h" />
+    <ClInclude Include="..\..\..\..\private\options.h" />
+    <ClInclude Include="..\..\..\..\private\os_intf.h" />
+    <ClInclude Include="..\platform.h" />
+    <ClInclude Include="..\..\..\..\private\rci_fwstub.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_attribute.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_buffer.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_callback.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_command.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_debug.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_element.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_entity.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_error.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_group.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_input.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_output.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_string.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_support.h" />
+    <ClInclude Include="..\..\..\..\private\rci_parser_traversal.h" />
+    <ClInclude Include="..\..\..\..\private\rci_service.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

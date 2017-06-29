@@ -1,0 +1,317 @@
+#!/bin/sh
+. /usr/bin/scriptlib
+
+# Check if exist multiwan index
+if [ -n $1 ] ; then
+    MULTIWAN=$1
+else
+    MULTIWAN=
+fi
+
+CONFIG=/etc/ppp/pppoe.conf
+export CONFIG
+. $CONFIG
+
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+
+if [ -z $MULTIWAN ] ; then
+	PIDFILE_PPPD="/var/run/ppp-pppoe.pid"
+	CNT_TYPE=`rdcsman 0x00040900 u32`
+else
+	PIDFILE_PPPD="/var/run/ppp-pppoe$MULTIWAN.pid"
+	TMP=`printf "%x" $((MULTIWAN+1))`
+	MULTIHEX=`printf "%x" $MULTIWAN`
+	CNT_TYPE=`rdcsman 0x0004090$TMP u32`
+fi
+
+writeCSIDvalues () {
+	if [ -r $PIDFILE_PPPD ] ; then
+		sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+		[ $? != 0 ] && exit 1 	
+	else
+		exit 1
+	fi
+
+	if [ -z $PPP_IF ] ; then
+		exit 1
+	fi
+		
+	sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+	sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+	sl_get_uptime CNTTIME
+	
+	if [ -z $MULTIWAN ] ; then
+		if [ "$IF_IP" = "10.64.64.64" ] ; then
+            #Got a fake IP, interface is disconnect
+			wrcsman "0x80040200 00 && \
+					 0x80040300 00 && \
+					 0x80040400 00 && \
+					 0x80040500 00 && \
+					 0x80040600 00 && \
+					 0x80010002 00 && \
+					 0x80010003 00 && \
+					 0x80010004 00 && \
+					 0x80010005 00 && \
+					 0x80010006 00 "
+
+			if [ $CNT_TYPE -eq 0 ] ; then
+                #wait for traffic
+				wrcsman "0x80040700 0x05 && \
+					 	 0x80010007 0x05"
+			else
+                #manual or autoreconnect, but wan is unconnected.
+				wrcsman "0x80040700 0x00 && \
+					 	 0x80010007 0x00"
+			fi
+
+		elif [ "$IF_IP" = "" ] ; then
+    		#Got no IP, interface is disconnect
+            wrcsman "0x80040200 00 && \
+                     0x80040300 00 && \
+                     0x80040400 00 && \
+                     0x80040500 00 && \
+                     0x80040600 00 && \
+                     0x80010002 00 && \
+                     0x80010003 00 && \
+                     0x80010004 00 && \
+                     0x80010005 00 && \
+                     0x80010006 00 "
+
+    		#disconnecting
+	        wrcsman "0x80040700 0x03 && \
+                 	 0x80010007 0x03"
+
+		else
+            #Got a real IP address
+			LOADSHARING=`rdcsman 0x004301c0 u32`
+			if [ $LOADSHARING -eq 0 ] ; then
+				wrcsman "0x80040100 $CNTTIME && \
+						 0x80040200 {$IF_IP} && \
+						 0x80040300 {$IF_NM} && \
+						 0x80040400 {$IF_GW} && \
+						 0x80040500 {$IF_DNS1} && \
+						 0x80040600 {$IF_DNS2} && \
+                         0x80040C00 \"$PPP_IF && \
+						 0x80040700 0x02 && \
+						 0x80010002 {$IF_IP} && \
+						 0x80010003 {$IF_NM} && \
+						 0x80010004 {$IF_GW} && \
+						 0x80010005 {$IF_DNS1} && \
+						 0x80010006 {$IF_DNS2} && \
+						 0x8001000B \"$PPP_IF && \
+						 0x80010007 0x02"
+			else
+				LOADSHARING_WANTYPE=`rdcsman 0x0043000b u32`
+				if [ $LOADSHARING_WANTYPE -eq 6 ] ; then
+					wrcsman "0x80040100 $CNTTIME && \
+							 0x80040200 {$IF_IP} && \
+							 0x80040300 {$IF_NM} && \
+							 0x80040400 {$IF_GW} && \
+							 0x80040500 {$IF_DNS1} && \
+							 0x80040600 {$IF_DNS2} && \
+							 0x80040700 0x02"
+				fi
+			fi
+		fi
+	else
+		if [ "$IF_IP" = "10.64.64.64" ] ; then
+            #Got a fake IP, interface is disconnect
+			wrcsman "0x8004020$TMP 00 && \
+					 0x8004030$TMP 00 && \
+					 0x8004040$TMP 00 && \
+					 0x8004050$TMP 00 && \
+					 0x8004060$TMP 00 && \
+					 0x8001011$MULTIHEX 00 && \
+					 0x8001012$MULTIHEX 00 && \
+					 0x8001013$MULTIHEX 00 && \
+					 0x8001014$MULTIHEX 00 && \
+					 0x8001015$MULTIHEX 00 "
+
+			if [ $CNT_TYPE -eq 0 ] ; then
+                #wait for traffic
+				wrcsman "0x8004070$TMP 0x05 && \
+					 	 0x8001016$MULTIHEX 0x05"
+			else
+                #manual or autoreconnect, but wan is unconnected.
+				wrcsman "0x8004070$TMP 0x00 && \
+					 	 0x8001016$MULTIHEX 0x00"
+			fi
+
+		elif [ "$IF_IP" = "" ] ; then
+			#Got no IP, interface is disconnect
+            wrcsman "0x8004020$TMP 00 && \
+                     0x8004030$TMP 00 && \
+                     0x8004040$TMP 00 && \
+                     0x8004050$TMP 00 && \
+                     0x8004060$TMP 00 && \
+                     0x8001011$MULTIHEX 00 && \
+                     0x8001012$MULTIHEX 00 && \
+                     0x8001013$MULTIHEX 00 && \
+                     0x8001014$MULTIHEX 00 && \
+                     0x8001015$MULTIHEX 00 "
+
+			#disconnecting   
+			wrcsman "0x8004070$TMP 0x03 && \
+					 0x8001016$MULTIHEX 0x03"
+
+		else
+            #Got a real IP address
+			wrcsman "0x8004010$TMP $CNTTIME && \
+					 0x8004020$TMP {$IF_IP} && \
+					 0x8004030$TMP {$IF_NM} && \
+					 0x8004040$TMP {$IF_GW} && \
+					 0x8004050$TMP {$IF_DNS1} && \
+					 0x8004060$TMP {$IF_DNS2} && \
+					 0x80040C1$MULTIHEX \"$PPP_IF && \
+					 0x8004070$TMP 0x02 && \
+					 0x8001011$MULTIHEX {$IF_IP} && \
+					 0x8001012$MULTIHEX {$IF_NM} && \
+					 0x8001013$MULTIHEX {$IF_GW} && \
+		             0x8001014$MULTIHEX {$IF_DNS1} && \
+				     0x8001015$MULTIHEX {$IF_DNS2} && \
+		             0x8001019$MULTIHEX \"$PPP_IF && \
+					 0x8001016$MULTIHEX 0x02"
+		fi
+	fi
+
+}
+
+#clear last ppp auth fail tmp file
+rm -rf /var/run/ppp_auth_fail
+
+# Check for $PIDFILE.connect
+if [ -r "$PIDFILE_CONNECT" ] ; then
+    PID=`cat "$PIDFILE_CONNECT"`
+    # Check if still running
+    kill -0 $PID > /dev/null 2>&1
+    if [ $? = 0 ] ; then
+		echo "$0: There already seems to be a PPPoE connection up (PID $PID)" >& 2
+        
+        wrcsman "0x80040700 2"
+		exit 0
+    fi
+    # Delete bogus PIDFILE
+    rm -f "$PIDFILE_CONNECT" "$PIDFILE_START"
+fi
+
+echo $$ > $PIDFILE_START
+pppoe-connect "$@" &
+CONNECT_PID=$!
+if [ "$CONNECT_TIMEOUT" = "" -o "$CONNECT_TIMEOUT" = 0 ] ; then
+    exit 0
+fi
+
+#
+# Important! it must be waited for pppd creating the pppx interface	
+#
+
+sleep 5
+local retry=0
+if [ -e /var/run/multiwan_enable ] ; then
+	while [ true ]; do
+		if [ "$retry" = "30" ] ; then
+            echo "Timeout for waiting PPPoE connection !! "
+            break;
+        fi
+
+		if [ -r $PIDFILE_PPPD ] ; then
+			sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+			if [ "$PPP_IF" != "" ] ; then
+				sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+				if [ "$IF_IP" != "" ] ; then
+       					break; # pppX interface is created
+				else
+					echo "No PPPoE interface ip"
+				fi
+			else
+				echo "No PPPoE interface"
+			fi
+		else
+			echo "No PPPoE pid"
+		fi
+
+		#Check 3G autobak status
+		AUTOBAK_STA=`rdcsman 0x801e1200 u32`
+		if [ $AUTOBAK_STA -eq 1 ] ; then
+			break;
+		fi
+
+		retry=$((retry+1))
+        sleep 1
+	done
+else
+	while [ true ]; do
+		if [ "$retry" = "30" ] ; then
+            echo "Timeout for waiting PPPoE connection !! "
+            break;
+        fi
+        
+        CNT_STAT=`rdcsman 0x80040700 u32`
+        if [ $CNT_STAT -eq 3 ]; then
+            echo "PPPoe Connection Status is Disconnecting !!"
+            break;
+        fi
+
+		if [ ! -r $PIDFILE_PPPD ] ; then
+            retry=$((retry+1))
+            sleep 1
+            continue;                   
+        else
+            break; # pppX interface is created
+        fi
+	done
+fi
+writeCSIDvalues
+
+# Don't monitor connection if dial-on-demand
+if [ "$DEMAND" != "" -a "$DEMAND" != "no" ] ; then
+    exit 0
+fi
+
+# Monitor connection
+TIME=0
+CONNECT_POLL=1
+CONNECT_TIMEOUT=20
+while [ true ] ; do
+	if [ -z $MULTIWAN ] ; then
+	    pppoe-status > /dev/null 2>&1
+	else
+	    pppoe-status $MULTIWAN > /dev/null 2>&1
+	fi
+
+    # Looks like the interface came up
+    if [ $? = 0 ] ; then
+		echo "$0: Connected!"
+		exit 0
+    fi
+
+	if [ -f /var/run/ppp_auth_fail ] ; then
+		echo "$0: Authentication Fail!"
+		if [ -z $MULTIWAN ] ; then
+			wrcsman	"0x80010007 0x06 &&\
+					 0x80040700 0x06"
+		else
+			wrcsman	"0x8001016$MULTIHEX 0x06 &&\
+					 0x8004070$TMP 0x06"
+		fi
+		exit 0
+	fi
+
+    CNT_STAT=`rdcsman 0x80040700 u32`
+    if [ $CNT_STAT -eq 3 ]; then
+        echo "PPPoe Status is Disconnecting !!"
+        break;
+    fi
+    sleep $CONNECT_POLL
+    TIME=$(($TIME + $CONNECT_POLL))
+    if [ $TIME -gt $CONNECT_TIMEOUT ] ; then
+        break
+    fi
+done
+echo "TIMED OUT" >& 2
+
+# Clean up PIDFILE(s)
+rm -f "$PIDFILE_START"
+exit 1
+

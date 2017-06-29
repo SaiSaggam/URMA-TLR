@@ -1,0 +1,174 @@
+***************
+TEST 1.
+Goal: test the upgrade library
+***************
+1. Prepare two firmware files, firmware_new.bin and firmware_old.bin
+2. Upgrade firmware with amit_ftpd
+3. Check the log of amit_ftpd, you should see two different destination
+-------------------
+write into flash
+DUAL IMAGE: k1=0x60000, f1=0x2A0000, k2=0x4DC0000, f2=0x5000000
+DUAL IMAGE: sec_id=0x04, data offset is set to 0x4DC0000
+write into flash
+write into flash
+DUAL IMAGE: sec_id=0x08, data offset is set to 0x5000000
+write into flash
+write into flash
+write into flash
+--------------------
+and
+--------------------
+write into flash
+DUAL IMAGE: k1=0x60000, f1=0x2A0000, k2=0x4DC0000, f2=0x5000000
+DUAL IMAGE: sec_id=0x04, data offset is set to 0x60000
+write into flash
+write into flash
+DUAL IMAGE: sec_id=0x08, data offset is set to 0x2A0000
+write into flash
+---------------------
+4. Every time you upgrade firmwre, the destination offset will changed round robin.
+
+
+
+
+
+*****************
+TEST 2.
+Goal: check if the bootloader can boot from the newest one
+*****************
+1. After test 1, your system should contain two images.
+2. Check the bootloader log, you should see these:
+----------------------
+..
+.MAC FF:FF:FF:FF:FF:FF
+kernel1 timestamp=137976323, kernel2 timestamp=137977311
+FW: choose newer one
+boot from FW2, FW1(0x60010), FW2(0x4DC0010)
+======================
+boot_kernel *ka = 4dc0038 ksc = 4dc0010 (*h)->header_len = 28
+recovery CopyFlash_check!!............................Kernel CRC OK!
+................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................Rootfs CRC OK!
+-----------------------
+3. The log shows the time stamp of each image, and bootloader will boot from the newer one.
+4. You can check which partition is used as your RootFS by typing command "df".
+------------------------
+# df
+Filesystem           1k-blocks      Used Available Use% Mounted on
+/dev/mtdblock5           32640     32640         0 100% /
+none                    127284      2740    124544   2% /ram
+#
+------------------------
+
+
+
+
+*****************
+TEST 3.
+Goal: check if the bootloader can switch to another image if the first priority is corrupted.
+*****************
+1. After test 2, you can see which image that bootloader use to boot.
+2. If you boot from FW1, then use this command to destroy the RootFS1:
+		"eraseall /dev/mtd3"
+	 If you boot from FW2, the command is "eraseall /dev/mtd5"
+------------------------
+# df
+Filesystem           1k-blocks      Used Available Use% Mounted on
+/dev/mtdblock5           32640     32640         0 100% /
+none                    127284      2740    124544   2% /ram
+# eraseall /dev/mtd5
+Erased 76928 Kibyte @ 0 -- 100% complete.
+#
+------------------------
+3. After erasing the RootFS, reboot the system.
+4. You can see the bootloader still want to boot from the original image, but get CRC error on RootFS checking. And bootloader would try to boot from another image.
+------------------------
+kernel1 timestamp=137976323, kernel2 timestamp=137977311
+FW: choose newer one
+boot from FW2, FW1(0x60010), FW2(0x4DC0010)
+======================
+boot_kernel *ka = 4dc0038 ksc = 4dc0010 (*h)->header_len = 28
+recovery CopyFlash_check!!............................Kernel CRC OK!
+................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................Rootfs CRC Error! DC2BF4D0 C082EFC4
+FW2 CRC error, try to boot from FW1
+======================
+boot_kernel *ka = 60038 ksc = 60010 (*h)->header_len = 28
+recovery CopyFlash_check!!............................Kernel CRC OK!
+................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................Rootfs CRC OK!
+------------------------
+
+
+
+
+*****************
+TEST 4.
+Goal: check if the bootloader can switch to another image when user changes the boot-bit.
+*****************
+1. After boot, type command "amit_change_boot 0" or "amit_change_boot 1"
+	0 means boot from newer one, 1 means boot from older one. Default value is 0.
+2. Reboot the system and check the boot messages to see if the behavior is correct.
+------------------------
+# amit_change_boot 1
+# reboot
+
+...csid[0x230]=1(len:1)
+kernel1 timestamp=138084940, kernel2 timestamp=138085442
+FW: choose older one
+boot from FW1, FW1(0x60010), FW2(0x4DC0010)
+------------------------
+3. Change to another setting and check again.
+------------------------
+# amit_change_boot 0
+# reboot
+
+...csid[0x230]=0(len:1)
+kernel1 timestamp=138084940, kernel2 timestamp=138085442
+FW: choose newer one
+boot from FW2, FW1(0x60010), FW2(0x4DC0010)
+------------------------
+
+
+
+
+
+*****************
+TEST 5.
+Goal: check if the FW upgrade can upgrade to right place after user changes the boot-bit.
+*****************
+1. After boot, type command "amit_change_boot 0" or "amit_change_boot 1"
+	0 means boot from newer one, 1 means boot from older one. Default value is 0.
+2. If the boot-bit is '0', FW will overwrite the older one. If the boot-bit is '1', FW will overwrite to the newer one.
+3. Upgrade a firmware through amit_ftpd then check the boot messages.
+------------------------
+...csid[0x230]=0(len:1)
+kernel1 timestamp=138084940, kernel2 timestamp=138085442
+FW: choose newer one
+boot from FW2, FW1(0x60010), FW2(0x4DC0010)
+
+# amit_change_boot 1
+
+DUAL IMAGE: k1=0x60000, f1=0x2A0000, k2=0x4DC0000, f2=0x5000000
+DUAL IMAGE: sec_id=0x04, data offset is set to 0x4DC0000
+write into flash
+write into flash
+DUAL IMAGE: sec_id=0x08, data offset is set to 0x5000000
+write into flash
+write into flash
+write into flash
+write into flash
+------------------------
+...csid[0x230]=0(len:1)
+kernel1 timestamp=138084940, kernel2 timestamp=138085442
+FW: choose newer one
+boot from FW2, FW1(0x60010), FW2(0x4DC0010)
+
+# amit_change_boot 0
+
+DUAL IMAGE: k1=0x60000, f1=0x2A0000, k2=0x4DC0000, f2=0x5000000
+DUAL IMAGE: sec_id=0x04, data offset is set to 0x60000
+write into flash
+write into flash
+DUAL IMAGE: sec_id=0x08, data offset is set to 0x2A0000
+write into flash
+write into flash
+write into flash
+write into flash

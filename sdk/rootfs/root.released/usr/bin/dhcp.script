@@ -1,0 +1,262 @@
+#!/bin/sh
+
+# udhcpc script edited by Tim Riker <Tim@Rikers.org>
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+IFCONFIG="/sbin/ifconfig"
+# RUNNING="/var/run/default-script-running"
+
+[ -z "$1" ] && echo "Error: should be called from udhcpc" && exit 1
+
+get_index $2 $3 # For -I specific
+get_general_config ${Index} ${Index_3G}
+#get_general_status
+get_config ${Index} ${Index_3G}
+get_usb_status ${Index}
+
+Index=`rdcsman 0x801e5010 u16`
+PIDFILE_CONNECT="/var/run/udhcpc.${interface}.pid.connect"
+#RESOLV_CONF="/etc/resolv.conf"
+RESOLV_CONF_DIGI_CELL1="/var/dns/cellular1/resolv.conf"
+RESOLV_CONF_DIGI_CELL2="/var/dns/cellular2/resolv.conf"
+LOG="/var/lsing/3g_dhcp.${interface}.log"
+[ -n "${broadcast}" ] && BROADCAST="broadcast ${broadcast}"
+[ -n "${subnet}" ] && NETMASK="netmask ${subnet}"
+
+udhcpc_renew_write_csman_start()
+{
+	sl_get_IP_NM_GW_in_ifconfig ${interface} IF_IP IF_NM IF_GW
+  sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+  sl_get_uptime CNTTIME
+  #get MAC address for subnet0 interface
+  MACADDR=`ifconfig ${interface} | awk -F ":" '/HWaddr/' | awk '{printf $5}'`
+  #MACADDR0=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $1 }'`
+  #MACADDR1=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $2 }'`
+  #MACADDR2=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $3 }'`
+  #MACADDR3=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $4 }'`
+  #MACADDR4=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $5 }'`
+  #MACADDR5=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $6 }'`
+  #write_mac_addr "${MACADDR0}" "${MACADDR1}" "${MACADDR2}" "${MACADDR3}" "${MACADDR4}" "${MACADDR5}" ${Index} 
+  write_mac_addr "${MACADDR}" ${Index} 
+  
+  #echo "WAN_IF ${WAN_IF} interface ${interface} IF_IP ${IF_IP} IF_NM ${IF_NM} IF_GW ${IF_GW} IF_DNS1 ${IF_DNS1} IF_DNS2 ${IF_DNS2} CNTTIME ${CNTTIME}" > /var/run/testa
+  #WAN_IF=`rdcsman 0x8000f231 str`
+  #CSID_IP=`rdcsman 0x80010002 ipv4`
+  #CSID_NM=`rdcsman 0x80010003 ipv4`
+  #CSID_GW=`rdcsman 0x80010004 ipv4`
+  if [ ${IF_IP} == "10.64.64.64" ]; then
+		 write_if_info "0.0.0.0" "0.0.0.0" "0.0.0.0" ${Index}
+		 write_dns_info "0.0.0.0" "0.0.0.0" ${Index}
+
+     # if CNT_TYPE is on-demand write "wait for traffic" state to csid
+     if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+        write_cnt_status 5 ${Index}
+     else
+        write_cnt_status 5 ${Index}
+     fi
+  # ipv6 does not need
+  #elif [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "1" ] ; then  # for IPv6
+  #   write_error_code 0 ${Index} # clean error code
+  #   write_if_info_ipv6 "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+  #   write_dns_info_ipv6 "${IF_DNS1}" "${IF_DNS2}" ${Index}
+  #   write_cnttime_info "${CNTTIME}" ${Index}
+  #   write_if_name "${interface}" ${Index}
+  #   write_cnt_status 2 ${Index}
+  else
+
+         write_cnttime_info "${CNTTIME}" ${Index}
+		 write_if_name "${interface}" ${Index}
+		 write_if_info "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+		 write_dns_info "${IF_DNS1}" "${IF_DNS2}" ${Index}
+		 write_cnt_status 2 ${Index}
+#     if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ] ; then    # for IPv4/IPv6
+#        write_if_info_ipv6 "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+#        write_dns_info_ipv6 "${IF_DNS1}" "${IF_DNS2}" ${Index}
+#     fi
+  fi
+
+  udhcpc_write_dns
+  return 0
+}
+
+udhcpc_bound_write_csman_start()
+{
+  sl_get_IP_NM_GW_in_ifconfig ${interface} IF_IP IF_NM IF_GW        
+  sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+  sl_get_uptime CNTTIME
+  #get MAC address for subnet0 interface
+  MACADDR=`ifconfig ${interface} | awk -F ":" '/HWaddr/' | awk '{printf $5}'`
+  #MACADDR0=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $1 }'`
+  #MACADDR1=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $2 }'`
+  #MACADDR2=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $3 }'`
+  #MACADDR3=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $4 }'`
+  #MACADDR4=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $5 }'`
+  #MACADDR5=`ifconfig usbnet0 | awk -F ":" '/HWaddr/' | awk '{printf $5}' | awk -F":" '{ print $6 }'`
+  #write_mac_addr "${MACADDR0}" "${MACADDR1}" "${MACADDR2}" "${MACADDR3}" "${MACADDR4}" "${MACADDR5}" ${Index} 
+  write_mac_addr "${MACADDR}" ${Index} 
+  
+  echo "${interface} IF_IP ${IF_IP} IF_NM ${IF_NM} IF_GW ${IF_GW} IF_DNS1 ${IF_DNS1} IF_DNS2 ${IF_DNS2} CNTTIME ${CNTTIME}" > /var/run/testb
+  if [ "${IF_IP}" == "10.64.64.64" ] ; then
+		 write_if_info "0.0.0.0" "0.0.0.0" "0.0.0.0" ${Index}
+		 write_dns_info "0.0.0.0" "0.0.0.0" ${Index}
+
+     # if CSID_C_3G_CNT_TYPE is on-demand write "wait for traffic" state to csid
+     if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ]; then
+        write_cnt_status 5 ${Index}
+     else
+        write_cnt_status 5 ${Index}
+     fi
+  # ipv6 does not need
+  #elif [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "1" ] ; then  # for IPv6
+  #   write_error_code 0 ${Index} # clean error code
+  #   write_if_info_ipv6 "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+  #   write_dns_info_ipv6 "${IF_DNS1}" "${IF_DNS2}" ${Index}
+  #   write_cnttime_info "${CNTTIME}" ${Index}
+  #   write_if_name "${interface}" ${Index}
+  #   write_cnt_status 2 ${Index}
+  else
+
+     write_error_code 0 ${Index} # clean error code
+	 write_if_info "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+	 write_dns_info "${IF_DNS1}" "${IF_DNS2}" ${Index}
+     write_cnttime_info "${CNTTIME}" ${Index}
+     write_if_name "${interface}" ${Index}
+     write_cnt_status 2 ${Index}
+
+#     if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ] ; then    # for IPv4/IPv6
+#        write_if_info_ipv6 "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+#        write_dns_info_ipv6 "${IF_DNS1}" "${IF_DNS2}" ${Index}
+#     fi
+  fi
+
+  udhcpc_write_dns
+  return 0
+}
+
+udhcpc_write_csman_stop()
+{
+   clear_all_cnt_status ${Index}
+
+   return 0
+}
+
+udhcpc_write_dns()
+{
+   local DNS1_3G="${CSID_C_3G_IF_PRIDNS}"
+   local DNS2_3G="${CSID_C_3G_IF_SECDNS}"
+
+   [ "${DNS1_3G}" == "" ] && DNS1_3G="0.0.0.0"
+   [ "${DNS2_3G}" == "" ] && DNS2_3G="0.0.0.0"
+
+   if [ "${DNS1_3G}" != "0.0.0.0" ] || [ "${DNS2_3G}" != "0.0.0.0" ] ; then
+#sl_insert_dns_file ${RESOLV_CONF} ${DNS1_3G} ${DNS2_3G}
+      if [ "${DUALSIM_CARDSTATUS}" == "1" ]; then
+			  sl_insert_dns_file ${RESOLV_CONF_DIGI_CELL1} ${DNS1_3G} ${DNS2_3G}
+      elif [ "${DUALSIM_CARDSTATUS}" == "2" ]; then
+			  sl_insert_dns_file ${RESOLV_CONF_DIGI_CELL2} ${DNS1_3G} ${DNS2_3G}
+      fi
+      write_dns_info "${DNS1_3G}" "${DNS2_3G}" ${Index}
+      # wrcsman "0x80010005 {$DNS1_3G} && 0x80010006 {$DNS2_3G}"
+   else
+#      sl_insert_dns_file ${RESOLV_CONF} ${dns}
+      if [ "${DUALSIM_CARDSTATUS}" == "1" ]; then
+			  sl_insert_dns_file ${RESOLV_CONF_DIGI_CELL1} ${dns}
+      elif [ "${DUALSIM_CARDSTATUS}" == "2" ]; then
+			  sl_insert_dns_file ${RESOLV_CONF_DIGI_CELL2} ${dns}
+      fi
+
+      cnt=0
+      for i in ${dns} ; do
+         [ "${cnt}" == "0" ] && write_dns_info "${i}" "" ${Index}
+         [ "${cnt}" == "1" ] && write_dns_info "" "${i}" ${Index}
+         cnt=$((${cnt}+1))
+      done   
+   fi  
+}
+
+case "$1" in
+
+   deconfig)
+        ${IFCFG_PROG} ${interface} 0.0.0.0
+        udhcpc_write_csman_stop
+        ;;
+
+   renew)
+        udhcpc_renew_write_csman_start
+
+        if [ "${CSID_C_3G_MULTIWAN_IP_MODE}" == "1" ]; then
+            3g-ip-mode-action ${Indnx} ${Index_3G} ${interface}
+        else
+            ${IFCFG_PROG} ${interface} ${ip} ${BROADCAST} ${NETMASK}
+        fi
+        udhcpc_write_dns
+
+        #if [ "${LOADSHARING_ENABLE}" == "1" ] ; then
+        #   logger -p 8.7 -t "dhcpc" "Load Sharing Don't do dhcp.script update flag !\""
+        #   echo "Load Sharing Don't do dhcp.script update flag" > ${LOG}
+        #   # rm ${RUNNING}
+        #   exit 0 
+        #fi
+        ;;
+
+   bound)
+        ${IFCFG_PROG} ${interface} ${ip} ${BROADCAST} ${NETMASK}
+        udhcpc_write_dns
+
+        # for PPTP or L2TP and having 'deafult' route , Don't add default route
+#        if [ "${router}" != "" ] ; then
+#            echo "deleting routers"
+#            while route del default gw 0.0.0.0 dev ${interface} ; do
+#                :
+#            done
+#            for i in ${router} ; do
+#                route add default gw ${i} dev ${interface}
+#            done
+#        fi
+
+        #if [ "${CSID_C_FAILOVER_LOADSHARING_ENABLE}" == "1" ] ; then
+        #    logger -p 8.7 -t "dhcpc" "Load Sharing Don't do dhcp.script update flag !\""
+        #    echo "Load Sharing Don't do dhcp.script update flag" > ${LOG}
+            # rm -f ${RUNNING}
+        #    exit 0 
+        #fi
+
+        udhcpc_bound_write_csman_start
+        ;;
+
+   leasefail)        
+        local M_INDEX
+
+        ${IFCFG_PROG} ${interface} 0.0.0.0
+        if [ -f "${PIDFILE_CONNECT}" ] ; then
+            CONNECT_PID="`cat ${PIDFILE_CONNECT}`"
+            kill ${CONNECT_PID} > /dev/null 2>&1
+            rm -f ${PIDFILE_CONNECT} > /dev/null 2>&1    
+        fi    
+
+        # to write cnt status to disconnecting
+	get_3g_cnt_status ${Index} ${Index_3G}
+	# when IPv4 and IPv6 do not get IP address,
+	# try to disconnecting
+        if [ "${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" == "" ]; then
+#logger -p 8.7 -t "dhcpc" "caspar11"
+            write_cnt_status 3 ${Index}
+        fi
+        M_INDEX=`rdcsman 0x801e501$Index u16`
+        3g-wrmulti-csid write $M_INDEX $Index
+        #if [ -z ${MULTIWAN} ] ; then
+        #    write_cnt_status 3 ${Index}
+        #    wrcsman "0x80035007 0x03"
+        #else
+        #    wrcsman "0x8003516${MULTIWAN} 0x04"    
+        #fi
+        ;;    
+    
+   *)
+        ${IFCFG_PROG} ${interface} 0.0.0.0
+        udhcpc_write_csman_stop
+        ;;
+esac
+
+exit 0

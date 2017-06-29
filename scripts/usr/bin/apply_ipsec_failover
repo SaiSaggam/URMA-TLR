@@ -1,0 +1,9 @@
+#!/bin/sh
+result=`sendmsg vpnmon $2 update ipsec-failover $2`
+if [ "$result" == "OK" ] ; then
+    result=`sendmsg ifman 1 update ipsec-failover $2`
+    if [ "$result" == "OK" ] ; then
+        exit 0
+    fi
+fi
+exit 1

@@ -1,0 +1,11 @@
+.idea/
+.cache/
+tmp
+dist/
+device_dist/
+node_modules/
+meteor/public/devbundles/device-bundle.js.map
+device/test/.cache/
+device/test/__pycache__/
+results.xml
+*.pyc

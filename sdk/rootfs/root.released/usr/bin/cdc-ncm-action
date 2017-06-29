@@ -1,0 +1,439 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+UDHCPC="udhcpc"
+
+# Set Interface
+if [ "$2" != "" ]; then
+   ETH="$2"
+else
+   ETH="usbnet0"
+fi
+
+get_index "$3" "$4"
+FileNameCode="${ETH}"
+UDHCPC_PID_FILE="/var/run/udhcpc.${FileNameCode}.pid"
+PIDFILE_CONNECT="/var/run/udhcpc.${FileNameCode}.pid.connect"
+DEMAND_FILE="/var/run/udhcpc.${FileNameCode}.demand"
+UDHCPC_DEFAULT_SCRIPT="/usr/bin/dhcp.script"
+[ -f "/tmp/dhcp.script" ] && UDHCPC_DEFAULT_SCRIPT="/tmp/dhcp.script"
+HOSTNAME="`cat /etc/hostname`"
+if [ "${HOSTNAME}" == "" ]; then
+   HOSTNAME="Router"
+fi
+LOG="/tmp/cdc-ncm-action-${FileNameCode}.log"
+TMPFIL="/tmp/cdc-ncm-connect-${FileNameCode}"
+
+cdc_ncm_status()
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   TIME=0
+   TIMEOUT=10
+   while [ true ] ; do	
+      sl_get_IP_NM_GW_in_ifconfig ${ETH} IF_IP IF_NM IF_GW
+      #echo "$0 : IF_IP=${IF_IP} IF_NM=${IF_NM} IF_GW=${IF_GW}"	
+      if [ "${IF_IP}x" != "x" ] && [ "${IF_NM}x" != "x" ] && [ "${IF_GW}x" != "x" ]; then	
+         return 0		
+      else			
+         sleep 1
+         TIME=$((TIME+1))
+         if [ ${TIME} -gt ${TIMEOUT} ] ; then
+            return 1	
+         fi			
+      fi
+   done
+}
+
+cdc_ncm_stop()
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   local VENDORID="$CSID_S_USB_VENDOR_ID"
+   local PRODUCTID="$CSID_S_USB_PRODUCT_ID"
+   local DevModem="${CSID_S_USB_MODEM1}"
+
+   #echo -e "stop" > /var/cdc_ncm_stop
+   #rm -rf /tmp/cdc_ncm_dhcp_up
+   [ -f "${DEMAND_FILE}" ] && rm -f ${DEMAND_FILE}
+   [ -f "${TMPFIL}" ] && rm -f ${TMPFIL}
+
+   if [ -f "${PIDFILE_CONNECT}" ] ; then
+      CONNECT_PID="`cat ${PIDFILE_CONNECT}`"
+      kill -9 ${CONNECT_PID} > /dev/null 2>&1
+      rm -f ${PIDFILE_CONNECT} > /dev/null 2>&1	
+   fi
+
+   if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+      UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+      rm -f ${UDHCPC_PID_FILE}
+      kill -9 ${UDHCPC_PID} > /dev/null 2>&1 || exit 1
+   fi
+
+   #${IFCFG_PROG} ${ETH} 0.0.0.0
+   ${IFCFG_PROG} ${ETH} down
+
+   #if [ "${CSID_C_FAILOVER_LOADSHARING_ENABLE}" == "1" ] ; then
+   #   logger -p 8.7 -t "cdc-ncm-action" "Load Sharing Don't do cdc_ncm-action update flag !"
+   #   exit 0 
+   #fi
+
+   clear_all_cnt_status ${Index}
+   write_cnt_status 0 ${Index}
+
+   #wrcsman "0x801E0800 0x00 && \
+   #         0x801E0900 0x00 && \
+   #         0x801E1200 0x00"
+
+   #wrcsman "0x8001000E 0x01"
+
+   #if [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "7198" ] ||        # Huawei E586
+   #   [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "5518" ] ||     # Huawei E3272
+   #   [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "5471" ]; then     # Huawei E3372
+   if [ "${VENDORID}" == "4817" ] ; then        # Huawei Device
+        kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+        ${ATCMD_PROG} ${DevModem} 'AT^NDISDUP=1,0' 
+        return 0
+   fi
+
+   local step=1
+   local time=0
+   local timeout=5
+   while [ $((${step})) -le 2 ]; do
+      time=0
+      local AT_RET=""
+      local AT_CMD=""
+      if [ "${step}" == "1" ]; then
+         AT_CMD="ATH"
+         DevModem=${CSID_S_USB_MODEM1}
+      elif [ "${step}" == "2" ]; then
+         AT_CMD="AT*ENAP=0"
+         DevModem=${CSID_S_USB_MODEM2}
+      fi
+      while [ "${AT_RET}" == "" ]; do
+         echo ${step} > ${LOG}
+         ${ATCMD_PROG} ${DevModem} ${AT_CMD} > ${LOG}
+
+         AT_RET="`cat ${LOG} |grep OK`"
+	       time=$((${time}+1))
+	       [ $((${time})) -gt $((${timeout})) ] && break
+      done
+      logger -p 8.7 -t "cdc-ncm-action" "${AT_CMD} OK!"
+      step=$((${step}+1))
+   done   
+
+   logger -p 8.7 -t "cdc-ncm-action" "Stop ..."
+   return 0
+}
+
+cdc_ncm_start2()  
+{
+   # check running the number of times
+   #RESET_TIME="${CSID_S_3G_MODEM_RESET_TIME}"
+   #if [ "${RESET_TIME}" == "5" ] ; then
+   #   logger -p 8.7 -t "cdc-ncm-action" "3G power RESET ..."
+   #   3g-power-reset &
+      # wrcsman "0x801e6004 0"
+   #   exit 0
+   #elif [ $((${RESET_TIME})) -lt 5 ] ; then
+   #   RESET_TIME=$(($RESET_TIME+1))
+   #   logger -p 8.7 -t "cdc-ncm-action" "3G power RESET Time ${RESET_TIME}"
+      # wrcsman "0x801e6004 {$RESET_TIME}"
+   #fi
+
+   #time=0
+
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   if [ "${CSID_C_3G_APN}" != "" ]; then
+      ${ATCMD_PROG} ${CSID_S_USB_MODEM1} AT+CGDCONT=1,\"IP\",\"$CSID_C_3G_APN\" > ${LOG}
+   fi
+
+   write_error_code 0 ${Index} # clean error code
+   if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+      ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+   else
+      ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu ${CSID_C_3G_MTU} up
+   fi
+
+   #if [ "${CSID_S_USB_VENDOR_ID}" == "4817" -a "${PRODUCTID}" == "5518" ] || 
+   #	  [ "${CSID_S_USB_VENDOR_ID}" == "4817" -a "${PRODUCTID}" == "5471" ]; then
+   if [ "${VENDORID}" == "4817" ] ; then        # Huawei Device
+
+        ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT^NDISDUP=1,0'
+
+        PIP="`cat ${TMPFIL} | grep 'OK' | cut -d, -f2 | cut -d\" -f2`"
+        logger -t "O3G/SCRIPT" -p 8.7 "pip:${PIP}"
+
+        if [ -z "$PIP" ]; then
+
+            logger -t "O3G/SCRIPT" -p 8.7 "again"
+            ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT^NDISDUP=1,0'
+            sleep 1
+            if  [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" != "" -o "${CSID_C_3G_PASSWORD}" != "" ] ; then
+                ${ATCMD_PROG} ${CSID_S_USB_MODEM1} AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\",\"${CSID_C_3G_USERNAME}\",\"${CSID_C_3G_PASSWORD}\" > $TMPFIL
+            elif [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" == "" -a "${CSID_C_3G_PASSWORD}" == "" ]; then
+                ${ATCMD_PROG} ${CSID_S_USB_MODEM1} AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\" > $TMPFIL
+            elif [ "${CSID_C_3G_APN}" == "" ]; then
+                ${ATCMD_PROG} ${CSID_S_USB_MODEM1} AT^NDISDUP=1,1 > $TMPFIL
+            fi
+            sleep 1
+
+        fi
+   fi
+ 
+   if [ "${CSID_S_LOCAL_WAN_CNT_FORCE}" == "1" ]; then
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      # wrcsman "0x8001000e 0x00"
+   elif [ "${CSID_C_3G_CNT_TYPE}" == "0" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G on demand
+      # udhcpc-connect-cdc_ncm &
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   elif [ "${CSID_C_3G_CNT_TYPE}" == "2" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G manually
+      # udhcpc-connect-cdc_ncm &
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   else
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   fi
+
+   # check running the number of times
+   # if 3G connect then RESET time set 0
+   #if [ "${CSID_S_LOCAL_WAN_IP}" != "" ] ; then
+   #   :
+		  # wrcsman "0x801e6004 0"
+   #else
+   #   exit 0
+   #fi
+
+   logger -p 8.7 -t "cdc-ncm-action" "Start ..."
+
+   return $?
+}
+
+cdc_ncm_start()  
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   local DevModem="${CSID_S_USB_MODEM1}"
+
+   #if [ "`cat /proc/cpuinfo | grep BogoMIPS | awk '{print $3}'`" != "239.61" ]; then
+      # wrcsman "0x001e2490 0x00"
+   #fi
+   # wrcsman "0x801e4001 0x04"
+
+   local VENDORID="${CSID_S_USB_VENDOR_ID}"
+   local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+
+   #if [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "7198" ] ||        # Huawei E586
+   #   [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "5518" ] ||    # Huawei E3272
+   #   [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "5471" ] ; then     # Huawei E3372
+   if [ "${VENDORID}" == "4817" ] ; then        # Huawei Device
+      cdc_ncm_start2
+      return $?
+   fi
+
+   # Set prefer type
+   if [ "${CSID_C_3G_PREFER_MODE}" == "" ] || [ "${CSID_C_3G_PREFER_MODE}" == "0" ];then
+      ${ATCMD_PROG} ${DevModem} 'AT+CFUN=1' > ${LOG}
+      sleep 3
+   elif [ "${CSID_C_3G_PREFER_MODE}" == "1" ] || [ "${CSID_C_3G_PREFER_MODE}" == "3" ];then
+      ${ATCMD_PROG} ${DevModem} 'AT+CFUN=5' > ${LOG}
+      sleep 3
+   elif [ "${CSID_C_3G_PREFER_MODE}" == "2" ] || [ "${CSID_C_3G_PREFER_MODE}" == "4" ];then
+      ${ATCMD_PROG} ${DevModem} 'AT+CFUN=6' > ${LOG}
+      sleep 3
+   fi
+
+   # check running the number of times
+   #RESET_TIME="${CSID_S_3G_MODEM_RESET_TIME}"
+   #if [ "${RESET_TIME}" == "5" ] ; then
+   #   logger -p 8.7 -t "cdc-ncm-action" "3G power RESET ..."
+   #   3g-power-reset &
+      # wrcsman "0x801e6004 0"
+   #   exit 0
+   #elif [ $((${RESET_TIME})) -lt 5 ] ; then
+   #   RESET_TIME=$(($RESET_TIME+1))
+   #   logger -p 8.7 -t "cdc-ncm-action" "3G power RESET Time ${RESET_TIME}"
+      # wrcsman "0x801e6004 {$RESET_TIME}"
+   #fi
+
+   local step=1
+   local time=0
+   local timeout=5
+   while [ $((${step})) -le 6 ]; do
+      time=0
+      local AT_RET=""
+      local AT_CMD=""
+      if [ "${step}" == "1" ]; then
+         AT_CMD="AT*EIAD=0"
+      elif [ "${step}" == "2" ]; then
+         AT_CMD="AT*EIAC=1"
+      elif [ "${step}" == "3" ]; then
+         AT_CMD="AT+CGDCONT=1,\"IP\",\"proxy\""
+      elif [ "${step}" == "4" ]; then
+         if [ "${CSID_C_3G_APN}" != "" ]; then
+            AT_CMD="AT*EIAPSW=1,1,\"${CSID_C_3G_APN}\""
+         else
+            AT_CMD="AT*EIAPSW=1,1,\"internet\""
+         fi
+      elif [ "${step}" == "5" ]; then
+         AT_CMD="AT*ENAP=1,1"
+      elif [ "${step}" == "6" ]; then
+         AT_CMD="AT*ENAP?"
+      fi
+      while [ "${AT_RET}" == "" ]; do
+         echo ${step} > ${LOG}
+         ${ATCMD_PROG} ${DevModem} ${AT_CMD} > ${LOG}
+
+         if [ "${step}" == "6" ]; then
+            if [ "${VENDORID}" == "3035" ] && [ "${PRODUCTID}" == "6413" ]; then
+               AT_RET="`cat ${LOG} | grep '1,""'`"
+            elif [ "${VENDORID}" == "3035" ] && [ "${PRODUCTID}" == "6416" ]; then # Ericsson F5521gw
+               AT_RET="`cat ${LOG} | grep '1,""'`"
+            elif [ "${VENDORID}" == "3035" ] && [ "${PRODUCTID}" == "6425" ]; then # Ericsson H5321gw
+               AT_RET="`cat ${LOG} | grep '1,""'`"
+            elif [ "${VENDORID}" == "1228" ] && [ "${PRODUCTID}" == "8991" ]; then # AzureWave WW-M18
+               AT_RET="`cat ${LOG} | grep '1, 1'`"
+            elif [ "${VENDORID}" == "5075" ] && [ "${PRODUCTID}" == "13158" ]; then # AzureWave WW-M18
+               AT_RET="`cat ${LOG} | grep '1, 1'`"
+            fi
+
+            time=$((${time}+1))
+            if [ $((${time})) -gt $((${timeout})) ]; then
+               echo "${AT_CMD} : ${AT_RET}"
+               ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT*ENAP=0'
+               cdc_ncm_stop
+               exit 1
+            fi
+         else
+            AT_RET="`cat ${LOG} |grep OK`"
+            time=$((${time}+1))
+            [ $((${time})) -gt $((${timeout})) ] && exit 1
+         fi
+      done
+      logger -p 8.7 -t "cdc-ncm-action" "${AT_CMD} OK!"
+      echo "${AT_CMD} : ${AT_RET}"
+      step=$((${step}+1))
+   done   
+
+   write_error_code 0 ${Index} # clean error code
+   if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+      ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+   else
+      ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu ${CSID_C_3G_MTU} up
+   fi
+
+   if [ "${CSID_S_LOCAL_WAN_CNT_FORCE}" == "1" ]; then
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      # wrcsman "0x8001000e 0x00"
+   elif [ "${CSID_C_3G_CNT_TYPE}" == "0" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G on demand
+      # udhcpc-connect-cdc_ncm &
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   elif [ "${CSID_C_3G_CNT_TYPE}" == "2" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G manually
+      # udhcpc-connect-cdc_ncm &
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   else
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      #if [ "${CSID_C_FAILOVER_LOADSHARING_ENABLE}" == "1" ] ; then
+      #   logger -p 8.7 -t "cdc-ncm-action" "Load Sharing Don't do cdc-ncm-action update flag !"
+      #   exit 0
+      #fi
+   fi
+
+   # check running the number of times
+   # if 3G connect then RESET time set 0
+   #if [ "${CSID_S_LOCAL_WAN_IP}" != "" ] ; then
+   #   :
+		  # wrcsman "0x801e6004 0"
+   #else
+   #   exit 0
+   #fi
+
+   logger -p 8.7 -t "cdc-ncm-action" "Start ..."
+
+   return $?
+}
+
+usage() {
+	 echo "$0 [start|stop|release|renew] [IFName] [index] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+if [ -e "/var/run/3g-power_reset" ] ; then
+   echo "File \"/var/run/3g-power_reset\" exist. Exit."
+   exit 0
+fi
+
+if [ "${CSID_S_USB_CNT_ERR_CODE}" != "" ] && [ "${CSID_S_USB_CNT_ERR_CODE}" != "0" ]; then
+   ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT+CPIN?' > ${LOG}
+   AT_RET="`cat ${LOG} | grep READY`"
+   if [ "${AT_RET}" == "" ] ; then
+      exit 0
+   fi
+fi
+
+case "$1" in
+   start)
+      pre_init
+      cdc_ncm_start
+      if [ "$?" == "1" ] ; then
+         cdc_ncm_stop
+         ${IFCFG_PROG} ${ETH} down
+         exit 1
+      fi
+      exit 0
+      ;;
+
+   stop)
+      cdc_ncm_stop
+      ;;
+
+   release)
+      if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -9 ${UDHCPC_PID}
+      fi
+      write_dns_info "0.0.0.0" "" ${Index}
+
+      exit 0
+      ;;
+
+   renew)
+      if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+         cdc_ncm_stop
+         cdc_ncm_start
+      elif [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ]; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -9 ${UDHCPC_PID}
+         cdc_ncm_status	
+      else
+         ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} 
+      fi
+		
+      exit 0
+      ;;
+		
+	*)
+      usage
+      exit 1
+      ;;
+esac
+
+exit 0

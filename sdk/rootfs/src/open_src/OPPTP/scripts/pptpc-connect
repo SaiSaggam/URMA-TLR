@@ -1,0 +1,72 @@
+#!/bin/sh
+
+# Paths to programs
+PPPD=pppd
+PPTP=pptp
+
+CONFIG=/etc/ppp/pptp.conf
+
+export CONFIG
+. $CONFIG
+
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+PIDFILE_PPPD="/var/run/ppp-pptp.pid"
+
+#Parameter 1 for PPTP server
+PNSSERVER=$1
+#Parameter 2 for force pptp connect
+CNT_FORCE=$2
+
+CNTTYPE=`rdcsman 0x00050900 u32`
+
+echo "CONNECT CNT_FORCE=$CNT_FORCE"
+
+if [ "$CNTTYPE" = "0" -a "$CNT_FORCE" = "0" ] ; then 
+#dial-on-demand 
+	PPPD_EXTRA="demand nopersist holdoff 3 ipcp-accept-remote ipcp-accept-local ktune"
+else
+#auto-reconncet and manual connect
+	PPPD_EXTRA=
+fi
+
+#
+# PPPD options
+#
+LCP_INTERVAL=20
+LCP_FAILURE=3
+DEFAULTROUTE="defaultroute"
+PEERDNS="usepeerdns"
+
+if [ $DEMAND = "no" -o $DEMAND = "" ] ; then
+IDLE_TIME=""
+else
+IDLE_TIME="idle $DEMAND"
+fi 
+
+
+PPP_STD_OPTIONS="sync noipdefault noauth $DEFAULTROUTE hide-password nodetach $PEERDNS mtu $MTU noaccomp nodeflate nopcomp novj novjccomp user $USER lcp-echo-interval $LCP_INTERVAL lcp-echo-failure $LCP_FAILURE linkname pptp $IDLE_TIME $PPPD_EXTRA"
+
+PPTP_CMD="$PPTP $PNSSERVER --nolaunchpppd --sync"
+
+echo $$ > $PIDFILE_CONNECT
+
+    
+    # Launch the pptp and pppd
+	$PPPD pty "$PPTP_CMD" \
+	    $PPP_STD_OPTIONS \
+	    &
+	    
+    wait
+
+#pptp client do not need
+#	# if CNTTYPE != PPTP_CNT_TYPE_MANUAL
+#	if [ $MANUAL != "yes"  ] ; then 
+#        #killed by commander 
+#	    wrcsman "0x80050700 0x03 && \
+#				0x80010007 0x03"
+#		rm -rf $PIDFILE_CONNECT
+#	fi
+	
+	exit
+

@@ -1,0 +1,242 @@
+#!/bin/sh
+# Paths to programs
+. /usr/bin/scriptlib
+
+RUNNING="/var/run/pppoev6-action-running"
+# Make sure only one default script running.
+while :
+do
+    if [ ! -f "$RUNNING" ] || [ "$1" = "stop" ] ; then
+        rm -f $RUNNING
+        break
+    fi
+    echo "exist $RUNNING"
+    sleep 1
+done
+echo 1 > $RUNNING
+
+# Check if exist multiwan index
+if [ -n $2 ] ; then
+    MULTIWAN=$2
+else
+    MULTIWAN=
+fi
+
+#ORG_CNT_TYPE=`rdcsman 0x80040900 u16`
+usage () {
+    echo "$0 [start|stop|restart|status]"
+    rm -f $RUNNING
+    exit 1
+}
+
+regenerateConfig () {
+    if [ -z $MULTIWAN ] ; then
+        USERNAME="`rdcsman 0x00900300 str`"
+        PASSWD="`rdcsman 0x00900301 str`"
+        if [ "$USERNAME" != "" ] && [ "$PASSWD" != "" ]; then
+            sl_insert_secrets_file "$USERNAME" "$PASSWD"
+        else
+            echo "No username or password !"
+            exit 0
+        fi
+        uvm /usr/uo/pppoev6.conf.uo > /etc/ppp/pppoev6.conf
+    else
+        uvm /usr/uo/pap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/pap-secrets
+        uvm /usr/uo/chap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/chap-secrets
+        uvm /usr/uo/pppoev6.conf.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/pppoev6.conf
+    fi
+    chmod 600 /etc/ppp/*-secrets
+}
+
+
+# main ##########################################################
+
+[ -z "$1" ] && usage
+
+case "$1" in
+    start)
+        #CSID_C_IPV6_BIND_V4ANDV6 T=u32, D=1, dual stack
+        #wrcsman "0x00900004 0x01"
+        BIND_V4V6=$(rdcsman 0x00900004 u32) #enable dual stack
+        if [ $BIND_V4V6 -eq 1 ]; then
+            if [ -z $MULTIWAN ] ; then
+                ETH=`rdcsman 0x8000F231 str`
+                CNT_FORCE=`rdcsman 0x8001000E u32`
+            else
+                TMP1=$((MULTIWAN+1))
+                TMP2=$((MULTIWAN+2))
+                ETH=`rdcsman 0x8000F36$TMP2 str`
+                CNT_FORCE=`rdcsman 0x800101C$MULTIWAN u32`
+            fi
+        fi
+
+        if [ -z $MULTIWAN ] ; then
+            if [ $CNT_FORCE -eq 1 ] ; then
+                pppoev6-stop
+            fi
+
+            echo -n "Bringing up PPPoE link"
+            if [ $BIND_V4V6 -eq 1 ]; then
+                if [ $CNT_FORCE -eq 1 ] ; then
+                    wrcsman "0x8001000E 0x00"
+                fi
+            fi
+
+            #wrcsman "0x80900030 0x01" #Connect Status:connecting
+            regenerateConfig
+            pppoev6-start
+            if [ $? = 0 ] ; then
+                rm -f $RUNNING
+                exit 0
+            else
+                if [ $BIND_V4V6 -eq 1 ]; then
+                    wrcsman	"0x80010007 0x03 && \ 
+                             0x80040700 0x03"       
+                    wrcsman "0x80900030 0x03" #Connect Status:connecting
+                else
+                    #wrcsman "0x80900030 0x00 &&\ 
+                    #         0x80010007 0x00"
+                    wrcsman "0x80900030 0x03"
+                fi
+                rm -f $RUNNING
+                exit 1
+            fi
+        else
+            regenerateConfig
+            if [ $CNT_FORCE -eq 1 ] ; then
+                pppoev6-stop $MULTIWAN
+            fi
+
+            echo "Bringing up PPPoE link MultiWAN"
+            if [ $BIND_V4V6 -eq 1 ]; then
+                if [ $CNT_FORCE -eq 1 ] ; then
+                    wrcsman "0x800101C$MULTIWAN 0x00"
+                fi
+            fi
+
+            #wrcsman "0x80900030 0x01" #Connect Status:connecting
+            pppoev6-start $MULTIWAN
+            exit 0
+        fi
+        ;;
+
+    stop)
+        regenerateConfig
+        BIND_V4V6=$(rdcsman 0x00900004 u32) #enable dual stack
+
+        echo "Shutting down PPPoE link"
+        if [ -z $MULTIWAN ] ; then
+            #wrcsman "0x80900030 0x03" #Connect Status:disconnecting
+            pppoev6-stop > /dev/null 2>&1
+            RET=$?
+            if [ $BIND_V4V6 -eq 1 ]; then
+                # ipv4 csid
+                wrcsman "0x80040200 0x00 && \
+                    0x80040300 0x00 && \
+                    0x80040400 0x00 && \
+                    0x80040500 0x00 && \
+                    0x80040600 0x00 && \
+                    0x80040700 0x00 && \
+                    0x80010002 0x00 && \
+                    0x80010003 0x00 && \
+                    0x80010004 0x00 && \
+                    0x80010005 0x00 && \
+                    0x80010006 0x00 && \
+                    0x80010007 0x00"
+
+                # ipv6 csid  0020:PPP_IF  0006:Link  0000:Global  0030:Status  0010:UI_Alter
+                wrcsman "0x80900020 \" && \
+                    0x80900000 \" && \
+                    0x80900006 \" && \
+                    0x80900009 \" && \
+                    0x8090000a 0x00 && \
+                    0x80900001 0x00 && \
+                    0x80900030 0x00" 
+            else
+                # ipv6 csid  0020:PPP_IF  0006:Link  0000:Global  0030:Status  0010:UI_Alter
+                wrcsman "0x80900020 \" &&\
+                    0x80900000 \" && \
+                    0x80900006 \" && \
+                    0x80900009 \" && \
+                    0x8090000a 0x00 && \
+                    0x80900001 0x00 && \
+                    0x80900030 0x00"
+            fi
+        else
+            pppoev6-stop $MULTIWAN > /dev/null 2>&1
+            RET=$?
+            if [ $BIND_V4V6 -eq 1 ]; then
+                # ipv4 csid		
+                wrcsman "0x8004020$TMP1 0x00 && \
+                    0x8004030$TMP1 0x00 && \
+                    0x8004040$TMP1 0x00 && \
+                    0x8004050$TMP1 0x00 && \
+                    0x8004060$TMP1 0x00 && \
+                    0x8004070$TMP1 0x00 && \
+                    0x8001011$MULTIWAN 0x00 && \
+                    0x8001012$MULTIWAN 0x00 && \
+                    0x8001013$MULTIWAN 0x00 && \
+                    0x8001014$MULTIWAN 0x00 && \
+                    0x8001015$MULTIWAN 0x00 && \
+                    0x8001016$MULTIWAN 0x00"
+
+                # ipv6 csid  0020:PPP_IF  0006:Link  0000:Global  0030:Status  0010:UI_Alter
+                wrcsman "0x80900020 \" && \
+                    0x80900000 \" && \
+                    0x80900006 \" && \
+                    0x80900009 \" && \
+                    0x00900011 \" && \
+                    0x00900012 0x00 && \
+                    0x8090000a 0x00 && \
+                    0x80900001 0x00 && \
+                    0x80900030 0x00" 
+            else
+                # ipv6 csid  0020:PPP_IF  0006:Link  0000:Global  0030:Status  0010:UI_Alter
+                wrcsman "0x80900020 \" && \
+                    0x80900000 \" && \
+                    0x80900006 \" && \
+                    0x80900009 \" && \
+                    0x00900011 \" && \
+                    0x00900012 0x00 && \
+                    0x8090000a 0x00 && \
+                    0x80900001 0x00 && \
+                    0x80900030 0x00"
+            fi
+        fi
+
+        #ifconfig $ETH 0.0.0.0
+        rm -f $RUNNING
+        exit $RET
+
+        ;;
+
+    restart)
+        if [ -f "$RUNNING" ] ; then
+            rm -f $RUNNING
+        fi
+
+        if [ -z $MULTIWAN ] ; then
+            $0 stop
+            $0 start
+        else
+            $0 stop $MULTIWAN
+            $0 start $MULTIWAN
+        fi
+        ;;
+
+    status)
+        regenerateConfig
+        if [ -z $MULTIWAN ] ; then
+            pppoe-status
+        else
+            pppoe-status $MULTIWAN
+        fi
+        ;;
+
+    *)    
+        usage
+        ;;  
+esac
+
+rm -f $RUNNING
+exit 0	

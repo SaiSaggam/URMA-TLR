@@ -1,0 +1,33 @@
+.animate-show {
+  opacity: 1;
+}
+.animate, .animate-switch, .animate-show {
+  &.ng-enter, &.ng-leave, &.ng-hide-add, &.ng-hide-remove,
+  &.ng-hide-remove.ng-hide-remove-active, &.ng-hide-add.ng-hide-add-active {
+    transition:all ease 1s;
+    overflow: hidden;
+    display: inline-block;
+  }
+  &.ng-enter, &.ng-leave {
+    width: 100%;
+  }
+  &.ng-enter, &.ng-leave.ng-leave-active, &.ng-hide {
+    opacity: 0;
+  }
+  &.ng-leave, &.ng-enter.ng-enter-active {
+    opacity: 1;
+  }
+  &.ng-leave, &.ng-leave-active, &.dc-hide-replace.ng-hide-add-active {
+    height: 0;
+  }
+}
+
+//animation for loading icon and anything else that needs to spin at a medium pace.
+@keyframes spin {
+  from { transform: scale(1) rotate(0deg);}
+  to { transform: scale(1) rotate(360deg);}
+}
+@-webkit-keyframes spin {
+  from { transform: scale(1) rotate(0deg);}
+  to { transform: scale(1) rotate(360deg);}
+}

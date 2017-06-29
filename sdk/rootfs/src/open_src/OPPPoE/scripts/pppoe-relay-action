@@ -1,0 +1,48 @@
+#!/bin/sh
+# Paths to programs
+
+PROGRAM="/usr/sbin/pppoe-relay"
+LAN_IF=`rdcsman 0x8000F201 str`
+WAN_IF=`rdcsman 0x8000F231 str`
+
+
+usage () {
+        echo "$0 [start|stop|restart]"
+        exit 1
+}
+
+start () {
+    echo -n "Start PPPoE Relay..."
+    $PROGRAM -S $WAN_IF -C $LAN_IF 
+
+}
+
+stop () {
+	echo -n "Stop PPPoE Relay..."
+	killall pppoe-relay
+}
+
+# main ##########################################################
+
+[ -z "$1" ] && usage 
+
+case "$1" in
+    start)
+		start 
+    	;;
+
+    stop)
+		stop		
+        ;;
+
+    restart)
+		stop
+		start
+		;;
+
+    *)
+        usage
+        ;;
+esac
+
+exit 0

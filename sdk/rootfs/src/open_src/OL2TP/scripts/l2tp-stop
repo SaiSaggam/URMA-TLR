@@ -1,0 +1,77 @@
+#!/bin/sh
+
+# Check if exist multiwan index
+if [ -n $1 ] ; then
+    MULTIWAN=$1
+else
+    MULTIWAN=
+fi
+if [ -z $MULTIWAN ] ; then
+	L2TP_RESULT_FILE="/var/run/l2tp-result"
+	L2TP_SOCKET_FILE="/var/run/l2tpctrl"
+	PIDFILE_PPPD="/var/run/ppp-l2tp.pid"
+	L2TP_PHASE1_TYPE=`rdcsman 0x00060E00 u32`
+	
+else
+	L2TP_RESULT_FILE="/var/run/l2tp$MULTIWAN-result"
+	L2TP_SOCKET_FILE="/var/run/l2tpctrl$MULTIWAN"
+	PIDFILE_PPPD="/var/run/ppp-l2tp$MULTIWAN.pid"
+	L2TP_PHASE1_TYPE=`rdcsman 0x00062E0$MULTIWAN u32`
+fi
+
+. /usr/bin/scriptlib
+
+if [ -r $L2TP_RESULT_FILE ] ; then
+		
+	CFG=`cat $L2TP_RESULT_FILE`
+	stt=0
+	for i in $CFG
+	do
+		if [ $stt = 1 ] ; then
+			TUNNEL_ID=$i
+			stt=2
+			continue	
+		fi
+	
+		if [ $stt = 2 ] ; then
+			LAC_ID=$i
+			break	
+		fi
+	
+		[ $i = "OK" ] && stt=1
+			
+	done
+
+	echo "$0: stop session $L2TP_SOCKET_FILE $TUNNEL_ID $LAC_ID"
+	echo "L2TP start to disconnect! ( l2tp-control -s $L2TP_SOCKET_FILE \"stop-session $TUNNEL_ID $LAC_ID\" )"
+	l2tp-control -s $L2TP_SOCKET_FILE "stop-session $TUNNEL_ID $LAC_ID"
+	#rm $L2TP_RESULT_FILE
+  echo "Stop L2TP Client Daemon (l2tp-control -s $L2TP_SOCKET_FILE \"exit\")"	
+	l2tp-control -s $L2TP_SOCKET_FILE "exit"
+fi
+	
+
+#L2TP_PHASE1_TYPE=`rdcsman 0x00060E00 u8`
+
+if [ "$L2TP_PHASE1_TYPE" = 0 ] ; then
+	if [ -z $MULTIWAN ] ; then
+		udhcpc-action stop
+	else
+		udhcpc-action stop $MULTIWAN
+	fi
+elif [ "$L2TP_PHASE1_TYPE" = 1 ] ; then 
+	if [ -z $MULTIWAN ] ; then
+		fixip-action stop	
+	else
+		fixip-action stop $MULTIWAN
+	fi	
+fi
+
+#killall l2tpd
+	
+exit 0
+
+
+
+
+

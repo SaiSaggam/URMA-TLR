@@ -1,0 +1,34 @@
+CZMQ Input Plugin
+
+REQUIREMENTS:
+
+* libsodium ( https://github.com/jedisct1/libsodium )
+* zeromq v4.x build with libsodium support ( http://zeromq.org/ )
+* czmq 3.x ( http://czmq.zeromq.org/ )
+
+-------------------------------------------------------------------------------
+module(load="imczmq")
+
+input(
+	type="imczmq"
+	endpoints="tcp://*:24555"
+	topics="topic1,topic2,topic3"
+	socktype="PULL"
+	authtype="CURVESERVER"
+	clientcertpath="/etc/curve.d/"
+	servercertpath="/etc/curve.d/example_curve_server_cert"
+)
+-------------------------------------------------------------------------------
+
+Explanation of Options:
+
+type: type of action (imczmq for this plugin)
+endpoints: comma delimited list of zeromq endpoints (see zeromq documentation)
+socktype: zeromq socket type (currently supports PULL and SUB)
+authtype: CURVECLIENT or CURVESERVER
+clientcertpath: 
+	if CURVECLIENT, this client's cert
+	if CURVESERVER, "*" for all, or a directory of allowed public certs
+servercertpath: 
+	if CURVECLIENT, the servers public cert you wish to connect to
+	if CURVESERVER, this servers cert

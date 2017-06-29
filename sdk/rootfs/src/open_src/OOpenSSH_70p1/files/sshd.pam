@@ -1,0 +1,5 @@
+auth            required        pam_unix.so nodelay
+account         required        pam_nologin.so
+account         required        pam_unix.so
+password        required        pam_unix.so shadow use_authtok
+session         required        pam_unix.so

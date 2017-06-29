@@ -1,0 +1,29 @@
+#!/bin/sh
+
+do_make()
+{
+    cd src
+    ./configure
+    cd ..
+    make -C src
+    if [ -e src/src/lzma/lzma ]; then
+        strip src/src/lzma/lzma
+    fi
+}
+
+if [ ! -e src/src/lzma/lzma ] || 
+   [ ! -x src/src/lzma/lzma ]; then
+    echo "No or can't run LZMA utility !!"
+    do_make    
+    exit 0
+fi
+
+src/src/lzma/lzma -h > /dev/null
+ret=`echo $?`
+if [ "$ret" = "0" ]; then
+    exit 0
+fi
+
+echo "The original LZMA utility can't run on this platform ! Rebuid it ..."
+do_make
+

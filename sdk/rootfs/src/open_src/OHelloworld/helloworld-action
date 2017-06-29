@@ -1,0 +1,69 @@
+#!/bin/sh
+# Paths to programs
+
+RUNNING="/var/run/helloworld-action-running"
+# Make sure only one default script running.
+while :
+do
+    if [ ! -f "$RUNNING" ] ; then
+        break
+    fi
+    echo "exist $RUNNING"
+    sleep 1
+done
+echo 1 > $RUNNING
+
+usage () {
+        echo "$0 [start|stop|restart|status]"
+		if [ -f $RUNNING ] ; then
+		rm $RUNNING
+		fi
+        exit 1
+}
+
+HELLOWORLD_ENABLE=`rdcsman 0x00A00002 u32` 	# helloworld enable?
+
+EXE=helloworld
+PID_FILE="/var/run/helloworld.pid"
+
+# main ##########################################################
+
+[ -z "$1" ] && usage
+
+case "$1" in
+    start)
+	    echo -n "Startup helloworld..."
+		$EXE & echo $! > $PID_FILE
+    	;;
+
+    stop)
+ 		echo -n "Shutting down helloworld..."
+		PID=`cat $PID_FILE`
+		echo -n "helloworld PID = $PID"
+		kill -9 $PID
+		rm $PID_FILE
+        ;;
+
+    restart)
+		if [ -f $RUNNING ] ; then
+			rm $RUNNING
+		fi
+		$0 stop
+		if [ $HELLOWORLD_ENABLE -eq 1 ] ; then
+			$0 start
+		fi
+		;;
+
+    status)
+		;;
+
+    *)
+        usage
+        ;;
+esac
+
+if [ -f $RUNNING ] ; then
+rm $RUNNING
+fi
+
+exit 0

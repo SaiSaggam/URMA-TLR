@@ -1,0 +1,17 @@
+#!/bin/sh
+
+CONFIGFILE="/home/digi/configfile"
+
+format_err() {
+  echo "Syntax: update config <config file>"
+}
+
+if [ $# -lt 5 ]; then
+  format_err
+  exit 1
+else
+  configf=`echo "$5" | sed 's/^\/*//' | sed 's/\.\.\///g`
+    echo config file $configf
+    echo $configf > ${CONFIGFILE}
+fi
+exit 0

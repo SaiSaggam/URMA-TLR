@@ -1,0 +1,612 @@
+#!/bin/sh
+
+#shell script infomation
+ME=ppp-hb
+FP=/usr/bin/$ME
+IPTHB="/var/run/iptables.hb"
+WAN_SWITCH="`rdcsman 0x0001004a u32`"
+
+USAGE(){
+cat <<EOF5
+    $ME script manages half bridge modes
+    usage:
+    $FP command [mandatory parameters] <optional switches [mandatory parameters]>
+
+    command:
+    start	sets up half-bridge mode scripts to run on IP change
+    stop	exits and disables half-bridge mode
+
+    switch:
+    <-c [name]>	Connection ID - auto detects defaults to connection0
+    <-d>		diag var save
+    <-3g>		3g mode (same ip and gateway for 3g)
+    <-sgw>		Spoof ISP Gateway uses default Netmask 255.255.255.0
+    <-lif [name]>	Lan interface name - auto detects default br0
+    <-mgw>		Use modem IP as gateway in LAN dhcp
+    <-nm [mask]>	Forced Netmask in form 255.255.255.255 (default)
+    <-nodhcp>	Do not use dhcpd - only use if IP static!
+    <-nonat>	Disable nat, but leave firewall
+    <-nofw>		Completely disable iptables netfilter firewall, default is not to change Web GUI config
+    <-s [value]>	Start delay in seconds on first call to allow log time to update etc
+    <-t [value]>	Short lease time in seconds used when no WAN IP default 30 seconds
+            Lease time used when WAN UP is as initially defined in Web GUI
+    <-v>		verbose logging of iptables, route and ifconfig commands 
+EOF5
+}
+
+#commands outside /bin
+IFC=/sbin/ifconfig
+IPT=/sbin/iptables
+RTE=/sbin/route
+KIL=/bin/killall
+UPD=/usr/sbin/udhcpd
+LGR=/bin/logger
+
+#system files
+UPS=/etc/ppp/ip-up
+DNS=/etc/ppp/ip-down
+OCF=/var/tmp/udhcpd.conf
+
+#temp files
+TMP=/tmp/
+VAR="$TMP"vars.sh
+EXT="$TMP"undo.sh
+DCF="$TMP"default.conf
+NCF="$TMP"dhcpd.conf
+SHB='#!/bin/sh'
+
+#functions
+LG(){
+	echo "$ME: $@"|$LGR -s
+}
+
+EX(){
+	LG "Error - $@, exiting"
+	exit 1
+}
+
+#CL options
+#defaults from previous call
+if [ -x "$VAR" ];then
+	. $VAR
+else # non null defaults
+	DP=1;
+    FW=1;
+    LIF=br0;
+    STATE=0
+fi
+
+#default command
+CM=HP
+
+#Command Line over-rides stored options
+while [ "$1" ]; do
+    case $1 in
+	start)	#[ "$STATE" != "0" ]&& exit 1
+		CM=IT
+		shift; continue;;
+
+	stop)	
+        [ "$STATE" = "0" ] && EX "not enabled"
+		CM=EXI
+		shift; continue;;
+
+	--adv-hb)	
+		CM=ADV_HB_IT
+        WANIF="$2";
+        if [ "$WANIF" = "" ]; then
+            WANIF="`rdcsman  0x8001000b str`" # CSID_S_LOCAL_WAN_IF_NAME 
+            if [ "$WANIF" = "" ]; then
+                WANIF="usbnet0"
+            fi
+        fi
+        LG "Half Bridge run on WAN IF : $WANIF"
+		shift 2; continue;;
+
+	-3g)	
+		CM=ADV_HB_IT
+        WANIF="$2";
+        if [ "$WANIF" = "" ]; then
+            if [ "$WAN_SWITCH" = "1" ]; then
+                WANIF="`rdcsman  0x8001000b str`" # CSID_S_LOCAL_WAN_IF_NAME 
+            else
+                WANIF="`rdcsman  0x801e2201 str`" # CSID_S_3G_MULTIWAN_WAN_IF_NAME
+            fi
+ 
+            if [ "$WANIF" = "" ]; then
+                WANIF="usbnet0"
+            fi
+        fi
+        LG "Half Bridge run on WAN IF : $WANIF"
+		shift; continue;;
+
+	-c)	
+        CON="$2";
+        LG "CONnection" $CON
+		shift 2; continue;;
+
+	-d)	
+        DBG=1;
+        LG "Saving all vars on clean exit"
+		shift; continue;;
+
+	-sgw)	
+        SGW=1;
+        SNM=1;
+        LG "Spoof GateWay"
+		shift; continue;;
+
+	-lif)	
+        LIF="$2";
+        LG "Lan InterFace:" $LIF
+		shift 2; continue;;
+
+	-mgw)	
+        MGW=1;
+        LG "Modem IP as GateWay"
+		shift; continue;;
+
+	-nonat)	
+        NNT="1";
+        LG "NoNaT config"
+		shift; continue;;
+
+	-nm)	
+        NM="$2";
+        SNM=1;
+        LG "NetMask:" $NM
+		shift 2; continue;;
+
+	-s)	
+        SD="$2";
+        LG "Start Delay:" $SD
+		shift 2; continue;;
+
+	-t)	
+        SL="$2";
+        LG "Short Lease Time:" $SL
+		shift 2; continue;;
+
+	-v)	
+        VB=1;
+        LG "VerBose logging enabled"
+		shift; continue;;
+
+	-nofw)	
+        FW="";
+        LG "No Firewall"
+		shift; continue;;
+
+	-nodhcp)	
+        DP=""; LG "No dhcp"
+		shift; continue;;
+
+	*)	
+        CM=HP; 
+        LG "Unknown option:" $1
+		shift;continue;;
+
+	esac
+done
+echo "command: $CM"
+
+#Check for compatible options
+[ "$SGW" ] && [ -z "$FW" ] && EX "Gateway spoof needs iptables"
+[ -z "$FW" ] && NNT=1
+
+#ACTION MACROS
+
+#restart udhcpd
+UDH(){
+	[ "$(ps|grep [u]dhcpd)" ] && $KIL udhcpd
+	$UPD $1 >/dev/null &
+	LG "udhcpd started with conf" $1
+}
+#fix by Torus 20140307
+#create single IP dhcpd conf file
+CNF(){
+		MAC=`rdcsman  0x001e6f00  mac` # CSID_C_3G_BRIDGE_FIXMAC
+		FIXMAC=`echo $MAC | sed -e 's/-/:/g`
+    local lease_time="`rdcsman 0x00030002 u32`" # $C_DHCP_SVR_LEASETIME
+    if [ "$lease_time" != "0" ]; then
+        lease_time="option lease $lease_time"
+    else 
+        lease_time="option lease 300"
+    fi
+    if [ "$FIXMAC" != "" ]; then
+    	static_MAC="static_lease $FIXMAC $2"
+    else 
+    	static_MAC=
+    fi
+	cat >$1<<EOF3
+    start $2
+    end $2
+    interface $LIF
+    opt router $3
+    opt subnet $4
+    lease_file      /var/run/udhcpd.leases  #defualt: /var/lib/misc/udhcpd.leases
+    pidfile /var/run/udhcpd.pid      #default: /var/run/udhcpd.pid
+    max_leases	101
+    pool_check 0
+    $lease_time
+    $(cat /etc/resolv.conf|while read n d; do echo "opt dns $d";done)
+    $static_MAC
+EOF3
+}
+
+#parse dhcpd conf
+PRS()
+{
+	x=$(cat $OCF|grep "$2")
+	x="${x##* }"
+	[ -z "$x" ]&& EX "Unable to parse $2"
+	eval $1="$x"
+}
+
+# create default dhcpd conf
+DEFCNF(){
+    #check read  web  LAN dhcp config
+	[ ! -r "$OCF" ]&& EX "Unable to read $OCF"
+
+    #client IP
+	PRS LIP start
+
+    #modem IP
+	PRS MIP router
+
+    #LAN Mask
+	PRS LNM subnet
+
+    #LAN i/f
+	PRS LIF interface
+
+    #lease time from web gui
+	PRS LT "opt lease"
+
+    #re-use same lease_file
+	PRS LF lease_file
+
+    #create new default dhcp conf file
+	CNF $DCF $LIP $MIP $LNM ${SL:=30}
+	STATE=2
+}
+
+#Function to save current state and turn off CLI controlled utils
+CLX(){
+	echo "$1=$(echo $1|$CLI)">>$EXT
+	echo "begin;$1=0;end"|$CLI
+}
+
+#function to config core functions
+CFG()
+{
+    #if not provided from command line try to find connection id
+	if [ -z "$CON" ];then
+		x=$(echo "upnp:settings/connection"|$CLI)
+		x="${x%% *}"
+		CON=${x:=connection0}	#default
+	fi
+
+    #Start undo script
+	cat >$EXT<<EOF4
+$SHB
+#undo file to restore original router state when exiting $FP
+$CLI <<EOF
+begin
+EOF4
+
+    #default to leave firewall as defined in web -
+	if [ "$FW" ];then
+        #just turn off NAT
+		CLX "$CON:fwan:settings/private/nat/state"
+	else
+        #completely turn off iptables netfilter
+		CLX "fdb:settings/service/nat/state"
+	fi
+
+    #disable  DHCPD
+	[ "$DP" ]&& CLX "landhcps0:settings/state"
+
+    #disable upnp needs IP on ppp0
+	CLX "upnp:settings/state"
+
+    #and if no nat ,DPROXY,SNTP,DDNS,UPNP
+	if [ "$NNT" ];then
+		CLX "dproxy:settings/state"
+		CLX "sntp:settings/status"
+		if echo "logic:status/nspver"|$CLI |grep 3.7;then
+			x=client
+		else	
+			x=""
+		fi
+		DDNS=ddns$x:settings/$CON
+		CLX "$DDNS/dyndns/state"
+		CLX "$DDNS/noip/state"
+		CLX "$DDNS/tzo/state"
+		CLX "$DDNS/dnsomatic/state"
+	fi
+
+    #Finish undo file
+	echo -e "end\nEOF">>$EXT; chmod +x $EXT
+	STATE=3	#CONFIGURED
+}
+
+#iptables
+IP(){
+	[ "$VB" ]&& LG "$IPT $@"
+	$IPT "$@"
+}
+
+#route
+RT(){
+	[ "$VB" ]&& LG "$RTE $@"
+	$RTE "$@"
+}
+
+#ifconfig
+IC(){
+	[ "$VB" ]&& LG "$IFC $@"
+	$IFC $@
+}
+
+#Macro for H-B IP UP called on wanup or if init and WAN already up
+HBUP()
+{
+    #remove ISP supplied address from ppp0
+	IC ${WIF:=ppp0} 0.0.0.0
+
+    #Spoof GW
+	if [ "$SGW" ];then
+		a="${WIP##*.}"
+		if [ "$a" = "254" ];then
+			b=253
+		else
+            #set SGW next to IP
+			let b=$a/2*2
+			[ "$b" = "$a" ]&& let b=$a+1
+		fi
+		SGW="${WIP%.*}.$b"
+		LG "Spoofed Gateway is $SGW Netmask ${NM:=255.255.255.0}"
+	fi
+
+    #create new udhcpd conf file
+	if [ "$DP" ];then
+		CNF $NCF $WIP ${TGW:-$GW} ${NM:=$MK} $LT
+
+        #restart dhcpd with new config
+		UDH $NCF
+	fi
+
+    #Tell modem to find the WAN IP via br0
+	RT add -host $WIP dev $LIF
+
+    #GW via ppp0
+	RT add -host $GW dev $WIF
+	RT add default gw $GW
+
+    #enable proxy arp which allows modem to answer arp requests for the ISP GW etc on the LAN i/f
+	echo "1" >/proc/sys/net/ipv4/conf/$WIF/proxy_arp
+	echo "1" >/proc/sys/net/ipv4/conf/$LIF/proxy_arp
+
+    #spoofed net
+	if [ "$SNM" ];then
+        #calculate spoofed subnet
+		a="${WIP%.*}";b="${WIP#*.}";n="${NM%.*}";m="${NM#*.}"
+		SNW=$((${WIP%%.*}&${NM%%.*})).$((${b%%.*}&${m%%.*})).$((${a##*.}&${n##*.})).$((${WIP##*.}&${NM##*.}))
+		RT add -net $SNW netmask $NM dev $WIF
+	fi
+
+    #divert spoof GW to real one
+	[ "$SGW" ]&& IP -t nat -I PREROUTING -i $LIF -d $SGW -j DNAT --to $GW
+}
+
+HBUP_ADV()
+{
+    #remove ISP supplied address from ppp0
+    IC ${WIF:=$WANIF} 0.0.0.0
+
+    #SGW = WIP + 1
+	a=$((${WIP##*.}+1))
+	SGW="${WIP%.*}.$a"
+	FAKEGW=$WIP
+
+    #create new udhcpd conf file
+    if [ "$DP" ];then
+        CNF $NCF $WIP ${TGW:-$FAKEGW} ${NM:=$MK} $LT
+
+        #restart dhcpd with new config
+        UDH $NCF
+    fi
+
+    local WANTYPE="`rdcsman 0x00010003 u8`"
+    if [ "$WANTYPE" = "21" ]; then # flashofdm
+        IC ${WIF:=$WANIF} 0.0.0.0
+        RT add default dev $WIF
+   
+        # Management from Router WAN side
+        [ -e $IPTHB ] && sh $IPTHB && rm -f $IPTHB
+
+        local LANIP="`rdcsman 0x00010004 ipv4`"
+        iptables -t nat -I PREROUTING -i $WIF -d $WIP -p tcp -m tcp --dport 80 -j DNAT --to-destination $LANIP:80
+        echo "iptables -t nat -D PREROUTING -i $WIF -d $WIP -p tcp -m tcp --dport 80 -j DNAT --to-destination $LANIP:80" >> $IPTHB
+
+        iptables -t nat -I PREROUTING -i $WIF -d $WIP -p tcp -m tcp --dport 2300 -j DNAT --to-destination $LANIP:2300
+        echo "iptables -t nat -D PREROUTING -i $WIF -d $WIP -p tcp -m tcp --dport 2300 -j DNAT --to-destination $LANIP:2300" >> $IPTHB
+        
+        for pid in `ps | grep udhcpc | grep flashofdm | awk '{print $1}'`; do kill -9 $pid ; done
+
+    elif [ "${WIF##ppp}" != "$WIF" ]; then # PPP device 
+        IC $WIF $SGW netmask 255.255.255.255
+        RT add default dev $WIF
+    else  # Ethernet device
+        IC $WIF $SGW 
+        RT add default dev $WIF
+        RT add default dev $WIF gw $GW
+    fi
+
+    #Tell modem to find the WAN IP via br0
+    RT add -host $WIP dev $LIF
+
+    #enable proxy arp which allows modem to answer arp requests for the ISP GW etc on the LAN i/f
+    echo "1" >/proc/sys/net/ipv4/conf/$WIF/proxy_arp
+    echo "1" >/proc/sys/net/ipv4/conf/$LIF/proxy_arp
+}
+
+#Macro for HB IP-DN called when wan goes down or exiting
+HBDN()
+{
+    # Disable WAN Management 
+    [ -e $IPTHB ] && sh $IPTHB && rm -f $IPTHB
+
+    #delete old routing and firewall rules
+	[ "$SNW" ]&& RT del -net $SNW netmask $NM dev $WIF 
+	RT del -host $WIP dev $LIF 
+	RT del -host $GW dev $WIF 
+	RT del default 
+	RT del default 
+
+    # Restart/Alter WAN Type
+    #wrcsman "0x80010008 1" 
+}
+
+#called on ppp up or if init and WAN already up
+WANUP()
+{
+    # Stop  
+    LG "Stop NAT Server since Half-bridge "
+    nat stop 
+
+	if [ "$SD" -gt "0" ];then
+		LG "Pausing for $SD seconds as requested"
+		sleep $SD;
+        SD=0
+	fi
+
+    #if not already done configure
+	if [ "$STATE" -lt "3" ];then
+		LG "Configuring, please wait..."
+		CFG
+
+        #Read ISP supplied info from ifconfig ppp0 information string - may have changed since we were called
+        local WANTYPE="`rdcsman 0x00010003 u8`"
+        if [ "$WANTYPE" = "21" ]; then # flashofdm
+            WIP="`rdcsman 0x80010002 ipv4`"
+            MK="`rdcsman 0x80010003 ipv4`"
+            GW="`rdcsman 0x80010004 ipv4`"
+        elif [ "$WANTYPE" = "16" ] && [ "$WAN_SWITCH" = "0" ]; then # 3G WAN
+            WIP="`rdcsman 0x801e0201 ipv4`"
+            MK="`rdcsman 0x801e0301 ipv4`"
+            GW="`rdcsman 0x801e0401 ipv4`"            
+        elif [ "${WIF##ppp}" = "$WIF" ]; then # Not PPP device 
+            x=$($IFC $WIF|grep inet|grep -v inet6); MK=${x#*k:}
+            x=${x#*r:}              ; WIP=${x%% *}
+            GW="`route|grep $WIF|grep default|awk '{print $2}'`"
+        else ## pppX device 
+            x=$($IFC $WIF|grep inet|grep -v inet6); MK=${x#*k:}
+            x=${x#*r:}              ; WIP=${x%% *}
+            x=${x#*P:}              ; GW=${x%% *}
+        fi
+
+		LG "Configuring ...fetch WIP: $WIP, NK: $MK, GW: $GW"
+	fi
+
+    if [ "$1" = "ADV_HB" ]; then
+        HBUP_ADV
+    else     
+    	HBUP
+    fi
+	STATE=4	#RUNNING
+}
+
+# Execute commands
+case $CM in
+    IT)
+        STATE=1	#INITIALIZED
+        x=$($IFC|grep Point) #get name of WAN I/F ppp0?,  if it exists go straight in
+        WIF="${x%% *}"
+        [ "$WIF" ] && WANUP
+        ;;
+
+    ADV_HB_IT)
+        STATE=1 #INITIALIZED
+        x=$($IFC|grep $WANIF) #get name of WAN I/F USBNET0,  if it exists go straight in
+        WIF="${x%% *}"
+        [ "$WIF" ] && WANUP "ADV_HB"
+        ;;
+
+    UP)
+        WANUP
+        ;;
+
+    DN) #DOWN
+        HBDN
+        #no connection so revert to default dhcp - no delay
+        [ "$STATE" -gt "1" ] && [ "$DP" ] && wrcsman "0x80030002 1" #UDH $DCF
+        ;;
+
+    EXI) #disable scripts
+        #return modem functionality if in half-bridge
+        if [ "$STATE" -gt "3" ];then
+            HBDN
+            [ "$DP" ] && wrcsman "0x80030002 1" # UDH /etc/udhcpd.conf
+            if [ -x "$EXT" ];then
+                . $EXT 
+            fi
+        fi	
+        echo "0" >/proc/sys/net/ipv4/conf/$WIF/proxy_arp                                           
+        echo "0" >/proc/sys/net/ipv4/conf/$LIF/proxy_arp
+        STATE=0
+        LG "Half Bridge Mode Finished"
+        exit
+        ;;
+
+    HP)
+        USAGE
+        EX "Nothing to do"
+        ;;
+
+    *) 
+        EX "Invalid Command, I should never get here!"
+        ;;
+esac
+
+#Clean exit save vars
+x(){
+	eval a=\$$1
+	[ "$a" ]&& echo $1=$a>>$VAR
+}
+
+echo "#Saved Vars for $FP">$VAR
+x CM
+x STATE
+x WIP
+x MK
+x GW
+x SNM
+x NM
+x SGW
+x SNW
+x WIF
+x CON
+
+x MIP
+x LNM
+x LIF
+
+x LIP
+x MGW
+x LF
+x LT
+x SL
+x SD
+
+x FW
+x NNT
+x DP
+x DBG
+x VB
+
+[ "$DBG" ]&& set >>$VAR
+chmod +x $VAR
+exit
+

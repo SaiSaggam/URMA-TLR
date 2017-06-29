@@ -1,0 +1,6 @@
+.idea/
+tmp
+dist/
+device_dist/
+node_modules/
+meteor/public/devbundles/device-bundle.js.map

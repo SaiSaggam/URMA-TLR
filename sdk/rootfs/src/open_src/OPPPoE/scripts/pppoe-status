@@ -1,0 +1,61 @@
+#!/bin/sh
+
+if [ -n $1 ] ; then
+    MULTIWAN=$1
+else
+    MULTIWAN=
+fi
+
+# Defaults
+CONFIG=/etc/ppp/pppoe.conf
+
+if [ ! -f "$CONFIG" -o ! -r "$CONFIG" ] ; then
+    echo "$0: Cannot read configuration file '$CONFIG'" >& 2
+    exit 1
+fi
+
+. $CONFIG
+. /usr/bin/scriptlib
+
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+
+if [ -z $MULTIWAN ] ; then
+	PIDFILE_PPPD="/var/run/ppp-pppoe.pid"
+else
+	PIDFILE_PPPD="/var/run/ppp-pppoe$MULTIWAN.pid"
+fi
+
+
+if [ "$DEMAND" != "no" ] ; then
+    echo "Note: You have enabled demand-connection; pppoe-status may be inaccurate."
+fi
+
+
+# If no PIDFILE_PPPD, something fishy!
+if [ ! -r "$PIDFILE_PPPD" ] ; then
+    echo "pppoe-status: Link is down (can't read pppd PID file $PIDFILE_PPPD)"
+    exit 1
+fi
+
+sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+if [ $? = 0 ] ; then
+
+	# check the cnt status is CONNECT 
+	if [ -z $MULTIWAN ] ; then
+		CNTSTATUS=`rdcsman 0x80040700 u32`
+	else
+		TMP1=`printf "%x" $((MULTIWAN+1))`
+		CNTSTATUS=`rdcsman 0x8004070$TMP1 u32`
+	fi
+
+	[ $CNTSTATUS -ne 2 ] && echo "CNTSTATUS=$CNTSTATUS" && exit 1
+	echo "$0: IF=$PPP_IF  PID=$PPP_PID"
+	echo "pppoe-status: Link is up and running on interface $IF"
+	exit 0
+fi	    			
+
+
+echo "pppoe-status: Link is down -- could not find interface corresponding to"
+exit 1			    
+		

@@ -1,0 +1,37 @@
+#!/bin/sh
+
+data_get()
+{
+    rm -rf $2
+    echo $$ > /var/run/data_get.pid
+    [ "$1" != "" ] && [ "$2" != "" ] && wget $1 -O $2
+    echo "wget $1 -O $2"
+
+    #filename='examples.desktop'
+    #exec < $2
+
+    #while read line
+    #do
+    #    echo $line                 # print
+        
+    #    echo 'a' $line             # print a line
+    #done       
+    rm /var/run/data_get.pid
+    exit 0
+}
+
+usage()
+{
+    echo "Tool usage:"
+    echo "   $0 data_get URL -O DST :       wget URL data to DST"
+}
+#=====main=====
+[ "$2" != "" ] && [ "$3" != "" ] 
+
+case "$1" in
+    "data_get")     data_get $2 $3
+                    exit 0;;
+    *)              usage;;
+esac
+exit 0
+

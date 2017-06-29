@@ -1,0 +1,60 @@
+
+This file is a copy from the target of /proc/mt7621/esw_cnt.
+It's just used for testing/verifying "show eth" when built on the host.
+
+                  <<CPU>>                        
+                    |                            
++-----------------------------------------------+
+|                 <<PSE>>                       |
++-----------------------------------------------+
+                   |                             
++-----------------------------------------------+
+|                 <<GDMA>>                      |
+| GDMA1_RX_GBCNT  : 0001505246 (Rx Good Bytes)  |
+| GDMA1_RX_GPCNT  : 0000008373 (Rx Good Pkts)   |
+| GDMA1_RX_OERCNT : 0000000000 (overflow error) |
+| GDMA1_RX_FERCNT : 0000000000 (FCS error)      |
+| GDMA1_RX_SERCNT : 0000000000 (too short)      |
+| GDMA1_RX_LERCNT : 0000000000 (too long)       |
+| GDMA1_RX_CERCNT : 0000000000 (checksum error) |
+| GDMA1_RX_FCCNT  : 0000000000 (flow control)   |
+| GDMA1_TX_SKIPCNT: 0000000000 (about count)    |
+| GDMA1_TX_COLCNT : 0000000000 (collision count)        |
+| GDMA1_TX_GBCNT  : 0000000492 (Tx Good Bytes)  |
+| GDMA1_TX_GPCNT  : 0000000006 (Tx Good Pkts)   |
+|                                               |
+| GDMA2_RX_GBCNT  : 0000000000 (Rx Good Bytes)  |
+| GDMA2_RX_GPCNT  : 0000000000 (Rx Good Pkts)   |
+| GDMA2_RX_OERCNT : 0000000000 (overflow error) |
+| GDMA2_RX_FERCNT : 0000000000 (FCS error)      |
+| GDMA2_RX_SERCNT : 0000000000 (too short)      |
+| GDMA2_RX_LERCNT : 0000000000 (too long)       |
+| GDMA2_RX_CERCNT : 0000000000 (checksum error) |
+| GDMA2_RX_FCCNT  : 0000000000 (flow control)   |
+| GDMA2_TX_SKIPCNT: 0000000000 (skip)           |
+| GDMA2_TX_COLCNT : 0000000000 (collision)      |
+| GDMA2_TX_GBCNT  : 0000000000 (Tx Good Bytes)  |
+| GDMA2_TX_GPCNT  : 0000000000 (Tx Good Pkts)   |
++-----------------------------------------------+
+=====================    Port0    Port1    Port2    Port3    Port4    Port5    6
+Tx Drop Packet      :       0        0        0        0        0        0      
+Tx CRC Error        :       0        0        0        0        0        0      
+Tx Unicast Packet   :       2      937     1111        0        2        0      
+Tx Multicast Packet :    5076      375      920        0     5073        0      
+Tx Broadcast Packet :    3295      346      433        0     3294        0      
+Tx Collision Event  :       0        0        0        0        0        0      
+Tx Pause Packet     :       0        0        0        0        0        0      
+Rx Drop Packet      :       0        0        0        0        0        0      
+Rx Filtering Packet :       0        8        0        0        0        0      
+Rx Unicast Packet   :       0     1121      937        0        0        0      
+Rx Multicast Packet :       0     4704      371        0        0        0      
+Rx Broadcast Packet :       0     2950      346        0        0        0      
+Rx Alignment Error  :       0        0        0        0        0        0      
+Rx CRC Error        :       0        0        0        0        0        0      
+Rx Undersize Error  :       0        0        0        0        0        0      
+Rx Fragment Error   :       0        0        0        0        0        0      
+Rx Oversize Error   :       0        0        0        0        0        0      
+Rx Jabber Error     :       0        0        0        0        0        0      
+Rx Pause Packet     :       0        0        0        0        0        0      
+
+

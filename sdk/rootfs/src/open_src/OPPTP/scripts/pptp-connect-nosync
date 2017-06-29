@@ -1,0 +1,111 @@
+#!/bin/sh
+
+if [ -n $2 ] ; then
+    MULTIWAN=$2
+	TMP=`printf "%x" $((MULTIWAN+1))`
+else
+    MULTIWAN=
+fi
+
+# Paths to programs
+PPPD=pppd
+PPTP=pptp
+
+CONFIG=/etc/ppp/pptp.conf
+export CONFIG
+. $CONFIG
+
+PNSSERVER=$1
+CNT_FORCE=`rdcsman 0x8001000E u16`
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+
+if [ -z $MULTIWAN ] ; then
+    PIDFILE_PPPD="/var/run/ppp-pptp.pid"
+    CNTTYPE=`rdcsman 0x00050900 u32`
+	LINKNAME="linkname pptp"
+else
+    PIDFILE_PPPD="/var/run/ppp-pptp$MULTIWAN.pid"
+    TMP=$((MULTIWAN+1))
+    CNTTYPE=`rdcsman 0x0005090$TMP u32`
+	LINKNAME="linkname pptp$MULTIWAN"
+fi
+
+if [ -z $MULTIWAN ] ; then
+	ACCOUNT="`rdcsman 0x00050100 str`"
+	PASSWORD="`rdcsman 0x00050200 str`"
+else
+	ACCOUNT="`rdcsman 0x0005010$TMP str`"
+	PASSWORD="`rdcsman 0x0005020$TMP str`"
+fi
+	USER_PASSWORD="user $ACCOUNT password $PASSWORD"
+
+if [ "$CNTTYPE" = "0" -a "$CNT_FORCE" = "0" ] ; then 
+    #dial-on-demand 
+    PPPD_EXTRA="demand nopersist holdoff 3 ipcp-accept-remote ipcp-accept-local ktune"
+else
+    #auto-reconncet and manual connect
+	PPPD_EXTRA=
+fi
+
+USE_MPPE=`rdcsman 0x00054100 u8`
+if [ "$USE_MPPE" = "1" ] ; then 
+    #PPPD_EXTRA="refuse-pap refuse-chap mppe required,stateless"
+    MPPE_OPT="refuse-pap refuse-chap mppe required,stateless"
+else
+    #PPPD_EXTRA="noccp nomppe nomppc"
+	MPPE_OPT="noccp nomppe nomppc"
+fi
+
+#
+# PPPD options
+#
+LCP_INTERVAL=20
+LCP_FAILURE=6
+PEERDNS="usepeerdns"
+
+if [ $DEMAND = "no" -o $DEMAND = "" ] ; then
+    IDLE_TIME=""    
+else
+    IDLE_TIME="idle $DEMAND"
+    DEFAULTROUTE="" #"defaultroute"
+fi 
+
+
+PPP_STD_OPTIONS="noipdefault noauth refuse-eap $MPPE_OPT\
+        hide-password nodetach $PEERDNS mtu 1410 \
+        noaccomp nodeflate nopcomp novj novjccomp \
+        user $USER $DEFAULTROUTE\
+        lcp-echo-interval $LCP_INTERVAL \
+        lcp-echo-failure $LCP_FAILURE \
+        $LINKNAME $IDLE_TIME $PPPD_EXTRA"
+
+if [ "$USE_MPPE" = "1" ] ; then 
+    PPTP_CMD="$PPTP $PNSSERVER --nolaunchpppd --loglevel 0"
+else
+    #PPTP_CMD="$PPTP $PNSSERVER --nolaunchpppd --loglevel 0 --sync"
+    PPTP_CMD="$PPTP $PNSSERVER --nolaunchpppd --loglevel 0"
+fi
+
+# Launch the pptp and pppd
+echo $$ > $PIDFILE_CONNECT
+echo "$PPPD pty $PPTP_CMD $PPP_STD_OPTIONS"
+
+$PPPD pty "$PPTP_CMD" $PPP_STD_OPTIONS $USER_PASSWORD &
+wait
+
+	# if CNTTYPE != PPTP_CNT_TYPE_MANUAL
+	if [ $MANUAL != "yes"  ] ; then 
+	#killed by commander 
+		if [ -z $MULTIWAN ] ; then
+		    wrcsman "0x80050700 0x03 && \
+					 0x80010007 0x03"
+		else
+		    wrcsman "0x8005070$TMP 0x03 && \
+					 0x8001016$MULTIWAN 0x03"
+		fi				
+    rm -rf $PIDFILE_CONNECT
+fi	
+
+exit
+

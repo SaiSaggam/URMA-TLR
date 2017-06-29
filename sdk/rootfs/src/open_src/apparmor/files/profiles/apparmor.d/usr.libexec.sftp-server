@@ -1,0 +1,14 @@
+#include <tunables/global>
+
+/usr/libexec/sftp-server {
+	#include <abstractions/base>
+
+	/usr/libexec/sftp-server r,
+
+	# Allow RW only for user's home directory, and don't let it read anything else
+	@{USERSHOME}/ r,
+	@{USERSHOME}/** rw,
+
+	# sftp needs read access to passwd (note, still no access to shadow)
+	/etc/passwd r,
+}

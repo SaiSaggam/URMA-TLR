@@ -1,0 +1,40 @@
+#!/bin/sh
+
+[ -f /var/run/freememrun ] && return
+[ -f /var/run/freememrun_das ] && return
+
+ echo 1 >> /var/run/freememrun
+# logger -t memory -p 8.7 "Freemem run ...  "        
+  
+force="0"
+[ "$1" = "-f" ] && force="1"
+
+all="`cat /proc/meminfo | grep MemTotal | awk '{print $2}'`"
+free="`cat /proc/meminfo | grep MemFree | awk '{print $2}'`"
+used="`echo $free $all | awk '{printf("%d\n",($2-$1))}'`"
+percent="`echo $free $all | awk '{printf("%.0f\n",100*($1/$2))}'`"
+
+wrcsman "0x8000F400 $all " # CSID_S_SYS_MEM_TOTAL 
+wrcsman "0x8000F401 $used" # CSID_S_SYS_MEM_USED  
+wrcsman "0x8000F402 $free" # CSID_S_SYS_MEM_FREE  
+
+if [ "$force" = "1" ]; then
+    echo 3 > /proc/sys/vm/drop_caches
+    echo 0 > /proc/sys/vm/drop_caches    
+else
+    reason=""
+    if [ $percent -le 10 ]; then
+        reason="less than 10% of Total"        
+    elif [ $free -le 3000 ]; then    
+        reason="less than 3MB"        
+    fi
+
+    if [ "$reason" != "" ]; then
+        logger -t memory -p 8.7 "Free Memory is $reason, Try to drop some cache ($free KB / $all KB)"        
+        echo 3 > /proc/sys/vm/drop_caches
+        echo 0 > /proc/sys/vm/drop_caches    
+    fi
+fi
+
+rm -f /var/run/freememrun
+

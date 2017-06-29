@@ -1,0 +1,50 @@
+#{$all-text-inputs},
+select[multiple=multiple] {
+//  margin-bottom: 0;
+  border-radius: 0;
+  border: 1px solid $medium-gray;
+  box-shadow: none;
+  &:focus {
+    box-shadow: none;
+  }
+}
+
+select, .select-box, .select-box:after {
+  height: 32px;
+}
+
+select {
+  -webkit-appearance: button;
+  border-radius: 0;
+  margin-left: $spacing-unit;
+  overflow: hidden;
+  padding: 5px 32px 5px 10px;
+  border: 1px solid $medium-gray;
+  color: $dark-gray;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-box {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.select-box:after {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  top: 0;
+  padding: 5px 6px 0 6px;
+  width: 22px;
+  border-left: 1px solid $medium-gray;
+  content:"\f0dc";
+  font-family: FontAwesome;
+  color: $dark-gray;
+  pointer-events: none;
+}
+
+label {
+  font-weight: 200;
+}

@@ -1,0 +1,33 @@
+#!/bin/sh
+
+#. /tmp/lcs-pppoe-header
+. /usr/bin/lcs-pppoe-header
+#logger -p 8.7 -t ip-down-lcs "0:$0, 1:$1, 2:$2, 3:$3, 4:$4, 5:$5, 6:$6"
+
+IF_PPPOE="$1"
+IF_BR="`rdcsman $CSID_S_SYS_IF_BR0 str`" 
+[ "$IF_BR" = "" ] && IF_BR="br0"
+
+# IP/Netmask/GW/Status
+wrcsman "$CSID_S_PPPOE_LCS_IF_IP {0.0.0.0}"
+wrcsman "$CSID_S_PPPOE_LCS_IF_NM {0.0.0.0}"
+wrcsman "$CSID_S_PPPOE_LCS_IF_GW {0.0.0.0}"
+wrcsman "$CSID_S_PPPOE_LCS_IF_PRIDNS {0.0.0.0}"
+wrcsman "$CSID_S_PPPOE_LCS_IF_SECDNS {0.0.0.0}"  
+wrcsman "$CSID_S_PPPOE_LCS_CNT_STATUS 0" 
+wrcsman "$CSID_S_PPPOE_LCS_CNT_TIME 0" 
+wrcsman "$CSID_S_PPPOE_LCS_ACNAME \"" 
+wrcsman "$CSID_S_PPPOE_LCS_IF_NAME \""
+#wrcsman "$CSID_S_PPPOE_LCS_ACNAME \""
+
+rm -f $IFACE_FILE 
+rm -f $PID_FILE
+rm -f $PROUTE_RULE
+
+[ -e $NAT_FILE ] && sh $NAT_FILE && rm -f $NAT_FILE
+#lcs-pppoe-monitor stop
+[ -e $PROUTE_PID ] && kill `cat $PROUTE_PID`
+lcs-pppoe redns
+lcs-pppoe dmfilter
+flush_rtcache;
+

@@ -1,0 +1,28 @@
+{
+  "name": "urma-py-server",
+  "version": "0.0.1",
+  "description": "Unified Remote Management Architecture (URMA) python reference server",
+  "scripts": {
+    "global_install": "node .tools/global_installer.js",
+    "build": "gulp --cwd . --gulpfile .tools/gulpfile.js",
+    "server": "cd .build/dist && python server.py -wp ../../../app/.build/dist -lh NONE",
+    "debug": "cd .build/dist && python server.py  -wp ../../../app/.build/mdist -lh NONE",
+    "test": "py.test device/test/main_pytest.py  --verbose --tb=long --junitxml=results.xml"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@stash.digi.com/idigi/URMA-py-server.git"
+  },
+  "author": "",
+  "contributers": [
+    "Dave Hutchison <dave.hutchison@digi.com>",
+    "Dana Immertreu <dana.immertreau@digi.com>",
+    "Jeff Ryan <jeff.ryan@digi.com>"
+  ],
+  "license": "ISC",
+  "private": true,
+  "dependencies": {
+    "gulp": "^3.9.1"
+  },
+  "devDependencies": {}
+}

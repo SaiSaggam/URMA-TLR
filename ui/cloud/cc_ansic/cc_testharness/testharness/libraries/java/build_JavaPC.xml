@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE project>
+<project basedir="." default="dist" name="CloudConnectorPC">
+        <property name="build.dir" location="build"/>
+        <property name="class.dir" location="${build.dir}/classes"/>
+        <property name="dist.dir" location="dist"/>
+        <property name="src.dir" location="src"/>
+        <property name="jar" value="CloudConnectorPC.jar"/>
+        <!-- This should be overriden by caller.  Used in the Manifest. -->
+        <property name="version" value="1.0.0"/>
+
+        <target name="clean">
+                <delete file="${dist.dir}/${jar}"/>
+                <delete dir="${build.dir}"/>
+        </target>
+
+        <target name="init" depends="clean">
+                <mkdir dir="${build.dir}"/>
+        </target>
+
+        <target name="compile" depends="init">
+                <mkdir dir="${class.dir}"/>
+                <javac srcdir="${src.dir}" destdir="${class.dir}" includeantruntime="false" target="1.7" source="1.7">
+                    <classpath>
+                        <pathelement path="../../../cc_java_core/CloudConnector_JavaSE/dist/CloudConnectorSE.jar"/>
+                    </classpath>
+                </javac>
+        </target>
+
+        <target name="jar" depends="compile">
+                <jar destfile="${build.dir}/${jar}">
+                        <fileset dir="${class.dir}"/>
+                        <fileset dir="." includes="*descriptor*.xml" />
+                        <fileset dir="." includes="*.jks" />
+                        <zipgroupfileset dir="../../../cc_java_core/CloudConnector_JavaSE/dist" includes="CloudConnectorSE.jar" />
+                        <manifest>
+<!--                                 <attribute name="Main-Class" value="com.etherios.connector.IPlatformCustomization"/> -->
+                                <attribute name="Implementation-Vendor" value="Digi International"/>
+                                <attribute name="Implementation-Title" value="Cloud Connector for Java PC implementation"/>
+                                <attribute name="Implementation-Version" value="${version}"/>
+                                <attribute name="Sealed" value="true"/>
+                        </manifest>
+                </jar>
+        </target>
+
+        <target name="dist" depends="jar">
+                <mkdir dir="${dist.dir}"/>
+                <copy file="${build.dir}/${jar}" todir="${dist.dir}"/>
+        </target>
+</project>

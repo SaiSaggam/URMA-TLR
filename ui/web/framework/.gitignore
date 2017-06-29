@@ -1,0 +1,10 @@
+.DS_Store
+
+node_modules
+.idea/
+packages/urma-core/*.browserify.js.cached
+packages/urma-core/*.browserify.js.map
+tests/nightwatch/logs
+tests/nightwatch/reports
+tests/spacejam/reports
+

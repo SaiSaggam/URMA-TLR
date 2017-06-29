@@ -1,0 +1,435 @@
+#!/bin/sh
+
+IWPRIV="/usr/sbin/iwpriv"
+
+CSID_SYS_WLANIF="0x8000F392"
+CSID_SYS_LANIF="0x8000F301"
+CSID_SYS_WLAN0_MAC="0x8000F3A1"
+
+CSID_ACTION_INTERVAL="0x80440106"
+
+CSID_SSID="0x00440400"
+CSID_CHANNEL="0x00440200"
+CSID_AUTH="0x00441300"
+CSID_ENCRYPTE="0x00441400"
+CSID_WPAPSK="0x00441f00"
+CSID_WIRELESSMODE="0x00440c00"
+CSID_DEFKEYID="0x00441600"
+
+CSID_KEY0_TYPE="0x00441700"
+CSID_KEY0="0x00441800"
+CSID_KEY1_TYPE="0x00441900"
+CSID_KEY1="0x00441a00"
+CSID_KEY2_TYPE="0x00441b00"
+CSID_KEY2="0x00441c00"
+CSID_KEY3_TYPE="0x00441d00"
+CSID_KEY3="0x00441e00"
+
+CSID_S_WLANAP_DUALMODE_STATUS="0x80445002"
+#reserve one cahr for expr
+
+CSID_S_WLANAPCLI_AP_SSID="0x8032100"
+CSID_S_WLANAPCLI_AP_SSID_XX="0x803210"
+CSID_S_WLANAPCLI_AP_ENCRYP="0x8032200"
+CSID_S_WLANAPCLI_AP_AUTHMODE="0x8032400"
+CSID_S_WLANAPCLI_AP_MAC="0x8032500"
+CSID_S_WLANAPCLI_AP_CHANNEL="0x8032600"
+CSID_S_WLANAPCLI_AP_CHANNEL_XX="0x803260"
+
+CSID_C_LOCAL_WANTYPE="0x00010003"
+CSID_C_LOCAL_WANTYPE_RES="0x00010026"
+
+LOCAL_WANTYPE_WISP="19"
+
+CSID_C_WLANAPCLI24G_WLANAPCLI_ENABLE="0x00320001"
+CSID_C_WLANAPCLI5G_WLANAPCLI2_ENABLE="0x00450001"
+
+CSID_C_WLANAPCLI5G_AUTHMODE="0x0045000d"
+CSID_C_WLANAPCLI5G_ENCRYPTYPE="0x0045000e"
+CSID_C_WLANAPCLI5G_SSID="0x00450004"
+CSID_C_WLANAPCLI5G_WPAPSK="0x00450019"
+CSID_C_WLANAPCLI5G_DUALMODE_AP_MAC="0x0045001b"
+
+CSID_C_WLANAPCLI24G_AUTHMODE="0x0032000d"
+CSID_C_WLANAPCLI24G_ENCRYPTYPE="0x0032000e"
+CSID_C_WLANAPCLI24G_SSID="0x00320004"
+CSID_C_WLANAPCLI24G_WPAPSK="0x00320019"
+
+CSID_C_DHCP_SVR_ENABLE="0x00030001"
+
+STATUS_TIMEOUT=`rdcsman $CSID_ACTION_INTERVAL u32`
+LAN_IF=`rdcsman $CSID_SYS_LANIF str`
+#WLAN_IF_5G=`rdcsman $CSID_SYS_WLANIF str`
+WLAN_IF_24G="ra0"
+WLAN_IF_5G="rai0"
+WLAN_IF_APCLI="apcli0"
+WLAN0_MAC=`rdcsman $CSID_SYS_WLAN0_MAC bin`
+
+CSID_S_WLANAPCLIENT_LINK_STATUS="0x80445003"
+WLANAP2_APCLI_LINK_STATUS_UNLINK=0
+WLANAP2_APCLI_LINK_STATUS_LINK=2
+
+DEBUG=1
+DBG_WDS_INFO=/tmp/apcliapp.flow
+
+dbg()
+{
+    local str="$1"
+    [ "$DEBUG" = "1" ] && echo "$str" >> $DBG_WDS_INFO
+}
+
+apcli_init()
+{
+	APCLI_24G=`rdcsman $CSID_C_WLANAPCLI24G_WLANAPCLI_ENABLE u8`
+	APCLI_5G=`rdcsman $CSID_C_WLANAPCLI5G_WLANAPCLI2_ENABLE u8`
+	
+	APCLI_STATUS=1
+	
+	dbg "apcli_init APCLI_24G = $APCLI_24G, APCLI_5g = $APCLI_5G"
+	
+	if [ $APCLI_24G -eq 1 ] ; then
+	
+	if [ $STATUS_TIMEOUT -eq 0 ] ; then
+		STATUS_TIMEOUT=40
+	fi	
+		
+	ENDTIME=`date +%s`
+	ENDTIME=`expr $ENDTIME + $STATUS_TIMEOUT`
+	
+	DESTINATION_AP=`rdcsman  $CSID_C_WLANAPCLI24G_SSID str`
+	
+
+	while [ true ] ; do
+	
+		TIME=0
+		#sleep 5
+
+        TIME=`date +%s`
+        if [ $TIME -gt $ENDTIME ] ; then
+            break
+        fi
+		
+		if [ $APCLI_STATUS -eq 1 ] ; then
+			GATEWAY_COUNT=`apcli-scanap  | grep "$DESTINATION_AP" -c`
+			if [  X"$GATEWAY_COUNT" != X ] ; then
+				dbg "GATEWAY_COUNT = 1"
+				APCLI_STATUS=2
+			fi
+		fi
+		
+		#set related info to driver by iwpriv
+		if [ $APCLI_STATUS -eq 2 ] ; then
+			dbg "APCLI_STATUS init = 2"
+			i=0
+			while [ true ] ; do
+				
+				if [ $i -gt 9 ] ; then
+					WLANAPCLI_AP_SSID=`rdcsman $CSID_S_WLANAPCLI_AP_SSID_XX$i str`
+				else
+					WLANAPCLI_AP_SSID=`rdcsman $CSID_S_WLANAPCLI_AP_SSID$i str`
+				fi
+		
+				#dbg "i =$i, WLANAPCLI_AP_SSID=$WLANAPCLI_AP_SSID, DESTINATION_AP=$DESTINATION_AP, "
+				
+				
+				if [  "$WLANAPCLI_AP_SSID" == "$DESTINATION_AP" ] ; then
+				
+				#dbg "$WLANAPCLI_AP_SSID -eq $DESTINATION_AP"
+				
+				if [ $i -gt 9 ] ; then
+					#dbg "SSID=$WLANAPCLI_AP_SSID , CSID=$CSID_S_WLANAPCLI_AP_SSID_XX$i"
+					DCHANNEL=`rdcsman $CSID_S_WLANAPCLI_AP_CHANNEL_XX$i str`
+				else	
+					dbg "SSID=$WLANAPCLI_AP_SSID , CSID=$CSID_S_WLANAPCLI_AP_SSID$i"
+					DCHANNEL=`rdcsman $CSID_S_WLANAPCLI_AP_CHANNEL$i str`				
+				fi
+					$IWPRIV $WLAN_IF_24G set Channel=$DCHANNEL
+					dbg "CHANNEL = $DCHANNEL"
+					APCLI_STATUS=3
+				break;
+				fi
+		
+				i=`expr $i + 1`
+		
+				if [ $i -gt 50 ] ; then
+					APCLI_STATUS=1
+					break;
+				fi
+			done
+		fi
+		
+		#wait for connection
+		if [ $APCLI_STATUS -eq 3 ] ; then	
+			dbg "APCLI_STATUS init = 3"
+
+			APINFO=`iwconfig apcli0 | grep "Not-Associated"`
+			#dbg "$APINFO"
+			sleep 3
+			
+			if [  X"$APINFO" == X ] ; then
+				dbg "apcli_init : Connect to ap Successful !!!"
+				APCLI_STATUS=4
+				wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_LINK" 
+				break;
+			fi
+		fi
+		
+#		#wait for ip
+#		if [ $APCLI_STATUS -eq 4 ] ; then	
+#			dbg "APCLI_STATUS init = 4"
+#
+#			IPGET=`udhcpc -n -i apcli0 -s /usr/bin/default.script -p /var/run/udhcpc.pid | grep "Lease of"`
+#			
+#			if [  X"$IPGET" != X ] ; then
+#				APCLI_STATUS=5
+#				#sleep 1
+#				wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_LINK" 
+#
+#				dbg "apcli24G_init : get ip!!!"
+#				break;				
+#			fi
+#		fi
+	done
+			
+	if [ $APCLI_STATUS -ne 4 ] ; then	
+		wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_UNLINK"
+	fi
+	
+	fi
+
+	#For 5G apclient
+	if [ $APCLI_5G -eq 1 ] ; then
+	
+	if [ $STATUS_TIMEOUT -eq 0 ] ; then
+		STATUS_TIMEOUT=40
+	fi	
+		
+	ENDTIME=`date +%s`
+	ENDTIME=`expr $ENDTIME + $STATUS_TIMEOUT`
+	
+	DESTINATION_AP=`rdcsman  $CSID_C_WLANAPCLI5G_SSID str`
+	
+	while [ true ] ; do
+	
+		TIME=0
+		sleep 5
+
+        TIME=`date +%s`
+        if [ $TIME -gt $ENDTIME ] ; then
+            break
+        fi
+		
+		if [ $APCLI_STATUS -eq 1 ] ; then
+			GATEWAY_COUNT=`apcli-scanap 5g | grep "$DESTINATION_AP" -c`
+			if [  X"$GATEWAY_COUNT" != X ] ; then
+				dbg "GATEWAY_COUNT 5G = $GATEWAY_COUNT"
+				APCLI_STATUS=2
+			fi
+		fi
+		
+		#set related info to driver by iwpriv
+		if [ $APCLI_STATUS -eq 2 ] ; then
+			dbg "APCLI_STATUS init = 2"
+			i=0
+			while [ true ] ; do
+				
+				if [ $i -gt 9 ] ; then
+					WLANAPCLI_AP_SSID=`rdcsman $CSID_S_WLANAPCLI_AP_SSID_XX$i str`
+				else
+					WLANAPCLI_AP_SSID=`rdcsman $CSID_S_WLANAPCLI_AP_SSID$i str`
+				fi
+				
+				#echo $WLANAPCLI_AP_SSID
+				#dbg "WLANAPCLI_AP_SSID = $WLANAPCLI_AP_SSID"
+		
+				#if [  X"$WLANAPCLI_AP_SSID" != X ] ; then
+				if [  "$WLANAPCLI_AP_SSID" == "$DESTINATION_AP" ] ; then
+				
+				if [ $i -gt 9 ] ; then
+					dbg "SSID=$WLANAPCLI_AP_SSID , CSID=$CSID_S_WLANAPCLI_AP_SSID_XX$i"
+					DCHANNEL=`rdcsman $CSID_S_WLANAPCLI_AP_CHANNEL_XX$i str`				
+				else
+					dbg "SSID=$WLANAPCLI_AP_SSID , CSID=$CSID_S_WLANAPCLI_AP_SSID$i"
+					DCHANNEL=`rdcsman $CSID_S_WLANAPCLI_AP_CHANNEL$i str`
+				fi
+					$IWPRIV $WLAN_IF_5G set Channel=$DCHANNEL
+					dbg "CHANNEL = $DCHANNEL"
+					APCLI_STATUS=3
+				break;
+				fi
+		
+				i=`expr $i + 1`
+		
+				if [ $i -gt 50 ] ; then
+					APCLI_STATUS=1
+					break;
+				fi
+			done
+		fi
+		
+		#wait for connection
+		if [ $APCLI_STATUS -eq 3 ] ; then	
+			dbg "APCLI_STATUS init = 3"
+			sleep 3
+			APINFO=`iwconfig apclii0 | grep "Not-Associated"`
+			
+			#dbg "$APINFO"
+
+			if [  X"$APINFO" == X ] ; then
+				dbg "apcli_init : Connect to ap Successful !!!"
+				wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_LINK" 
+				APCLI_STATUS=4
+				break;
+			fi
+		fi
+		
+#		#wait for ip
+#		if [ $APCLI_STATUS -eq 4 ] ; then	
+#			dbg "APCLI_STATUS init = 4"
+#
+#			IPGET=`udhcpc -n -i apclii0 -s /usr/bin/default.script -p /var/run/udhcpc.pid | grep "Lease of"`
+#			
+#			if [  X"$IPGET" != X ] ; then
+#				APCLI_STATUS=5
+#				sleep 1
+#				wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_LINK" 
+#
+#				dbg "apcli5G_init : get ip!!!"
+#				break;				
+#			fi
+#		fi
+	done
+
+	if [ $APCLI_STATUS -ne 4 ] ; then	
+		wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_UNLINK"
+	fi
+		
+	fi	
+	
+	return 1	
+}
+ 
+apcli_linkcheck()
+{
+	
+	LINK_STATUS=0
+	APCLI_24G=`rdcsman $CSID_C_WLANAPCLI24G_WLANAPCLI_ENABLE u8`
+	APCLI_5G=`rdcsman $CSID_C_WLANAPCLI5G_WLANAPCLI2_ENABLE u8`	
+
+	if [ $STATUS_TIMEOUT -eq 0 ] ; then
+		STATUS_TIMEOUT=10
+	fi	
+		
+	ENDTIME=`date +%s`
+	ENDTIME=`expr $ENDTIME + $STATUS_TIMEOUT`
+	
+	if [ $APCLI_24G -eq 1 ] ; then
+	while [ true ] ; do
+	
+		TIME=0
+		#sleep 2
+
+    TIME=`date +%s`
+    
+    if [ $TIME -gt $ENDTIME ] ; then
+        break
+    fi		
+
+		APINFO=`iwconfig apcli0 | grep "Not-Associated"`
+		echo $APINFO
+
+		if [  X"$APINFO" == X ] ; then
+			echo apcli linkcheck : link active !!!
+			#wrcsman "$CSID_S_WLANAP_DUALMODE_STATUS 1" 
+			dbg "apcli24g linkcheck : link active !!!"
+			LINK_STATUS=1
+			break;
+		fi
+
+	done
+	
+	if [ $LINK_STATUS -eq 0 ] ; then
+		wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_UNLINK"
+		dbg "apcli24g linkcheck : link down !!!"
+	fi
+	fi
+	
+
+	if [ $APCLI_5G -eq 1 ] ; then
+	while [ true ] ; do
+	
+		TIME=0
+		#sleep 2
+
+    TIME=`date +%s`
+    
+    if [ $TIME -gt $ENDTIME ] ; then
+        break
+    fi		
+
+		APINFO=`iwconfig apclii0 | grep "Not-Associated"`
+		echo $APINFO
+
+		if [  X"$APINFO" == X ] ; then
+			echo linkcheck : link active !!!
+			#wrcsman "$CSID_S_WLANAP_DUALMODE_STATUS 1" 
+			dbg "apcli5g linkcheck : link active !!!"
+			LINK_STATUS=1
+			break;
+		fi
+
+	done
+	
+	if [ $LINK_STATUS -eq 0 ] ; then
+		wrcsman "$CSID_S_WLANAPCLIENT_LINK_STATUS $WLANAP2_APCLI_LINK_STATUS_UNLINK"
+		dbg "apcli5g linkcheck : link down !!!"
+	fi
+	fi
+	
+	return 1	
+}
+ 
+## Main ##############
+case "$1" in
+
+	apclilinkcheck)
+		SYSTIME=`date`
+		dbg "$SYSTIME : ==> apclilinkcheck"
+		
+		apcli_linkcheck
+
+		SYSTIME=`date`
+		dbg "$SYSTIME : <== apclilinkcheck"		
+		;;
+		
+	apcliinit)
+		SYSTIME=`date`
+		dbg "$SYSTIME : ==> apcliinit"
+		
+		apcli_init		
+
+		SYSTIME=`date`
+		dbg "$SYSTIME : <== apcliinit"		
+		;;
+		
+
+	apclimode)
+		SYSTIME=`date`
+		dbg "$SYSTIME : ==> apclimode"
+		
+		linkstatus=`rdcsman $CSID_S_WLANAPCLIENT_LINK_STATUS u8`
+		
+		if [ $linkstatus -eq $WLANAP2_APCLI_LINK_STATUS_UNLINK ] ; then		
+			dbg "$SYSTIME : ==> apclimode->apcli_init"
+			apcli_init		
+		else
+			dbg "$SYSTIME : ==> apclimode->apcli_linkcheck"
+			apcli_linkcheck
+		fi		
+
+		SYSTIME=`date`
+		dbg "$SYSTIME : <== apclimode"			
+
+		exit 1 ;;
+esac
+exit 0

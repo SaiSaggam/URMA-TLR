@@ -1,0 +1,7 @@
+config 'ssh' 'ssh1'
+	option server 'on'
+	option port '22'
+config 'user' 'user4'
+	option name 'fred1'
+	option password 'password'
+	option access 'super'

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE project>
+<project basedir="." default="dist" name="command_tool">
+	<property name="build.dir" location="build"/>
+	<property name="class.dir" location="${build.dir}/classes"/>
+	<property name="dist.dir" location="."/>
+	<property name="src.dir" location="src/main"/>
+	<property name="jar" value="command_tool.jar"/>
+	<!-- This should be overriden by caller.  Used in the Manifest. -->
+	<property name="version" value="0.0"/>
+
+	<path id="project-classpath">
+		<fileset dir="." includes="json-simple-1.1.1.jar"/>
+	</path>
+
+	<target name="clean">
+		<delete file="${dist.dir}/${jar}"/>
+		<delete dir="${build.dir}"/>
+	</target>
+
+	<target name="init" depends="clean">
+		<mkdir dir="${build.dir}"/>
+	</target>
+
+	<target name="compile" depends="init">
+		<mkdir dir="${class.dir}"/>
+		<javac srcdir="${src.dir}" destdir="${class.dir}" classpathref="project-classpath" includeantruntime="false" target="1.6" source="1.6"/>
+	</target>
+
+	<manifestclasspath property="commandtool.manifest.classpath" jarfile="${jar}">
+		<classpath>
+			<fileset dir="." includes="*.jar" />
+		</classpath>
+	</manifestclasspath>
+
+	<target name="jar" depends="compile">
+		<jar destfile="${build.dir}/${jar}">
+			<fileset dir="${class.dir}"/>
+			<manifest>
+				<attribute name="Main-Class" value="com.digi.config.command_tool.CommandTool"/>
+				<attribute name="Class-Path" value="${commandtool.manifest.classpath}" />
+				<attribute name="Implementation-Vendor" value="Digi International"/>
+				<attribute name="Implementation-Title" value="TLR Command Definition Tool"/>
+				<attribute name="Implementation-Version" value="${version}"/>
+				<attribute name="Sealed" value="true"/>
+			</manifest>
+		</jar>
+	</target>
+
+	<target name="dist" depends="jar">
+		<mkdir dir="${dist.dir}"/>
+		<copy file="${build.dir}/${jar}" todir="${dist.dir}"/>
+	</target>
+</project>

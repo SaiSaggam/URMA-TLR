@@ -1,0 +1,33 @@
+{
+  "name": "urma-framework",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "meteor test-packages --driver-package=practicalmeteor:mocha digi:urma-core"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@stash.digi.com/idigi/urma-framework.git"
+  },
+  "keywords": [],
+  "author": "Jeff Ryan <jeffry@digi.com>",
+  "license": "ISC",
+  "dependencies": {
+    "browser": "^0.2.6",
+    "chai": "^3.5.0",
+    "growl": "^1.9.2",
+    "jade": "^1.11.0",
+    "mocha": "^2.4.5",
+    "react": "^0.14.8",
+    "react-addons-linked-state-mixin": "^0.14.8",
+    "react-addons-test-utils": "^0.14.8",
+    "react-dom": "^0.14.7",
+    "react-mixin": "^3.0.4",
+    "react-router": "^2.0.1"
+  },
+  "devDependencies": {}
+}

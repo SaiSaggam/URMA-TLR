@@ -1,0 +1,151 @@
+
+IWPRIV="/usr/sbin/iwpriv"
+
+CSID_C_WLANAPCLI_ENABLE="0x00320001"
+
+CSID_C_WLANAPCLI_ApCliAuthMode="0x0032000d"
+CSID_C_WLANAPCLI_ApCliEncrypType="0x0032000e"
+CSID_C_WLANAPCLI_ApCliSsid="0x00320004"
+CSID_C_WLANAPCLI_WPAPSK="0x00320019"
+
+CSID_C_WLANAPCLI_KEYID="0x00320019"
+CSID_C_WLANAPCLI_WEPKEY0="0x00320012"
+CSID_C_WLANAPCLI_WEPKEY1="0x00320014"
+CSID_C_WLANAPCLI_WEPKEY2="0x00320016"
+CSID_C_WLANAPCLI_WEPKEY3="0x00320018"
+
+CSID_C_WLANAPCLI_DEFKEYID="0x00320010"
+CSID_C_WLANAPCLI_KEY0TYPE0="0x00320011"
+CSID_C_WLANAPCLI_KEY0TYPE1="0x00320013"
+CSID_C_WLANAPCLI_KEY0TYPE2="0x00320015"
+CSID_C_WLANAPCLI_KEY0TYPE3="0x00320017"
+
+CSID_C_WLANAP_CHANNEL="0x00190200"
+
+WLAN_IF_APCLI_24G="apcli0"
+
+APCLI_24G=`rdcsman $CSID_C_WLANAPCLI_ENABLE u8`
+
+DEBUG=1
+WIFI_ACTION_INFO=/tmp/wifi-action.flow
+
+dbg()
+{
+    local str="$1"
+    [ "$DEBUG" = "1" ] && echo "$str" >> $WIFI_ACTION_INFO
+}
+
+wisp()
+{
+if [ $APCLI_24G -eq 1 ] ; then
+
+		ifconfig $WLAN_IF_APCLI_24G up
+		
+		DAUTH=`rdcsman $CSID_C_WLANAPCLI_ApCliAuthMode u8`
+		
+		$IWPRIV $WLAN_IF_APCLI_24G set ApCliEnable=0
+		
+		#echo $DAUTH
+		if [ $DAUTH = "0" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=OPEN
+		elif [ $DAUTH = "1" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=SHARED
+		elif [ $DAUTH = "2" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=WEPAUTO
+		elif [ $DAUTH = "3" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=WPAPSK
+		elif [ $DAUTH = "4" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=WPA
+		elif [ $DAUTH = "5" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=WPA2PSK
+		elif [ $DAUTH = "6" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=WPA2
+		elif [ $DAUTH = "7" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=WPAPSKWPA2PSK
+		elif [ $DAUTH = "8" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliAuthMode=WPAWPA2				
+		fi		
+		
+		DENCRYPTE=`rdcsman $CSID_C_WLANAPCLI_ApCliEncrypType u8`
+		
+		#echo $DENCRYPTE
+		if [ $DENCRYPTE = "0" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliEncrypType=NONE
+		elif [ $DENCRYPTE = "1" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliEncrypType=WEP
+		elif [ $DENCRYPTE = "2" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliEncrypType=TKIP
+		elif [ $DENCRYPTE = "3" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliEncrypType=AES
+		elif [ $DENCRYPTE = "4" ] ; then
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliEncrypType=TKIPAES
+		fi
+
+		if [ $DENCRYPTE = "1" ] ; then
+			
+			KEYID=`rdcsman $CSID_C_WLANAPCLI_DEFKEYID u8`
+			if [ $KEYID = "1" ] ; then
+				KEY=`rdcsman $CSID_C_WLANAPCLI_WEPKEY0 str`
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliDefaultKeyID=1
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliKey1=$KEY
+			elif [ $KEYID = "2" ] ; then
+				KEY=`rdcsman $CSID_C_WLANAPCLI_WEPKEY1 str`
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliDefaultKeyID=2
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliKey2=$KEY
+			elif [ $KEYID = "3" ] ; then
+				KEY=`rdcsman $CSID_C_WLANAPCLI_WEPKEY2 str`
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliDefaultKeyID=3
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliKey3=$KEY
+			elif [ $KEYID = "4" ] ; then
+				KEY=`rdcsman $CSID_C_WLANAPCLI_WEPKEY3 str`
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliDefaultKeyID=4
+				$IWPRIV $WLAN_IF_APCLI_24G set ApCliKey4=$KEY
+			fi		
+		fi
+		
+		DApCliSsid=`rdcsman $CSID_C_WLANAPCLI_ApCliSsid str`
+		#echo $DApCliSsid
+		$IWPRIV $WLAN_IF_APCLI_24G set ApCliSsid="$DApCliSsid"
+
+		if [ $DAUTH = "3" ] ; then
+			DWPAPSK=`rdcsman $CSID_C_WLANAPCLI_WPAPSK str`
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliWPAPSK=$DWPAPSK
+		elif [ $DAUTH = "5" ] ; then
+			DWPAPSK=`rdcsman $CSID_C_WLANAPCLI_WPAPSK str`
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliWPAPSK=$DWPAPSK
+		elif [ $DAUTH = "7" ] ; then
+			DWPAPSK=`rdcsman $CSID_C_WLANAPCLI_WPAPSK str`
+			$IWPRIV $WLAN_IF_APCLI_24G set ApCliWPAPSK=$DWPAPSK
+		fi
+		
+		$IWPRIV $WLAN_IF_APCLI_24G set ApCliEnable=1
+
+		Channel24G=`rdcsman $CSID_C_WLANAP_CHANNEL u32`
+		$IWPRIV $WLAN_IF_APCLI_24G set Channel=$Channel24G
+else
+	$IWPRIV $WLAN_IF_APCLI_24G set ApCliEnable=0
+	ifconfig $WLAN_IF_APCLI_24G down
+fi
+}
+
+## Main ##############
+case "$1" in
+	wisp)
+
+		SYSTIME=`date`
+		dbg "$SYSTIME : wifi-action wisp start"
+		
+		wisp
+
+		SYSTIME=`date`
+		dbg "$SYSTIME : wifi-action wisp stop"
+		;;
+
+	*)
+		exit 1 ;;
+esac
+exit 0
+		
+
+
+

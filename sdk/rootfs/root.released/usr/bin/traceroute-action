@@ -1,0 +1,183 @@
+#!/bin/ash
+
+case "$1" in
+
+    start)
+        TARGET=`rdcsman 0x8015000F str`
+        TARGET_PROTO="`rdcsman 0x80150108 u32`"  # Protocol (UDP: 0 or ICMP: 1)
+
+        #For AMIT Model
+        IF_TYPE="`rdcsman 0x80150106 u32`" # Interface Type (LAN or WAN)
+        IF_IDX="`rdcsman 0x80150107 u32`"  # Interface Index (Pair with IF_TYPE)
+		
+		# check if WAN or LAN IP (0:WAN, 1:LAN, 2~4:VLAN)
+		traceroute_check_ip $TARGET
+		TARGET_TYPE=`echo $?`
+		
+		IF_NAME=""
+        if [ $IF_TYPE -eq 0 ] && [ $IF_IDX -eq 0 ]; then # Auto 
+        	if [ $TARGET_TYPE -eq 0 ]; then # WAN
+                # check if default route exist
+                DEFAULT=0
+                for dst in `ip route ls | awk '{ print $1 }'`; do
+                    if [ $dst = "default" ]; then
+                        DEFAULT=1
+                        break
+                    fi
+                done
+                
+                # if no default route, retrieve IF_NAME in wandef table
+                if [ $DEFAULT -eq 0 ]; then
+                    for dev in `ip route ls table wandef | awk '{ print $5}'`; do
+                        if [ -n $dev ]; then
+                            IF_NAME=$dev
+                            break
+                        fi
+                    done
+                    
+                    # find matching IF_IP
+                    IF_TMP="`rdcsman 0x8001000b str`"
+                    if [ $IF_NAME = $IF_TMP ]; then
+                        IF_IP="`rdcsman 0x80010002 ipv4`"
+                    else
+                        for i in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
+                            IF_TMP="`rdcsman 0x8001019$i str`"
+                            if [ $IF_NAME = $IF_TMP ]; then
+                                IF_IP="`rdcsman 0x8001011$i ipv4`"
+                            fi
+                        done
+                    fi
+                    
+                    if [ -z $IF_NAME ] || [ -z $IF_IP ] || [ "$IF_IP" == "0.0.0.0" ]; then
+                        IF_OR_IP_ERROR=1
+                    fi
+                fi
+            else # LAN/VLAN
+                TARGET_PROTO=1
+                
+                if [ $TARGET_TYPE -eq 1 ]; then # LAN
+                    IF_NAME="`rdcsman 0x8000F301 str`"  # S_SYS_IF_BR0
+                    IF_IP="`rdcsman 0x00010004 ipv4`" # C_LOCAL_LANIP
+                else # VLAN
+                    ADDR_IDX="`printf %x $((TARGET_TYPE-2))`"
+                    IF_NAME="`rdcsman 0x009300c$ADDR_IDX str`"  # C_VLAN_SVR_IFNAME[0] ~ C_VLAN_SVR_IFNAME[2]
+                    IF_IP="`rdcsman 0x009300d$ADDR_IDX ipv4`" # C_VLAN_SVR_IP[0] ~ C_VLAN_SVR_IP[2]
+                fi
+                
+                if [ -z $IF_NAME ] || [ -z $IF_IP ] || [ "$IF_IP" == "0.0.0.0" ]; then
+                    IF_OR_IP_ERROR=1
+                fi
+            fi
+        else # not Auto, user define interface
+        	if [ $IF_TYPE -eq 1 ]; then # LAN Group
+        		if [ $IF_IDX -eq 1 ]; then # LAN
+        			if [ $TARGET_TYPE -eq 1 ]; then # LAN
+						IF_NAME="`rdcsman 0x8000F301 str`"
+						IF_IP="`rdcsman 0x00010004 ipv4`"
+					else
+						IF_OR_IP_ERROR=1
+					fi
+        		elif [ $IF_IDX -eq 2 ]; then # VLAN1
+					if [ $TARGET_TYPE -eq 2 ]; then # VLAN1
+						ADDR_IDX="`printf %x $((IF_IDX-2))`"
+						IF_NAME="`rdcsman 0x009300c$ADDR_IDX str`"
+						IF_IP="`rdcsman 0x009300d$ADDR_IDX ipv4`"
+					else
+						IF_OR_IP_ERROR=1
+					fi
+				elif [ $IF_IDX -eq 3 ]; then # VLAN2
+					if [ $TARGET_TYPE -eq 3 ]; then # VLAN2
+						ADDR_IDX="`printf %x $((IF_IDX-2))`"
+						IF_NAME="`rdcsman 0x009300c$ADDR_IDX str`"
+						IF_IP="`rdcsman 0x009300d$ADDR_IDX ipv4`"
+					else
+						IF_OR_IP_ERROR=1
+					fi
+				elif [ $IF_IDX -eq 4 ]; then # VLAN3
+					if [ $TARGET_TYPE -eq 4 ]; then # VLAN3
+						ADDR_IDX="`printf %x $((IF_IDX-2))`"
+						IF_NAME="`rdcsman 0x009300c$ADDR_IDX str`"
+						IF_IP="`rdcsman 0x009300d$ADDR_IDX ipv4`"
+					else
+						IF_OR_IP_ERROR=1
+					fi
+				fi
+        	elif [ $IF_TYPE -eq 2 ]; then # WAN Group				
+				if [ $TARGET_TYPE -eq 0 ]; then # WAN
+                    ADDR_IDX="`printf %x $((IF_IDX-1))`"
+                    WAN_IDX="`rdcsman 0x0001060$ADDR_IDX u32`" # C_LOCAL_WAN1_INDEX[0~15]
+					
+					# Interface mapping
+					if [ $WAN_IDX -eq 99 ] || [ $WAN_IDX -eq 0 ]; then
+						IF_NAME="`rdcsman 0x8001000b str`" # S_LOCAL_WAN_IF_NAME
+						IF_IP="`rdcsman 0x80010002 ipv4`" # S_LOCAL_WAN_IP
+					elif [ $WAN_IDX -ge 1 ] && [ $WAN_IDX -le 16 ]; then
+						ADDR_IDX="`printf %x $((WAN_IDX-1))`"
+						IF_NAME="`rdcsman 0x8001019$ADDR_IDX str`" # S_LOCAL_MULTIWAN_IF_NAME[$WAN_IDX - 1]
+						IF_IP="`rdcsman 0x8001011$ADDR_IDX ipv4`" # S_LOCAL_MULTIWAN_IP[$WAN_IDX - 1]
+					fi
+				else # LAN/VLAN
+					IF_OR_IP_ERROR=1
+				fi
+        	fi
+            
+            if [ -z $IF_NAME ] || [ -z $IF_IP ] || [ "$IF_IP" == "0.0.0.0" ]; then
+                IF_OR_IP_ERROR=1
+            fi
+        fi
+
+        if [ $IF_OR_IP_ERROR -eq 1 ]; then
+            logger -t "tracert" "Interface error, traceroute fail..."
+            echo "Interface error, traceroute fail..." > /var/run/traceroute_result
+        else
+            IF_ARGS=""
+            if [ -n "$IF_NAME" ]; then
+                # Interface binding for specific interface option on traceroute test.
+                IF_ARGS="-i $IF_NAME"
+            fi
+
+            SIP_ARGS=""
+            if [ -n "$IF_IP" ] && [ "$IF_IP" != "0.0.0.0" ]; then
+                # Determinate source IP option on traceroute test.
+                SIP_ARGS="-s $IF_IP"
+            fi
+
+            PROTO_ARGS=""
+            if [ -n "$TARGET_PROTO" ] && [ "$TARGET_PROTO" == "1" ]; then
+                # Use ICMP protocol instead of UDP for traceroute test.
+                PROTO_ARGS="-I"
+            fi
+
+            logger -t "tracert" "traceroute -w 2 \"$TARGET\" $IF_ARGS $SIP_ARGS $PROTO_ARGS > /var/run/traceroute_result  &"
+            traceroute -w 2 "$TARGET" $IF_ARGS $SIP_ARGS $PROTO_ARGS > /var/run/traceroute_result  &
+            PID=$!
+            wrcsman "0x80150011 $PID && 0x80150010 1"
+        fi
+        ;;
+
+    startv6)
+        TARGET=`rdcsman 0x8015000F str`
+        traceroute -w 2 "$TARGET" > /var/run/traceroute_result  &
+        PID=$!
+        wrcsman "0x80150011 $PID && 0x80150010 1"
+        ;;
+
+    status)
+        PID=`rdcsman 0x80150011 u32`
+        if [ ! -d "/proc/$PID" ] ; then
+            wrcsman "0x80150010 0"
+        fi
+        ;;
+
+    show)
+        cat /var/run/traceroute_result
+        ;;
+
+    *)
+        exit 1
+        ;;
+esac
+
+exit 0
+
+

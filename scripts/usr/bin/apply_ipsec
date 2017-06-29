@@ -1,0 +1,10 @@
+#!/bin/sh
+#echo "apply_ipsec $1 $2"
+result=`sendmsg vpnmon $2 update ipsec $2`
+if [ "$result" == "OK" ] ; then
+    result=`sendmsg ifman 1 update ipsec $2`
+    if [ "$result" == "OK" ] ; then
+        exit 0
+    fi
+fi
+exit 1

@@ -1,0 +1,5 @@
+Makefile
+config.h
+libestr.pc
+stamp-h1
+autom4te.cache

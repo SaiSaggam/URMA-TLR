@@ -1,0 +1,11 @@
+config 'snmp' 'snmp1'
+	option v1 'off'
+	option v2c 'off'
+	option v3 'off'
+	option port '161'
+	option authentication_traps 'off'
+
+config 'snmp_user' 'snmp_user1'
+	option access "read-only"
+	option authentication "none"
+	option privacy "none"

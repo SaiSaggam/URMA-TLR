@@ -1,0 +1,149 @@
+#!/bin/sh
+
+. /usr/bin/l2tpc-customer
+RUNNING="/var/run/l2tp-action-running"
+# Make sure only one script running.
+while :
+do
+    if [ ! -f "$RUNNING" ] ; then
+        break
+    fi
+    echo "exist $RUNNING"
+    sleep 1
+done
+echo 1 > $RUNNING
+
+# Check if exist multiwan index
+if [ -n $2 ] ; then
+    MULTIWAN=$2
+else
+    MULTIWAN=
+fi
+
+if [ -z $MULTIWAN ] ; then
+	CNT_FORCE=`rdcsman 0x8001000E u16`
+else
+	CNT_FORCE=`rdcsman 0x800101C$MULTIWAN u32`
+fi
+
+regenerateConfig () {
+	if [ -z $MULTIWAN ] ; then
+	  :
+		#uvm /usr/uo/pap-secrets.uo > /etc/ppp/pap-secrets 
+	 	#uvm /usr/uo/chap-secrets.uo > /etc/ppp/chap-secrets  
+		#uvm /usr/uo/l2tp.conf.uo > /etc/l2tp/l2tp.conf
+	else
+#		uvm /usr/uo/pap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/pap-secrets 
+#	 	uvm /usr/uo/chap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/chap-secrets  
+		uvm /usr/uo/l2tp.conf.uo 1 $MULTIWAN $MULTIWAN > /etc/l2tp/l2tp.conf
+	fi
+    touch /var/run/l2tpc-reconf
+}
+
+# main ##########################################################
+#regenerateConfig
+
+case "$1" in
+
+	start)
+		if [ -z $MULTIWAN ] ; then
+			if [ $CNT_FORCE = 1 ] ; then
+				l2tp-stop
+			fi
+		#uvm /usr/uo/pap-secrets.uo > /etc/ppp/pap-secrets 
+   	 	#uvm /usr/uo/chap-secrets.uo > /etc/ppp/chap-secrets          
+   	 	#uvm /usr/uo/l2tp.conf.uo > /etc/l2tp/l2tp.conf  #replace by l2tpc-customer
+        #gen_l2tpd_conf
+        #touch /var/run/l2tpc-reconf
+
+        # HW NAT may affect VPN throughput
+        [ "`lsmod | grep hw_nat`" != "" ] && rmmod hw_nat  
+   	 					
+			l2tp-start
+
+			if [ $CNT_FORCE = 1 ] ; then
+				wrcsman "0x8001000E 0x00"
+			fi
+
+			if [ $? = 0 ] ; then
+				rm $RUNNING
+				exit 0
+   	 		else
+   	 			wrcsman "0x80060700 0x03 && 0x80010007 0x03"
+				rm $RUNNING
+    				exit 1	
+   	 		fi	
+		else
+			if [ $CNT_FORCE = 1 ] ; then
+				l2tp-stop $MULTIWAN
+			fi
+
+		 	l2tp-start $MULTIWAN
+
+			if [ $CNT_FORCE = 1 ] ; then
+				wrcsman "0x800101C$MULTIWAN 0x00"
+			fi
+
+			if [ $? = 0 ] ; then
+				rm $RUNNING
+				exit 0
+	   	 	else
+		 		wrcsman "0x8006270$MULTIWAN 0x03 && 0x8001010$MULTIWAN 0x03"
+				rm $RUNNING
+				exit 1	
+			fi
+		fi	
+		
+		;;
+	
+	stop)
+		if [ -z $MULTIWAN ] ; then
+			l2tp-stop
+			RET=$?				
+			wrcsman "0x80060200 0x00 && \
+					 0x80060300 0x00 && \
+					 0x80060400 0x00 && \
+					 0x80060500 0x00 && \
+					 0x80060600 0x00 && \
+					 0x80060700 0x00 && \
+					 0x80010002 0x00 && \
+					 0x80010003 0x00 && \
+					 0x80010004 0x00 && \
+					 0x80010005 0x00 && \
+					 0x80010006 0x00 && \
+					 0x80010007 0x00 && \
+					 0x80060100 0x00"
+		else
+			l2tp-stop $MULTIWAN
+			RET=$?				
+			wrcsman "0x8006220$MULTIWAN 0x00 && \
+				 	 0x8006230$MULTIWAN 0x00 && \
+				 	 0x8006240$MULTIWAN 0x00 && \
+					 0x8006250$MULTIWAN 0x00 && \
+					 0x8006260$MULTIWAN 0x00 && \
+					 0x8006270$MULTIWAN 0x00 && \
+					 0x8001011$MULTIWAN 0x00 && \
+					 0x8001012$MULTIWAN 0x00 && \
+					 0x8001013$MULTIWAN 0x00 && \
+					 0x8001014$MULTIWAN 0x00 && \
+					 0x8001015$MULTIWAN 0x00 && \
+					 0x8001016$MULTIWAN 0x00 && \
+					 0x80060100 0x00"
+		fi
+		rm $RUNNING
+		exit $RET		
+		
+		;;	
+			
+	*)
+		rm $RUNNING
+		exit 1
+esac
+
+rm $RUNNING
+exit 0		
+			
+		
+		
+	
+			

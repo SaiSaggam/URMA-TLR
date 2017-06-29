@@ -1,0 +1,155 @@
+#!/bin/sh
+
+if [ -n $2 ]; then
+	MULTIWAN=$2
+else
+	MULTIWAN=
+fi
+
+# Paths to programs
+PPPD=pppd
+PPTP=pptp
+
+CONFIG=/etc/ppp/pptp.conf
+export CONFIG
+. $CONFIG
+
+PNSSERVER=$1
+#CNT_FORCE=`rdcsman 0x8001000E u16`
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+
+if [ -z $MULTIWAN ]; then
+	PIDFILE_PPPD="/var/run/ppp-pptp.pid"
+	CNT_FORCE=`rdcsman 0x8001000E u16`
+	CNTTYPE=`rdcsman 0x00050900 u32`
+	LINKNAME="pptp"
+else
+	PIDFILE_PPPD="/var/run/ppp-pptp$MULTIWAN.pid"
+	TMP=`printf "%x" $((MULTIWAN+1))`
+	CNT_FORCE=`rdcsman 0x800101C$MULTIWAN u32`
+	CNTTYPE=`rdcsman 0x0005090$TMP u32`
+	LINKNAME="pptp$MULTIWAN"
+fi
+
+if [ -z $MULTIWAN ]; then
+	ACCOUNT="`rdcsman 0x00050100 str`"
+	PASSWORD="`rdcsman 0x00050200 str`"
+else
+	ACCOUNT="`rdcsman 0x0005010$TMP str`"
+	PASSWORD="`rdcsman 0x0005020$TMP str`"
+fi
+#	USER_PASSWORD="user $ACCOUNT password $PASSWORD"
+
+if [ $CNTTYPE -eq 0 -a $CNT_FORCE -eq 0 ]; then
+	#dial-on-demand 
+	PPPD_EXTRA="demand nopersist holdoff 3 ipcp-accept-remote ipcp-accept-local ktune"
+else
+	#auto-reconncet and manual connect
+	PPPD_EXTRA=
+fi
+
+USE_MPPE=`rdcsman 0x00054100 u8`
+#KERNEL_MODE=0
+#if [ -f "/lib/pptp.so" ]; then
+#	KERNEL_MODE=`rdcsman 0x00050003 u16`
+#	if [ $KERNEL_MODE -eq 0 ]; then
+#		KERNEL_MODE=1
+#	fi
+#fi
+if [ -f "/lib/pptp.so" ]; then
+	KERNEL_MODE=1
+else
+	KERNEL_MODE=0
+fi
+
+if [ $USE_MPPE -eq 1 ]; then
+	#PPPD_EXTRA="refuse-pap refuse-chap mppe required,stateless"
+	MPPE_OPT="refuse-pap refuse-chap mppe required,stateless"
+else
+	#PPPD_EXTRA="sync noccp nomppe nomppc"
+	if [ $KERNEL_MODE -eq 1 ]; then
+		MPPE_OPT="noccp nomppe nomppc"
+	else
+		MPPE_OPT="sync noccp nomppe nomppc"
+	fi
+fi
+
+#
+# PPPD options
+#
+LCP_INTERVAL=20
+LCP_FAILURE=6
+PEERDNS="usepeerdns"
+
+if [ $DEMAND == "no" -o $DEMAND == "" ]; then
+	IDLE_TIME=
+else
+	IDLE_TIME="idle $DEMAND"
+	DEFAULTROUTE= #"defaultroute"
+fi
+
+UP_SCRIPT="/etc/ppp/ip-up-$LINKNAME"
+DOWN_SCRIPT="/etc/ppp/ip-down-$LINKNAME"
+echo "#!/bin/sh" > $UP_SCRIPT
+echo "#!/bin/sh" > $DOWN_SCRIPT
+echo "/usr/bin/pptp-action ip-up \$*" >> $UP_SCRIPT
+echo "/usr/bin/pptp-action ip-down \$*" >> $DOWN_SCRIPT
+chmod +x $UP_SCRIPT
+chmod +x $DOWN_SCRIPT
+if [ -z $MULTIWAN ]; then
+	IPPARAM=99
+else
+	IPPARAM=$MULTIWAN
+fi
+
+PPP_STD_OPTIONS="noipdefault noauth refuse-eap $MPPE_OPT \
+                 hide-password nodetach $PEERDNS mtu $MTU \
+                 noaccomp nodeflate nopcomp novj novjccomp \
+                 $DEFAULTROUTE \
+                 ip-up $UP_SCRIPT ip-down $DOWN_SCRIPT ipparam $IPPARAM \
+                 lcp-echo-interval $LCP_INTERVAL \
+                 lcp-echo-failure $LCP_FAILURE \
+                 linkname $LINKNAME $IDLE_TIME $PPPD_EXTRA"
+
+if [ $KERNEL_MODE -eq 1 ]; then
+	PPTP_CMD="plugin pptp.so pptp_server $PPTP_PNSSERVER"
+else
+	if [ $USE_MPPE -eq 1 ]; then
+		PPTP_CMD="$PPTP $PNSSERVER --nolaunchpppd --loglevel 0"
+	else
+		PPTP_CMD="$PPTP $PNSSERVER --nolaunchpppd --loglevel 0 --sync"
+	fi
+fi
+
+# Launch the pptp and pppd
+echo $$ > $PIDFILE_CONNECT
+
+if [ $KERNEL_MODE -eq 1 ]; then
+#	echo "$PPPD $PPTP_CMD $PPP_STD_OPTIONS user \"$ACCOUNT\" password \"$PASSWORD\""
+#	$PPPD $PPTP_CMD $PPP_STD_OPTIONS user "$ACCOUNT" password "$PASSWORD" &
+	echo "$PPPD $PPTP_CMD $PPP_STD_OPTIONS user $ACCOUNT password $PASSWORD"
+	$PPPD $PPTP_CMD $PPP_STD_OPTIONS user $ACCOUNT password $PASSWORD &
+else
+#	echo "$PPPD pty $PPTP_CMD $PPP_STD_OPTIONS user \"$ACCOUNT\" password \"$PASSWORD\""
+#	$PPPD pty $PPTP_CMD $PPP_STD_OPTIONS user "$ACCOUNT" password "$PASSWORD" &
+	echo "$PPPD pty $PPTP_CMD $PPP_STD_OPTIONS user $ACCOUNT password $PASSWORD"
+	$PPPD pty $PPTP_CMD $PPP_STD_OPTIONS user $ACCOUNT password $PASSWORD &
+fi
+
+wait
+
+# if CNTTYPE != PPTP_CNT_TYPE_MANUAL
+#if [ $MANUAL != "yes" ]; then
+#killed by commander
+if [ -z $MULTIWAN ]; then
+	wrcsman "0x80050700 0x03 && \
+		 0x80010007 0x03"
+else
+	wrcsman "0x8005070$TMP 0x03 && \
+		 0x8001016$MULTIWAN 0x03"
+fi
+rm -f $PIDFILE_CONNECT
+#fi
+exit
+

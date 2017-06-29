@@ -1,0 +1,74 @@
+#!/bin/sh
+# Paths to programs
+. /usr/bin/scriptlib
+
+RUNNING="/var/run/pppoe-action-running"
+
+# Make sure only one default script running.
+while :
+do
+    if [ ! -f "$RUNNING" ] || [ "$1" = "stop" ]; then
+        break
+    fi
+    echo "exist $RUNNING"
+    sleep 1
+done
+echo 1 > $RUNNING
+
+CNT_FORCE=1
+
+usage () {
+    echo "$0 [start|stop|restart|status]"
+    rm -f $RUNNING
+    exit 1
+}
+
+
+# main ##########################################################
+
+[ -z "$1" ] && usage
+
+case "$1" in
+    start)
+		if [ $CNT_FORCE -eq 1 ] ; then # Connect manual force enable
+			pppoe-stop
+		fi
+
+	 	echo "Bringing up PPPoE link"
+		pppoe-start
+		if [ $? = 0 ] ; then
+			rm -f $RUNNING
+			exit 0
+		else
+			rm -f $RUNNING
+			exit 1
+		fi
+    	;;
+
+    stop)
+	    echo "Shutting down PPPoE link"
+		pppoe-stop
+		RET=$?
+
+		rm -f $RUNNING
+		exit $RET
+        ;;
+
+    restart)
+		rm $RUNNING
+		$0 stop
+		$0 start
+		;;
+
+    status)
+		pppoe-status
+		;;
+
+    *)
+        usage
+        ;;
+esac
+
+rm -f $RUNNING
+exit 0
+

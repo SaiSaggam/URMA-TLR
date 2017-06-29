@@ -1,0 +1,24 @@
+[submodule "sdk"]
+	path = sdk
+	url = ../sdk.git
+	ignore = dirty
+[submodule "ui/cloud/cc_ansic"]
+	path = ui/cloud/cc_ansic
+	url = ../../cc/cc_ansic.git
+	ignore = dirty
+[submodule "ui/web/urma-py-server"]
+	path = ui/web/urma/urma-py-server
+	url = ssh://git@stash.digi.com/idigi/urma-py-server.git
+	ignore = dirty
+[submodule "ui/web/urma-seed"]
+	path = ui/web/urma/urma-seed
+	url = ssh://git@stash.digi.com/idigi/urma-seed.git
+	ignore = dirty
+[submodule "ui/web/framework"]
+	path = ui/web/framework
+	url = ssh://git@stash.digi.com/idigi/urma-framework.git
+	ignore = dirty
+[submodule "ui/web/server"]
+	path = ui/web/server
+	url = ssh://git@stash.digi.com/idigi/urma-py-server.git
+	ignore = dirty

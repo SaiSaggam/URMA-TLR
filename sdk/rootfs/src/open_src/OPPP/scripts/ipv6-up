@@ -1,0 +1,20 @@
+#!/bin/sh
+
+/usr/sbin/ip -6 route add default via $5 dev $1
+
+#IF=$1
+
+#if [ -z "$IF" ]; then 
+#	echo "interface error"
+#	exit 1
+#fi
+
+# set host mode to listen RA
+#echo 0 > /proc/sys/net/ipv6/conf/$IF/forwarding
+#echo 1 > /proc/sys/net/ipv6/conf/$IF/accept_ra
+#echo 1 > /proc/sys/net/ipv6/conf/$IF/accept_redirects
+
+#/etc/ppp/ipv6-up.check &
+
+
+

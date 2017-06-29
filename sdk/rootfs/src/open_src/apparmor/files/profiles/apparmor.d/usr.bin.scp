@@ -1,0 +1,14 @@
+#include <tunables/global>
+
+/usr/bin/scp {
+	#include <abstractions/base>
+
+	/usr/bin/scp r,
+	
+	# Allow RW only for user's home directory, and don't let it read anything else
+	@{USERSHOME}/ r,
+	@{USERSHOME}/** rw,
+
+	# scp needs read access to passwd (note, still no access to shadow)
+	/etc/passwd r,
+}

@@ -1,0 +1,23 @@
+#!/bin/sh
+
+runs_scripts_in_directory () {
+	for f in $1/*
+	do
+		if [ -x "$f" ]; then
+			"$f" || true
+		fi
+	done
+}
+
+if [ "$IFACE" != "" ] && [ "$IFACE_STATE" != "" ]; then
+	case "$IFACE_STATE" in
+	up)
+		runs_scripts_in_directory /usr/etc/network/if-up.d
+		;;
+	down)
+		runs_scripts_in_directory /usr/etc/network/if-down.d
+		;;
+	esac
+fi
+
+exit 0

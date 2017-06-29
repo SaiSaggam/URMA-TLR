@@ -1,0 +1,159 @@
+#!/bin/sh
+
+# udhcpc script edited by Tim Riker <Tim@Rikers.org>
+
+[ -z "$1" ] && echo "Error: should be called from udhcpc" && exit 1
+
+PIDFILE_CONNECT="/var/run/udhcpc_multi.pid.connect"
+RESOLV_CONF="/etc/resolv.conf"
+UDHCPC_MULTI_INDEX="/var/run/wisp_multi.index"
+
+[ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"
+[ -n "$subnet" ] && NETMASK="netmask $subnet"
+
+#-----------------------------------------------------------#
+#   It's just a temporary Solution for Mutiwan CSID Status, #
+#   We Should re-design it for further requests             #
+#-----------------------------------------------------------#
+
+MULTIWAN=`cat $UDHCPC_MULTI_INDEX`
+MWAN_HEX=`printf "%x" $MULTIWAN`
+
+#-----------------------------------------------------------#
+
+. /usr/bin/scriptlib
+
+udhcpc_write_csman_start()
+{
+	sl_get_IP_NM_GW_in_ifconfig $interface IF_IP IF_NM IF_GW		
+
+	if [ $IF_IP = "169.254.91.77" ] ; then
+        wrcsman "0x80365002 0x00 && \
+				 0x80365003 0x00 && \
+				 0x80365004 0x00 && \
+				 0x80365005 0x00 && \
+				 0x80365006 0x00 && \
+				 0x80365009 0x00 && \
+				 0x80035009 0x00"
+
+        wrcsman "0x8001011$MWAN_HEX 0x00 && \
+                 0x8001012$MWAN_HEX 0x00 && \
+                 0x8001013$MWAN_HEX 0x00 && \
+                 0x8001014$MWAN_HEX 0x00 && \
+                 0x8001015$MWAN_HEX 0x00 && \
+                 0x8001019$MWAN_HEX 0x00 && \
+                 0x8001016$MWAN_HEX 0x00 "
+
+        CNT_TYPE=`rdcsman 0x0036500a u16`
+        #if CNT_TYPE is on-demand write "wait for traffic" state to csid
+        if [ $CNT_TYPE -eq 0 ] ; then
+            wrcsman "0x80365007 0x05 && \
+                     0x8001016$MWAN_HEX 0x05"
+        fi
+	else   
+		wrcsman "0x80365002 {$IF_IP} && \
+				 0x80365003 {$IF_NM} && \
+				 0x80365004 {$IF_GW}"
+        
+        wrcsman "0x8001011$MWAN_HEX {$IF_IP} && \
+                 0x8001012$MWAN_HEX {$IF_NM} && \
+                 0x8001013$MWAN_HEX {$IF_GW}"
+
+		cnt=0
+		for i in $dns ; do		
+			[ $cnt = 0 ] && wrcsman "0x80365005 {$i} && 0x8001014$MWAN_HEX {$i}"
+			[ $cnt = 1 ] && wrcsman "0x80365006 {$i} && 0x8001015$MWAN_HEX {$i}"
+
+			cnt=$(($cnt+1))		
+		done
+      
+        wrcsman "0x80365007 0x02 && \
+                 0x8001019$MWAN_HEX \"$interface && \
+                 0x8001016$MWAN_HEX 0x02"
+        
+	fi
+}
+
+udhcpc_write_csman_stop()
+{
+    wrcsman "0x80365002 0x00 && \
+			 0x80365003 0x00 && \
+			 0x80365004 0x00 && \
+			 0x80365005 0x00 && \
+			 0x80365006 0x00 && \
+			 0x80365007 0x00 && \
+			 0x80365009 0x00 && \
+			 0x80035009 0x00"
+
+    wrcsman "0x8001011$MWAN_HEX 0x00 && \
+             0x8001012$MWAN_HEX 0x00 && \
+             0x8001013$MWAN_HEX 0x00 && \
+             0x8001014$MWAN_HEX 0x00 && \
+             0x8001015$MWAN_HEX 0x00 && \
+             0x8001019$MWAN_HEX 0x00 "
+        
+    if [ "$1" = "leasefail" ]; then
+        wrcsman "0x8001016$MWAN_HEX 0x4"	
+    else 
+        wrcsman "0x8001016$MWAN_HEX 0x00"	
+    fi
+}
+
+MTU_SIZE=`rdcsman 0x00365009 u16`
+case "$1" in
+	deconfig)
+		/sbin/ifconfig $interface 0.0.0.0
+		udhcpc_write_csman_stop "$1"
+		;;
+
+	renew|bound)
+        if [ $MTU_SIZE -eq 0 ] ; then
+		    /sbin/ifconfig $interface $ip $BROADCAST $NETMASK
+        else
+	    	/sbin/ifconfig $interface $ip $BROADCAST $NETMASK mtu $MTU_SIZE
+        fi
+		
+		# for PPTP or L2TP and having 'deafult' route , Don't add default route  
+		WANTYPE=`rdcsman 0x00010003 u32`
+		if [ $WANTYPE -eq 96 -o $WANTYPE -eq 128 ] ; then			
+			CFG=`route`
+			for s in $CFG
+			do			
+				if [ $s = "default" ] ; then
+					exit 0
+				fi	   
+			done			
+		fi	
+		
+
+		if [ -n "$router" ] ; then
+			echo "deleting routers"
+			while route del default gw 0.0.0.0 dev $interface ; do
+				:
+			done
+
+			for i in $router ; do
+				route add default gw $i dev $interface
+			done
+		fi
+
+		sl_insert_dns_file $RESOLV_CONF $dns
+		udhcpc_write_csman_start
+		;;
+
+	leasefail)
+	 	/sbin/ifconfig $interface 0.0.0.0
+	 	if [ -f "$PIDFILE_CONNECT" ] ; then
+			CONNECT_PID=`cat $PIDFILE_CONNECT`
+			kill $CONNECT_PID > /dev/null 2>&1
+			rm -f $PIDFILE_CONNECT > /dev/null 2>&1	
+		fi	
+		udhcpc_write_csman_stop "$1"
+		;;	
+	*)
+		
+	 	/sbin/ifconfig $interface 0.0.0.0
+		udhcpc_write_csman_stop
+		;;
+esac
+exit 0

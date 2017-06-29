@@ -1,0 +1,204 @@
+#!/bin/sh
+
+usage () {
+	echo "$0 [ start | stop ] [ index ]"
+	echo "$0 [ ip-up | ip-down ] [ argumenets ]"
+    	exit 1
+}
+
+[ -z "$1" ] && usage
+
+if [ "$1" == "ip-up" ] || [ "$1" == "ip-down" ]; then
+	if [ -n $6 ]; then
+		if [ $6 -eq 99 ]; then
+			MULTIWAN=
+		else
+			MULTIWAN=$6
+		fi
+	else
+		usage
+	fi
+else
+	if [ -n $2 ]; then
+		MULTIWAN=$2
+	else
+		MULTIWAN=
+	fi
+fi
+
+RUNNING="/var/run/pptp$MULTIWAN-action-running"
+# Make sure only one script running.
+#while :
+#do
+#	if [ -f $RUNNING ]; then
+#		echo "exist $RUNNING"
+#	else
+#		break
+#	fi
+#	sleep 1
+#done
+#echo 1 > $RUNNING
+
+if [ -z $MULTIWAN ]; then
+	CNT_FORCE=`rdcsman 0x8001000E u32`
+else
+	TMP=`printf "%x" $((MULTIWAN+1))`
+	CNT_FORCE=`rdcsman 0x800101C$MULTIWAN u32`
+fi
+
+regenerateConfig () {
+	if [ -z $MULTIWAN ]; then
+#		uvm /usr/uo/pap-secrets.uo > /etc/ppp/pap-secrets 
+#		uvm /usr/uo/chap-secrets.uo > /etc/ppp/chap-secrets            
+		uvm /usr/uo/pptp.conf.uo > /etc/ppp/pptp.conf
+	else
+#		uvm /usr/uo/pap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/pap-secrets 
+#		uvm /usr/uo/chap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/chap-secrets            
+		uvm /usr/uo/pptp.conf.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/pptp.conf
+	fi
+	uvm /usr/uo/options.pptp.uo > /etc/ppp/options.pptp
+#	chmod 600 /etc/ppp/*-secrets
+}
+
+# main ##########################################################
+#regenerateConfig
+
+case "$1" in
+	start)
+		# Make sure only one script running.
+		while :
+		do
+			if [ -f $RUNNING ]; then
+				echo "exist $RUNNING"
+			else
+				break
+			fi
+			sleep 1
+		done
+		echo 1 > $RUNNING
+
+		regenerateConfig
+
+		if [ -z $MULTIWAN ]; then
+			if [ $CNT_FORCE -eq 1 ]; then
+				pptp-stop
+			fi
+
+			# HW NAT may affect VPN throughput
+			[ "`lsmod | grep hw_nat`" != "" ] && rmmod hw_nat
+
+			echo "$0: start"
+
+			pptp-start 
+
+			if [ $CNT_FORCE -eq 1 ]; then
+				wrcsman "0x8001000E 0x00"
+			fi
+
+			if [ $? -eq 0 ]; then
+				rm -f $RUNNING
+				exit 0
+			else
+				wrcsman "0x80050700 0x03 && \
+					 0x80010007 0x03"
+				rm -f $RUNNING
+				exit 1
+			fi
+		else
+			if [ $CNT_FORCE -eq 1 ]; then
+				pptp-stop $MULTIWAN
+			fi
+
+			echo "$0: start"
+
+			pptp-start $MULTIWAN
+
+			if [ $CNT_FORCE -eq 1 ]; then
+				wrcsman "0x800101C$MULTIWAN 0x00"
+			fi
+
+			if [ $? -eq 0 ]; then
+				rm -f $RUNNING
+				exit 0
+			else
+				wrcsman "0x8005070$TMP 0x03 && \
+					 0x8001016$MULTIWAN 0x03"
+				rm -f $RUNNING
+				exit 1
+			fi
+		fi
+		;;
+	stop)
+		# Make sure only one script running.
+		while :
+		do
+			if [ -f $RUNNING ]; then
+				echo "exist $RUNNING"
+			else
+				break
+			fi
+			sleep 1
+		done
+		echo 1 > $RUNNING
+
+		if [ -z $MULTIWAN ]; then
+			#pptp-stop > /dev/null 2>&1
+			pptp-stop
+			RET=$?
+
+			wrcsman "0x80050200 0x00 && \
+				 0x80050100 0x00 && \
+				 0x80050300 0x00 && \
+				 0x80050400 0x00 && \
+				 0x80050500 0x00 && \
+				 0x80050600 0x00 && \
+				 0x80050700 0x00 && \
+				 0x80010002 0x00 && \
+				 0x80010003 0x00 && \
+				 0x80010004 0x00 && \
+				 0x80010005 0x00 && \
+				 0x80010006 0x00 && \
+				 0x80010007 0x00"
+		else
+			#pptp-stop > /dev/null 2>&1
+			pptp-stop $MULTIWAN
+			RET=$?
+
+			wrcsman "0x8005020$TMP 0x00 && \
+				 0x8005010$TMP 0x00 && \
+				 0x8005030$TMP 0x00 && \
+				 0x8005040$TMP 0x00 && \
+				 0x8005050$TMP 0x00 && \
+				 0x8005060$TMP 0x00 && \
+				 0x8005070$TMP 0x00 && \
+				 0x8001011$MULTIWAN 0x00 && \
+				 0x8001012$MULTIWAN 0x00 && \
+				 0x8001013$MULTIWAN 0x00 && \
+				 0x8001014$MULTIWAN 0x00 && \
+				 0x8001015$MULTIWAN 0x00 && \
+				 0x8001016$MULTIWAN 0x00"
+		fi
+
+		rm -f $RUNNING
+		exit $RET
+		;;
+	ip-up)
+		pptp-ip-up $2 $3 $4 $5 $6
+
+	#	rm -f $RUNNING
+		exit 0
+		;;
+	ip-down)
+		logger -t "ip-down-pptp" "$*"
+
+	#	rm -f $RUNNING
+		exit 0
+		;;
+	*)
+	#	rm -f $RUNNING
+		exit 1
+esac
+
+#rm -f $RUNNING
+#exit 0
+

@@ -1,0 +1,22 @@
+
+config ipsec ipsec1
+  option state "off"
+  list esp_authentication sha1
+  list esp_encryption aes128
+  list esp_diffie_hellman group14
+  list auth_by psk
+  option lifetime "3600"
+  option lifebytes "0"
+  option margintime "540"
+  option marginbytes "0"
+  option random "100"
+  option ike "1"
+  option ike_mode "main"
+  list ike_encryption aes128
+  list ike_authentication sha1
+  list ike_diffie_hellman group14
+  option ike_lifetime "4800"
+  option ike_tries "3"
+  option dpddelay "30"
+  option dpdtimeout "150"
+  option dpdaction "none"

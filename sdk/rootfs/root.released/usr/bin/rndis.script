@@ -1,0 +1,140 @@
+#!/bin/sh
+
+# udhcpc script edited by Tim Riker <Tim@Rikers.org>
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+[ -z "$1" ] && echo "Error: should be called from udhcpc" && exit 1
+
+get_index $2 $3 # For -I specific
+get_general_config ${Index} ${Index_3G}
+get_config ${Index} ${Index_3G}
+#get_general_status
+get_usb_status ${Index}
+
+PIDFILE_CONNECT="/var/run/udhcpc.${interface}.rndis.pid.connect"
+RESOLV_CONF="/etc/resolv.conf"
+[ -n "${broadcast}" ] && BROADCAST="broadcast ${broadcast}"
+[ -n "${subnet}" ] && NETMASK="netmask ${subnet}"
+
+udhcpc_write_csman_start()
+{
+	sl_get_IP_NM_GW_in_ifconfig ${interface} IF_IP IF_NM IF_GW		
+
+    echo -e "${IF_IP}\n" > /var/ifip
+    RES="`cat /var/ifip | awk -F. '{print $1}'`"
+    if [ ${RES} == "169" ] ; then # RNDIS wan type
+        #if [ ${IF_IP} = "169.254.91.77" ] ; then
+        echo -e "ifip\n" > /tmp/rndis_ifip
+        clear_all_cnt_status ${Index}
+
+        # if CSID_C_3G_CNT_TYPE is on-demand write "wait for traffic" state to csid
+        if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+           write_cnt_status 5 ${Index}
+        else
+           write_cnt_status 0 ${Index}
+        fi
+
+	else
+		echo -e "connect\n" > /tmp/rndis_connect
+		write_if_info ${IF_IP} ${IF_NM} ${IF_GW} ${Index}
+		
+		cnt=0
+		for i in ${dns} ; do		
+		    [ "${cnt}" == "0" ] && write_dns_info "${i}" "" ${Index}
+			[ "${cnt}" == "1" ] && write_dns_info "" "${i}" ${Index}
+			cnt=$((${cnt}+1))		
+		done
+
+		sl_get_uptime CNTTIME
+		write_cnttime_info ${CNTTIME} ${Index}
+        write_cnt_status 2 ${Index}
+        write_if_name ${interface} ${Index}
+		write_error_code 0 ${Index} # clean error code
+	fi
+}
+
+udhcpc_write_csman_stop()
+{
+  #if [ "${CSID_C_FAILOVER_LOADSHARING_ENABLE}" == "1" ] ; then
+  #   logger -p 8.7 -t "rndis dhcpc" "Load Sharing Don't do rndis.script update flag !\""
+  #   exit 0 
+  #fi
+
+  echo -e "cleancsid\n" > /tmp/rndis_clean
+
+  clear_all_cnt_status ${Index}
+
+	#		 0x801E0800 0x00 && \
+	#		 0x801E0900 0x00 && \
+	#		 0x801E1200" 
+
+  #if CSID_C_3G_CNT_TYPE is on-demand write "wait for traffic" state to csid
+	if [ "${CSID_C_3G_CNT_TYPE}" == "1" ] ; then
+		 write_cnt_status 3 ${Index}
+	fi
+	return 0 ;
+}
+
+case "$1" in
+	deconfig)
+    ${IFCFG_PROG} ${interface} 0.0.0.0
+    udhcpc_write_csman_stop
+    ;;
+
+  renew|bound)
+    ${IFCFG_PROG} ${interface} ${ip} ${BROADCAST} ${NETMASK}
+
+    # for PPTP or L2TP and having 'deafult' route , Don't add default route  
+		#FAILOVER_STATUS=`rdcsman 0x801E1200 u16`
+		#if [ "${CSID_C_WANTYPE}" == "96" ] || [ "${CSID_C_WANTYPE}" == "128" ] ; then			
+		  #CFG="`route`"
+			#for s in ${CFG}
+			#do			
+			  #if [ ${s} == "default" ] ; then
+				  #exit 0
+				#fi	   
+			#done			
+		#fi
+
+		if [ -n "${router}" ] ; then
+			echo "deleting routers"
+			while route del default gw 0.0.0.0 dev ${interface} ; do
+				:
+			done
+
+			for i in ${router} ; do
+				route add default gw ${i} dev ${interface}
+			done
+		fi
+
+    sl_insert_dns_file ${RESOLV_CONF} ${dns}
+
+	#if [ "${CSID_C_FAILOVER_LOADSHARING_ENABLE}" == "1" ] ; then
+    #   logger -p 8.7 -t "rndis dhcpc" "Load Sharing Don't do rndis.script update flag !\""
+    #   echo "Load Sharing Don't do rndis.script update flag" > /var/lsing/rndis_dhcp.log
+    #   exit 0 
+    #fi
+
+    udhcpc_write_csman_start
+    ;;
+
+  leasefail)
+	 	${IFCFG_PROG} ${interface} 0.0.0.0
+ 	
+    if [ -f "${PIDFILE_CONNECT}" ] ; then
+      CONNECT_PID="`cat ${PIDFILE_CONNECT}`"
+      kill ${CONNECT_PID} > /dev/null 2>&1
+      rm -f ${PIDFILE_CONNECT} > /dev/null 2>&1	
+    fi	
+    write_cnt_status 4 ${Index}
+
+    ;;	
+  *)
+    ${IFCFG_PROG} ${interface} 0.0.0.0
+    udhcpc_write_csman_stop
+		;;
+esac
+
+exit 0

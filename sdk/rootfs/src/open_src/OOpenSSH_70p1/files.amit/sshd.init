@@ -1,0 +1,128 @@
+SSHD="/usr/sbin/sshd"
+SSH_KEYGEN="/usr/bin/ssh-keygen"
+KEY_DIR="/etc/ssh"
+RSA_KEY="${KEY_DIR}/ssh_host_rsa_key"
+DSA_KEY="${KEY_DIR}/ssh_host_dsa_key"
+ED25519_KEY="${KEY_DIR}/ssh_host_ed25519_key"
+PID_FILE="/var/run/sshd.pid"
+CONFIG_DIR="/etc/ssh"
+SSH_FILE="${CONFIG_DIR}/sshd.sh"
+SSHD_CONFIG="${CONFIG_DIR}/sshd_conf"
+SSH_CHECK="${CONFIG_DIR}/sshd_check.sh"
+
+generate_rsa_key()
+{
+	if [ ! -s "${RSA_KEY}" ]; then
+		echo -n "Generating RSA host key... "
+		if ${SSH_KEYGEN} -q -t rsa -f "${RSA_KEY}" -C '' -N '' 2>/dev/null; then
+			chmod 600 "${RSA_KEY}"
+			chmod 644 "${RSA_KEY}.pub"
+			echo "OK"
+		else
+			echo "FAILED"
+			exit 1
+		fi
+	fi
+}
+
+generate_dsa_key()
+{
+	if [ ! -s "${DSA_KEY}" ]; then
+		echo -n "Generating DSA host key... "
+		if ${SSH_KEYGEN} -q -t dsa -f "${DSA_KEY}" -C '' -N '' 2>/dev/null; then
+			chmod 600 "${DSA_KEY}"
+			chmod 644 "${DSA_KEY}.pub"
+			echo "OK"
+		else
+			echo "FAILED"
+			exit 1
+		fi
+	fi
+}
+
+
+generate_ed25519_key()
+{
+	if [ ! -s "${ED25519_KEY}" ]; then
+		echo -n "Generating ED25519 host key... "
+		if ${SSH_KEYGEN} -q -t ed25519 -f "${ED25519_KEY}" -C '' -N '' 2>/dev/null; then
+			chmod 600 "${ED25519_KEY}"
+			chmod 644 "${ED25519_KEY}.pub"
+			echo "OK"
+		else
+			echo "FAILED"
+			exit 1
+		fi
+	fi
+}
+
+
+###############################################################################
+# Start and stop functions
+###############################################################################
+start()
+{
+        # Create keys if necessary
+	# First create key directory
+	[ -d "$KEY_DIR" ] || {
+		mkdir -p "$KEY_DIR"
+		chown root:root "$KEY_DIR"
+		chmod 755 "$KEY_DIR"
+	}
+	#generate_rsa1_key
+	generate_rsa_key
+	generate_dsa_key
+	generate_ed25519_key
+	
+	# Create config directory
+	[ -d "$CONFIG_DIR" ] || {
+		mkdir -p "$CONFIG_DIR"
+		chown root:root "$CONFIG_DIR"
+		chmod 755 "$CONFIG_DIR"
+	}
+
+	echo -n "Starting $NAME: "
+	sh $SSH_FILE
+	sh $SSH_CHECK
+	$SSHD -f "${SSHD_CONFIG}" 2>/dev/null
+	status=$?
+	if [ $status -ne 0 ]; then
+		echo "FAILED"
+		exit 1
+	fi
+	echo "OK"
+}
+
+stop ()
+{
+	echo -n "Stopping $NAME: "
+
+	# PID file has only the PID of the last instance
+	pkill sshd 2>/dev/null || true
+
+	rm -f "$PID_FILE"
+
+	echo "OK"
+}
+
+###############################################################################
+# Start of script
+###############################################################################
+
+case "${1}" in
+start)
+        start
+        ;;
+stop)
+        stop
+        ;;
+restart|force-reload)
+        stop
+        start
+        ;;
+*)
+        echo "Usage: $0 {start|stop|restart|force-reload}"
+        exit 1
+        ;;
+esac
+exit $?

@@ -1,0 +1,881 @@
+#!/bin/sh
+
+# From AUTOCONF
+prefix=
+exec_prefix=${prefix}
+
+# Paths to programs
+UVM=/usr/bin/uvm
+UO_PATH=/usr/uo
+CONF_PATH=/etc/ppp
+EXEC_PATH=/usr/sbin
+. /usr/bin/scriptlib
+
+ATCMD_PROG="send_ATcmd"
+IFCFG_PROG="ifconfig"
+
+get_index() {
+ 
+    # Get Index_usb info
+    if [ -z "$1" ] || [ $(($1)) -lt 0 ] || [ $(($1)) -gt 15 ]; then
+        # Auto select index (Currently set default 0)
+        Index="0"
+    else
+        Index="$(($1))"
+    fi
+
+    # Get Index_3G info
+    if [ -z "$2" ] || [ $(($2)) -lt 0 ] || [ $(($2)) -gt 15 ]; then
+        # Auto select index (Currently set default 0)
+        Index_3G="0"
+    else
+        Index_3G="$(($2))"
+    fi
+}
+
+get_sim_mode(){
+    CSID_C_3G_MULTIWAN_SIMCARD_MODE="`rdcsman 0x001e400$Index_3G u8`"
+}
+
+get_general_config() {
+ 
+    get_index ${Index} ${Index_3G}
+    get_sim_mode
+
+    CSID_C_3G_MAPPING_DEVICE="`rdcsman 0x001e420$Index_3G u16`"
+    CSID_C_3G_MAPPING_LEVEL="`rdcsman 0x001e224$Index_3G u16`"
+    CSID_C_3G_MAPPING_PORT="`rdcsman 0x001e225$Index_3G u16`"
+    CSID_C_3G_MODULE_PWR_GPIO="`rdcsman 0x001e0033 u8`"
+    CSID_C_3G_MULTIWAN_PWR_GPIO="`rdcsman 0x001e22f$Index_3G u8`"
+    CSID_C_3G_MULTIWAN_ACTIVE_HIGH="`rdcsman 0x001e276$Index_3G u8`"
+    CSID_C_3G_MODULE_PWR_TYPE="`rdcsman 0x001e277$Index_3G u8`"
+    CSID_C_3G_SIM_SLOT_TYPEPE="`rdcsman 0x001e278$Index_3G u8`"
+    CSID_C_3G_PWR_SIM_SLOTPE="`rdcsman 0x001e279$Index_3G u8`"
+
+    if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "0" ] ; then
+        CSID_C_3G_MULTIWAN_AUTO_APN="`rdcsman 0x001e216$Index_3G u16`"
+    else
+        CSID_C_3G_MULTIWAN_AUTO_APN="`rdcsman 0x801e7c5$Index_3G u16`"
+    fi
+
+    CSID_C_WANTYPE="`rdcsman 0x00010003 u16`"
+    [ "${CSID_C_WANTYPE}" == "" ] && CSID_C_WANTYPE="0"
+
+    #CSID_C_3G_AUTOBAK_ENABLE="`rdcsman 0x001e000d u16`"
+    #CSID_S_3G_MULTIWAN_AUTOBAK_STATUS="`rdcsman 0x001e20d$Index_3G u16`"
+    #CSID_C_FAILOVER_ENABLE="`rdcsman 0x00430001 u32`"
+    #CSID_C_FAILOVER_WANTYPE="`rdcsman 0x0043000b u32`"
+    #CSID_C_FAILOVER_LOADSHARING_ENABLE="`rdcsman 0x004301c0 u32`"
+}
+
+get_config() {
+    [ -f /usr/bin/3g-apn-profile ] && . /usr/bin/3g-apn-profile
+
+  	get_index ${Index} ${Index_3G}
+    get_sim_mode
+
+    if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "0" ] ; then
+        CSID_C_3G_MULTIWAN_AUTO_APN="`rdcsman 0x001e216$Index_3G u16`"
+    else
+        CSID_C_3G_MULTIWAN_AUTO_APN="`rdcsman 0x801e7c5$Index_3G u16`"
+    fi
+
+    if [ $CSID_C_3G_MULTIWAN_AUTO_APN == "0" ] ; then
+        #Auto-detection
+        if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "0" ] ; then
+            # Connection info for CSID_C_3G_MULTIWAN
+            CSID_C_3G_USERNAME="`rdcsman 0x001e201$Index_3G str`"
+            CSID_C_3G_PASSWORD="`rdcsman 0x001e202$Index_3G str`"
+            CSID_C_3G_APN="`rdcsman 0x001e203$Index_3G str`"
+            CSID_C_3G_DIALNUM="`rdcsman 0x001e205$Index_3G str`"
+        else
+            # Get Connect Dual SIM config
+            CSID_C_3G_USERNAME="`rdcsman 0x801e758$Index_3G str`"
+            CSID_C_3G_PASSWORD="`rdcsman 0x801e759$Index_3G str`"
+            CSID_C_3G_APN="`rdcsman 0x801e75a$Index_3G str`"
+            CSID_C_3G_DIALNUM="`rdcsman 0x801e75c$Index_3G str`"
+        fi
+
+    elif [ $CSID_C_3G_MULTIWAN_AUTO_APN == "1" ] ; then
+        #Manual-Configuration
+        if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "0" ] ; then
+
+            #Connection info for CSID_C_3G_MULTIWAN
+            CSID_C_3G_USERNAME="`rdcsman 0x001e201$Index_3G str`"
+            CSID_C_3G_PASSWORD="`rdcsman 0x001e202$Index_3G str`"
+            CSID_C_3G_APN="`rdcsman 0x001e203$Index_3G str`"
+            CSID_C_3G_DIALNUM="`rdcsman 0x001e205$Index_3G str`"
+        else
+            # Get Connect Dual SIM config
+            DUALSIM_CARDSTATUS="`rdcsman 0x801e756$Index_3G u16`"
+            if [ $DUALSIM_CARDSTATUS == "1" ] ; then
+                #for CSID C_3G_MULTIWAN_XXX_SIMA
+                CSID_C_3G_USERNAME="`rdcsman 0x001e40d$Index_3G str`"
+                CSID_C_3G_PASSWORD="`rdcsman 0x001e40f$Index_3G str`"
+                CSID_C_3G_APN="`rdcsman 0x001e401$Index_3G str`"
+                CSID_C_3G_DIALNUM="`rdcsman 0x001e40b$Index_3G str`"
+            elif [ $DUALSIM_CARDSTATUS == "2" ] ; then
+                #for CSID C_3G_MULTIWAN_XXX_SIMB
+                CSID_C_3G_USERNAME="`rdcsman 0x001e40e$Index_3G str`"
+                CSID_C_3G_PASSWORD="`rdcsman 0x001e411$Index_3G str`"
+                CSID_C_3G_APN="`rdcsman 0x001e405$Index_3G str`"
+                CSID_C_3G_DIALNUM="`rdcsman 0x001e40c$Index_3G str`"
+            fi
+        fi
+    elif [ $CSID_C_3G_MULTIWAN_AUTO_APN == "2" ] ; then
+        #APN profile list
+        local APN_PROFILE_CSID_IDX=`cat "${APN_PROFILE_IDX_FILE}"`
+
+        if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "0" ] ; then
+            #CSID_C_3G_PROFILE_XXX_SIMA
+            CSID_C_3G_USERNAME="`rdcsman 0x001e66${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+            CSID_C_3G_PASSWORD="`rdcsman 0x001e68${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+            CSID_C_3G_APN="`rdcsman 0x001e62${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+            CSID_C_3G_DIALNUM="`rdcsman 0x001e64${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+        else
+            # Get Connect Dual SIM config
+            DUALSIM_CARDSTATUS="`rdcsman 0x801e756$Index_3G u16`"
+            if [ $DUALSIM_CARDSTATUS == "1" ] ; then
+                #CSID_C_3G_PROFILE_XXX_SIMA
+                CSID_C_3G_USERNAME="`rdcsman 0x001e66${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+                CSID_C_3G_PASSWORD="`rdcsman 0x001e68${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+                CSID_C_3G_APN="`rdcsman 0x001e62${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+                CSID_C_3G_DIALNUM="`rdcsman 0x001e64${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+            elif [ $DUALSIM_CARDSTATUS == "2" ] ; then
+                #CSID_C_3G_PROFILE_XXX_SIMB
+                CSID_C_3G_USERNAME="`rdcsman 0x001e67${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+                CSID_C_3G_PASSWORD="`rdcsman 0x001e69${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+                CSID_C_3G_APN="`rdcsman 0x001e63${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+                CSID_C_3G_DIALNUM="`rdcsman 0x001e65${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+            fi
+
+            # to write CSID_S_3G_DUALSIM
+            wrcsman "0x801e758${Index_3G} \"${CSID_C_3G_USERNAME}"
+            wrcsman "0x801e759${Index_3G} \"${CSID_C_3G_PASSWORD}"
+            wrcsman "0x801e75a${Index_3G} \"${CSID_C_3G_APN}"
+            wrcsman "0x801e75c${Index_3G} \"${CSID_C_3G_DIALNUM}"
+        fi
+    fi
+
+    if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "0" ] ; then
+        CSID_C_3G_PIN="`rdcsman 0x001e204$Index_3G str`"
+        CSID_C_3G_MULTIWAN_IP_MODE="`rdcsman 0x001e7a0$Index_3G u8`" 
+        CSID_C_3G_MULTIWAN_IF_PRIDNS="`rdcsman 0x001e208$Index_3G ipv4`" 
+        CSID_C_3G_MULTIWAN_IF_SECDNS="`rdcsman 0x001e209$Index_3G ipv4`"  
+        CSID_C_3G_AUTHTYPE="`rdcsman 0x001e20f$Index_3G u16`"
+        CSID_C_3G_MULTIWAN_AUTHTYPE=$CSID_C_3G_AUTHTYPE 
+
+        # Roaming option
+        CSID_C_3G_MULTIWAN_ROAMING_ENABLE="`rdcsman 0x001e21b$Index_3G u32`"
+        CSID_C_3G_MULTIWAN_ROAMING_ENABLE_SIMA="`rdcsman 0x001e41a$Index_3G u32`"
+        ALLOW_ROAMING=0
+        [ $CSID_C_3G_MULTIWAN_ROAMING_ENABLE == "1" -o $CSID_C_3G_MULTIWAN_ROAMING_ENABLE_SIMA == "1" ] && ALLOW_ROAMING=1
+    else
+        DUALSIM_CARDSTATUS="`rdcsman 0x801e756$Index_3G u16`"
+        if [ $DUALSIM_CARDSTATUS == "1" ] ; then
+            CSID_C_3G_PIN="`rdcsman 0x001e409$Index_3G str`"
+            CSID_C_3G_MULTIWAN_IP_MODE="`rdcsman 0x001e7a0$Index_3G u8`"
+            CSID_C_3G_MULTIWAN_IF_PRIDNS="`rdcsman 0x001e414$Index_3G ipv4`"
+            CSID_C_3G_MULTIWAN_IF_SECDNS="`rdcsman 0x001e416$Index_3G ipv4`"
+            CSID_C_3G_AUTHTYPE="`rdcsman 0x001e412$Index_3G u16`"
+            CSID_C_3G_MULTIWAN_AUTHTYPE=$CSID_C_3G_AUTHTYPE
+        elif [ $DUALSIM_CARDSTATUS == "2" ] ; then
+            CSID_C_3G_PIN="`rdcsman 0x001e40a$Index_3G str`"
+            CSID_C_3G_MULTIWAN_IP_MODE="`rdcsman 0x001e7a1$Index_3G u8`"
+            CSID_C_3G_MULTIWAN_IF_PRIDNS="`rdcsman 0x001e415$Index_3G ipv4`"
+            CSID_C_3G_MULTIWAN_IF_SECDNS="`rdcsman 0x001e417$Index_3G ipv4`"
+            CSID_C_3G_AUTHTYPE="`rdcsman 0x001e413$Index_3G u16`"
+            CSID_C_3G_MULTIWAN_AUTHTYPE=$CSID_C_3G_AUTHTYPE
+        fi
+
+        # Roaming Option
+        CSID_C_3G_MULTIWAN_ROAMING_ENABLE="`rdcsman 0x001e21b$Index_3G u32`"
+        CSID_C_3G_MULTIWAN_ROAMING_ENABLE_SIMA="`rdcsman 0x001e41a$Index_3G u32`"
+        CSID_C_3G_MULTIWAN_ROAMING_ENABLE_SIMB="`rdcsman 0x001e41b$Index_3G u32`"
+        DUALSIM_CARDSTATUS="`rdcsman 0x801e756$Index_3G u16`"
+        ALLOW_ROAMING=0
+        if [ $DUALSIM_CARDSTATUS == "1" ] ; then
+            [ $CSID_C_3G_MULTIWAN_ROAMING_ENABLE == "1" -o $CSID_C_3G_MULTIWAN_ROAMING_ENABLE_SIMA == "1" ] && ALLOW_ROAMING=1
+        elif [ $DUALSIM_CARDSTATUS == "2" ] ; then
+            [ $CSID_C_3G_MULTIWAN_ROAMING_ENABLE == "1" -o $CSID_C_3G_MULTIWAN_ROAMING_ENABLE_SIMB == "1" ] && ALLOW_ROAMING=1
+        fi
+    fi
+
+    # IP mode, when choosing static IP
+    if [ "${CSID_C_3G_MULTIWAN_IP_MODE}" == "1" ]; then
+        if [ "$CSID_C_3G_MULTIWAN_SIMCARD_MODE" == "0" -o "${DUALSIM_CARDSTATUS}" == "1" ]; then
+            C_3G_MULTIWAN_IF_FIXED_IP="`rdcsman 0x001e7a2${Index_3G} ipv4`"
+            C_3G_MULTIWAN_IF_FIXED_NM="`rdcsman 0x001e7a4${Index_3G} ipv4`"
+            C_3G_MULTIWAN_IF_FIXED_GW="`rdcsman 0x001e7a6${Index_3G} ipv4`"
+        elif [ "${DUALSIM_CARDSTATUS}" == "2" ]; then
+            C_3G_MULTIWAN_IF_FIXED_IP="`rdcsman 0x001e7a3${Index_3G} ipv4`"
+            C_3G_MULTIWAN_IF_FIXED_NM="`rdcsman 0x001e7a5${Index_3G} ipv4`"
+            C_3G_MULTIWAN_IF_FIXED_GW="`rdcsman 0x001e7a7${Index_3G} ipv4`"
+        fi
+    fi
+
+    # Other options for MULTIWAN
+ 	CSID_C_3G_MULTIWAN_CNT_TYPE="`rdcsman 0x001e20a$Index_3G u8`"
+ 	CSID_C_3G_CNT_TYPE=$CSID_C_3G_MULTIWAN_CNT_TYPE
+	#CSID_C_3G_CNT_TYPE="`rdcsman 0x001e000a u8`"
+
+    CSID_C_3G_MULTIWAN_IP_TYPE="`rdcsman 0x001e22b$Index_3G u8`"
+
+    CSID_C_3G_MULTIWAN_PROFILE="`rdcsman 0x001e221$Index_3G u8`"
+	CSID_C_3G_PROFILE=$CSID_C_3G_MULTIWAN_PROFILE
+
+    CSID_C_3G_MULTIWAN_MTU="`rdcsman 0x001e20b$Index_3G u16`"
+	CSID_C_3G_MTU=$CSID_C_3G_MULTIWAN_MTU
+
+    CSID_C_3G_MULTIWAN_IDLETIME="`rdcsman 0x001e20c0$Index_3G u8`"
+	CSID_C_3G_IDLETIME=$CSID_C_3G_MULTIWAN_IDLETIME
+
+	CSID_C_3G_PPP_ONLY="`rdcsman 0x001e22d$Index_3G u8`"
+	CSID_C_3G_PREFER_MODE="`rdcsman 0x001e215$Index_3G u16`"
+
+    CSID_C_3G_MULTIWAN_SERVICENAME="`rdcsman 0x001e207$Index_3G str`"
+
+ 
+    # Other options
+    CSID_C_3G_SERVICENAME="`rdcsman 0x001e0007 str`"
+#    CSID_C_3G_PPP_LCP_INTERVAL="`rdcsman 0x001e0104 str`"
+#    CSID_C_3G_PPP_LCP_FAILURE="`rdcsman 0x001e0105 str`"
+   
+    CSID_C_3G_IF_PRIDNS="$CSID_C_3G_MULTIWAN_IF_PRIDNS"
+    CSID_C_3G_IF_SECDNS="$CSID_C_3G_MULTIWAN_IF_SECDNS"
+ 
+    CSID_C_3G_MRU=""
+    CSID_C_3G_CID="`rdcsman 0x001e001D str`"
+    [ "${CSID_C_3G_CID}" == "" ] && CSID_C_3G_CID=1
+    CSID_C_3G_PDP_TYPE="" # "`rdcsman 0x001e001c u16`"
+    CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL="`rdcsman 0x001e213$Index_3G u16`"
+    CSID_C_3G_MULTIWAN_KA_LCP_TIMES="`rdcsman 0x001e214$Index_3G u16`"
+
+    CSID_C_3G_PRE_COMMAND="`rdcsman 0x001e0031 str`"
+    CSID_C_3G_MULTIWAN_PRE_COMMAND="`rdcsman 0x001e22e$Index_3G str`"
+    
+    CSID_S_3G_WNC_MAL_API_ENABLE="`rdcsman 0x801e503$Index_3G u8`"
+
+    # Keep alive option
+    CSID_C_3G_MULTIWAN_KEEP_ALIVE="`rdcsman 0x001e210$Index_3G u16`"
+    CSID_C_3G_MULTIWAN_KA_PING_INTERVAL="`rdcsman 0x001e211$Index_3G u16`"
+    CSID_C_3G_MULTIWAN_KA_PING_IP="`rdcsman 0x001e212$Index_3G ipv4`"
+    CSID_C_3G_MULTIWAN_KA_PING_HOST="`rdcsman 0x001e226$Index_3G str`"
+
+    # Option for modem connect fail
+    CSID_C_3G_MODEM_RESTART_ENABLE="`rdcsman 0x001e273$Index_3G u8`"
+    CSID_C_3G_MODEM_RESTART_TIMES="`rdcsman 0x001e274$Index_3G u32`"
+}
+
+get_general_status() {
+    get_index ${Index} ${Index_3G}  
+
+	idx_3g="`printf "%x" $((${Index_3G}))`"
+ 	idx_3g=`expr $idx_3g + 1` 
+
+    #echo "get_general_status() Index=${Index} Indeex_3G=${Index_3G}" 
+    CSID_S_3G_MULTIWAN_SIM_STATUS="`rdcsman 0x801e3c0$idx_3g u32`"
+}
+
+get_cnt_status() {
+   CSID_S_3G_AUTOBAK_STATUS="`rdcsman 0x801E1200 u16`"
+   CSID_S_3G_AUTOBAK_MODE="`rdcsman 0x801e4000 u16`"
+   CSID_S_3G_MODEM_RESET_TIME="`rdcsman 0x801e6004 u8`"
+
+   idx="`printf "%x" $(($1))`"
+   CSID_S_USB_IF_IP="`rdcsman 0x805500f${idx} ipv4`"
+   CSID_S_USB_IF_NM="`rdcsman 0x8055011${idx} ipv4`"
+   CSID_S_USB_IF_GW="`rdcsman 0x8055012${idx} ipv4`"
+   CSID_S_USB_IF_PRIDNS="`rdcsman 0x8055013${idx} ipv4`"
+   CSID_S_USB_IF_SECDNS="`rdcsman 0x8055014${idx} ipv4`"
+   CSID_S_USB_CNT_IF_NAME="`rdcsman 0x8055016${idx} str`"
+   CSID_S_USB_CNT_STATUS="`rdcsman 0x8055015${idx} u16`"
+   CSID_S_USB_CNT_TIME="`rdcsman 0x8055017${idx} u32`"
+   CSID_S_USB_CNT_ERR_CODE="`rdcsman 0x8055018${idx} u32`"
+   CSID_S_USB_CNT_NETWORK_NAME="`rdcsman 0x8055019${idx} str`"
+   CSID_S_USB_CNT_NETWORK_TYPE="`rdcsman 0x805501a${idx} u16`"
+   CSID_S_USB_SIGNAL_STR="`rdcsman 0x805501b${idx} u16`"
+   CSID_S_USB_PIN_STATUS="`rdcsman 0x805501c${idx} u16`"
+   CSID_S_USB_MODEL_NAME="`rdcsman 0x805501d${idx} str`"
+   CSID_S_USB_CNT_DRIVER="`rdcsman 0x805501e${idx} u8`"
+   CSID_S_USB_MAC_ADDR="`rdcsman 0x805501f${idx} str`"
+   
+   #for IPv6
+   CSID_S_USB_IF_IPV6="`rdcsman 0x8055010${idx} str`"
+   CSID_S_USB_IF_GW_IPV6="`rdcsman 0x8055020${idx} str`"
+   CSID_S_USB_IF_PRIDNS_IPV6="`rdcsman 0x8055021${idx} str`"
+   CSID_S_USB_IF_SECDNS_IPV6="`rdcsman 0x8055022${idx} str`"
+}
+
+get_usb_status() {
+   idx="`printf "%x" $(($1))`"
+   CSID_S_USB_BUS="`rdcsman 0x8055000${idx} u8`"
+   CSID_S_USB_LEVEL="`rdcsman 0x8055001${idx} u8`"
+   CSID_S_USB_PORT="`rdcsman 0x8055002${idx} u8`"
+   CSID_S_USB_TYPE="`rdcsman 0x8055003${idx} u32`"
+   CSID_S_USB_VENDOR_ID="`rdcsman 0x8055004${idx} u16`"
+   CSID_S_USB_VENDOR_ID_HEX="`printf "%x" ${CSID_S_USB_VENDOR_ID}`"
+   CSID_S_USB_PRODUCT_ID="`rdcsman 0x8055005${idx} u16`"
+   CSID_S_USB_PRODUCT_ID_HEX="`printf "%x" ${CSID_S_USB_PRODUCT_ID}`"
+   CSID_S_USB_DRIVER_TYPE="`rdcsman 0x8055006${idx} u8`"
+   CSID_S_USB_MODEM1_NAME="$(rdcsman 0x8055007${idx} str)"
+   CSID_S_USB_MODEM1=""
+   [ "${CSID_S_USB_MODEM1_NAME}" != "" ] && CSID_S_USB_MODEM1="/dev/${CSID_S_USB_MODEM1_NAME}"
+   CSID_S_USB_MODEM2_NAME="$(rdcsman 0x8055008${idx} str)"
+   CSID_S_USB_MODEM2=""
+   [ "${CSID_S_USB_MODEM2_NAME}" != "" ] && CSID_S_USB_MODEM2="/dev/${CSID_S_USB_MODEM2_NAME}"
+   CSID_S_USB_NDIS1_NAME="`rdcsman 0x805500b${idx} str`"
+   CSID_S_USB_NDIS2_NAME="`rdcsman 0x805500c${idx} str`"
+   CSID_S_USB_NDIS3_NAME="`rdcsman 0x8055023${idx} str`"
+   CSID_S_USB_QMI_NODE1="`rdcsman 0x805500d${idx} str`"
+   CSID_S_USB_QMI_NODE2="`rdcsman 0x805500e${idx} str`"
+   CSID_S_USB_QMI_NODE3="`rdcsman 0x8055024${idx} str`"
+   CSID_S_USB_MAC_ADDR="`rdcsman 0x805501f${idx} str`"
+}
+
+get_3g_cnt_status() {
+    get_index ${Index} ${Index_3G}  
+
+	idx_3g="`printf "%x" $((${Index_3G}))`"
+ 	idx_3g=`expr $idx_3g + 1` 
+    echo "get_3g_cnt_status idx_3g=$idx_3g"
+	   
+	CSID_S_3G_MULTIWAN_IF_IP="`rdcsman 0x801e020${idx_3g} ipv4`"
+	CSID_S_3G_MULTIWAN_IF_NM="`rdcsman 0x801e030${idx_3g} ipv4`"
+	CSID_S_3G_MULTIWAN_IF_GW="`rdcsman 0x801e040${idx_3g} ipv4`"
+	CSID_S_3G_MULTIWAN_IF_PRIDNS="`rdcsman 0x801e050${idx_3g} ipv4`"
+	CSID_S_3G_MULTIWAN_IF_SECDNS="`rdcsman 0x801e060${idx_3g} ipv4`"
+	CSID_S_3G_MULTIWAN_WAN_IF_NAME="`rdcsman 0x801e220${idx_3g} str`"
+	CSID_S_3G_MULTIWAN_CNT_STATUS="`rdcsman  0x801e070${idx_3g} u16`"
+	CSID_S_3G_MULTIWAN_CNT_TIME="`rdcsman 0x801e010${idx_3g} u32`"
+	CSID_S_3G_MULTIWAN_ERR_CODE="`rdcsman 0x801e110${idx_3g} u32`"
+	CSID_S_3G_MULTIWAN_NETWORK_NAME="`rdcsman 0x801e100${idx_3g} str`"
+	CSID_S_3G_MULTIWAN_SERVICE_TYPE="`rdcsman 0x801e130${idx_3g} u16`"
+    CSID_S_3G_MULTIWAN_CARD_INFO="`rdcsman 0x801e0d0${idx_3g} str`"
+    CSID_S_3G_MULTIWAN_SIGNAL_STRENGTH="`rdcsman 0x801e0e0${idx_3g} u16`"
+	CSID_S_3G_MULTIWAN_SIGNAL_QUALITY="`rdcsman 0x801e0f0${idx_3g} u16`"
+	CSID_S_3G_MULTIWAN_MAC_ADDR="`rdcsman 0x801e2bf${idx_3g} str`"
+ 
+    # for IPv6
+    CSID_S_3G_MULTIWAN_IF_IP_IPV6="`rdcsman 0x801e504${idx_3g} str`"
+    CSID_S_3G_MULTIWAN_IF_GW_IPV6="`rdcsman 0x801e505${idx_3g} str`"
+    CSID_S_3G_MULTIWAN_IF_PRIDNS_IPV6="`rdcsman 0x801e506${idx_3g} str`"
+    CSID_S_3G_MULTIWAN_IF_SECDNS_IPV6="`rdcsman 0x801e507${idx_3g} str`"
+}
+
+get_3g_cnt_status0() {
+
+	CSID_S_3G_IF_IP="`rdcsman 0x801e0200 ipv4`"
+	CSID_S_3G_IF_NM="`rdcsman 0x801e0300 ipv4`"
+	CSID_S_3G_IF_GW="`rdcsman 0x801e0400 ipv4`"
+	CSID_S_3G_IF_PRIDNS="`rdcsman 0x801e0500 ipv4`"
+	CSID_S_3G_IF_SECDNS="`rdcsman 0x801e0600 ipv4`"
+	CSID_S_3G_CNT_STATUS="`rdcsman 0x801e0700 u16`"
+	CSID_S_3G_CNT_TIME="`rdcsman 0x801e0100 u32`"
+	CSID_S_3G_ERR_CODE="`rdcsman 0x801e1100 u32`"
+    CSID_S_3G_WAN_IF_NAME="`rdcsman 0x801e2200 str`"
+	CSID_S_3G_NETWORK_NAME="`rdcsman 0x801e1000 str`"
+	CSID_S_3G_SERVICE_TYPE="`rdcsman 0x801e1300 u16`"
+	CSID_S_3G_SIGNAL_QUALITY="`rdcsman 0x801e0f00 u16`"
+} 
+
+write_cnttime_info() {
+    local CNT_TIME="$1"
+    idx="`printf "%x" $(($2))`"
+
+    if [ "${CNT_TIME}" == "" ]; then
+        wrcsman "0x8055017${idx} 0"
+    else
+        wrcsman "0x8055017${idx} ${CNT_TIME}"
+    fi
+}
+
+write_if_name() {
+   local IFNAME="$1"
+   idx="`printf "%x" $(($2))`"
+
+   wrcsman "0x8055016${idx} \"${IFNAME}"
+}
+
+write_if_name_v6() {
+   local IFNAME="$1"
+   idx="`printf "%x" $(($2))`"
+
+   wrcsman "0x8055030${idx} \"${IFNAME}"
+}
+
+write_mac_addr() {
+   local MACADDR0="$1"
+   local MACADDR1="$2"
+   local MACADDR2="$3"
+   local MACADDR3="$4"
+   local MACADDR4="$5"
+   local MACADDR5="$6"
+#   idx="`printf "%x" $(($7))`"
+   idx="`printf "%x" $(($2))`"
+
+#   [ "${MACADDR}" != "" ] && wrcsman "0x805501f${idx} @6 ${MACADDR0} ${MACADDR1} ${MACADDR2} ${MACADDR3} ${MACADDR4} ${MACADDR5}"
+#   wrcsman "0x805501f${idx} @6 0x${MACADDR0} 0x${MACADDR1} 0x${MACADDR2} 0x${MACADDR3} 0x${MACADDR4} 0x${MACADDR5}"
+   
+   wrcsman "0x805501f${idx} \"${MACADDR0}"
+   
+}
+
+write_if_info() {
+   local IFIP="$1"
+   local IFNM="$2"
+   local IFGW="$3"
+   idx="`printf "%x" $(($4))`"
+
+   [ "${IFIP}" != "" ] && wrcsman "0x805500f${idx} {${IFIP}}"
+   [ "${IFNM}" != "" ] && wrcsman "0x8055011${idx} {${IFNM}}"
+   [ "${IFGW}" != "" ] && wrcsman "0x8055012${idx} {${IFGW}}"
+}
+
+write_dns_info() {
+   local CurIFDNS1="$1"
+   local CurIFDNS2="$2"
+   idx="`printf "%x" $(($3))`"
+
+   [ "${CurIFDNS1}" != "" ] && wrcsman "0x8055013${idx} {${CurIFDNS1}}"
+   [ "${CurIFDNS2}" != "" ] && wrcsman "0x8055014${idx} {${CurIFDNS2}}"
+}
+
+write_if_info_ipv6() {
+   local IFIP="$1"
+   local IFNM="$2"
+   local IFGW="$3"
+   idx="`printf "%x" $(($4))`"
+
+   [ "${IFIP}" != "" ] && wrcsman "0x8055010${idx} \"${IFIP}"
+   [ "${IFGW}" != "" ] && wrcsman "0x8055020${idx} \"${IFGW}"
+} 
+
+write_dns_info_ipv6() {
+   local CurIFDNS1="$1"
+   local CurIFDNS2="$2"
+   idx="`printf "%x" $(($3))`"
+
+   [ "${CurIFDNS1}" != "" ] && wrcsman "0x8055021${idx} \"${CurIFDNS1}"
+   [ "${CurIFDNS2}" != "" ] && wrcsman "0x8055022${idx} \"${CurIFDNS2}"
+}
+
+write_cnt_status() {
+   local CNTSTATUS="$1"
+   idx="`printf "%x" $(($2))`"
+
+   [ "${CNTSTATUS}" == "" ] && CNTSTATUS=0
+   
+   wrcsman "0x8055015${idx} ${CNTSTATUS}"
+}
+
+write_cnt_status_ipv6() {
+   local CNTSTATUS="$1"
+   idx="`printf "%x" $(($2))`"
+
+   [ "${CNTSTATUS}" == "" ] && CNTSTATUS=0
+   
+   wrcsman "0x801e071${idx} ${CNTSTATUS}"
+}
+
+write_error_code() {
+   local ERROR_CODE="$1"
+   idx="`printf "%x" $(($2))`"
+
+   [ "${ERROR_CODE}" == "" ] && ERROR_CODE=0
+   
+   wrcsman "0x8055018${idx} ${ERROR_CODE}"
+}
+
+clear_all_cnt_status() {
+    write_cnttime_info "" $1
+    write_if_name "" $1
+    write_if_info "0.0.0.0" "0.0.0.0" "0.0.0.0" $1
+    write_dns_info "0.0.0.0" "0.0.0.0" $1
+    write_cnt_status "0" $1
+    write_cnt_status_ipv6 "0" $1
+}
+
+show_general_config(){
+    get_general_config ${Index} ${Index_3G}
+
+    echo "CSID_C_3G_MAPPING_DEVICE[${Index_3G}]     : ${CSID_C_3G_MAPPING_DEVICE}"
+    echo "CSID_C_3G_MAPPING_LEVEL[${Index_3G}]      : ${CSID_C_3G_MAPPING_LEVEL}"
+    echo "CSID_C_3G_MAPPING_PORT[${Index_3G}]       : ${CSID_C_3G_MAPPING_PORT}"
+    echo ""
+    echo "CSID_C_3G_MODULE_PWR_GPIO[${Index_3G}]    : ${CSID_C_3G_MODULE_PWR_GPIO}"
+    echo "CSID_C_3G_MULTIWAN_PWR_GPIO[${Index_3G}]  : ${CSID_C_3G_MULTIWAN_PWR_GPIO}"
+    echo "CSID_C_3G_MULTI_ACTIVE_HIGH[${Index_3G}]  : ${CSID_C_3G_MULTIWAN_ACTIVE_HIGH}"
+    echo "CSID_C_3G_MODULE_PWR_TYPE[${Index_3G}]    : ${CSID_C_3G_MODULE_PWR_TYPE}"
+    echo "CSID_C_3G_SIM_SLOT_TYPEPE[${Index_3G}]    : ${CSID_C_3G_SIM_SLOT_TYPEPE}"
+    echo "CSID_C_3G_PWR_SIM_SLOTPE[${Index_3G}]     : ${CSID_C_3G_PWR_SIM_SLOTPE}"
+
+
+    echo "C_3G_MULTIWAN_SIMCARD_MODE[${Index_3G}]   : ${CSID_C_3G_MULTIWAN_SIMCARD_MODE}"
+}
+
+show_config() {
+   get_general_config ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+
+   echo "CSID_C_WANTYPE                 : ${CSID_C_WANTYPE}"
+   echo "CSID_S_3G_WNC_MAL_API_ENABLE   : ${CSID_S_3G_WNC_MAL_API_ENABLE}"
+   # echo "CSID_C_3G_AUTOBAK_ENABLE             : ${CSID_C_3G_AUTOBAK_ENABLE}"
+   # echo "CSID_C_FAILOVER_ENABLE               : ${CSID_C_FAILOVER_ENABLE}"
+   echo ""
+   echo "CSID_C_3G_MULTIWAN_USER[${Index_3G}]           : ${CSID_C_3G_USERNAME}"
+   echo "CSID_C_3G_MULTIWAN_PASSWORD[${Index_3G}]       : ${CSID_C_3G_PASSWORD}"
+   echo "CSID_C_3G_MULTIWAN_APN[${Index_3G}]            : ${CSID_C_3G_APN}"
+   echo "CSID_C_3G_MULTIWAN_PIN[${Index_3G}]            : ${CSID_C_3G_PIN}"
+   echo "CSID_C_3G_MULTIWAN_NUMBER[${Index_3G}]         : ${CSID_C_3G_DIALNUM}"
+   echo "CSID_C_3G_MULTIWAN_CNT_TYPE[${Index_3G}]       : ${CSID_C_3G_CNT_TYPE}"
+   echo "CSID_C_3G_MULTIWAN_IP_TYPE[${Index_3G}]        : ${CSID_C_3G_MULTIWAN_IP_TYPE}"
+   echo "CSID_C_3G_MULTIWAN_PROFILE[${Index_3G}]        : ${CSID_C_3G_PROFILE}"
+   echo "CSID_C_3G_MULTIWAN_MTU[${Index_3G}]            : ${CSID_C_3G_MTU}"
+   echo "CSID_C_3G_MULTIWAN_IDLETIME[${Index_3G}]       : ${CSID_C_3G_IDLETIME}"
+   echo "CSID_C_3G_MULTIWAN_AUTHTYPE[${Index_3G}]       : ${CSID_C_3G_MULTIWAN_AUTHTYPE}"
+   echo "CSID_C_3G_MULTIWAN_PREFER_MODE [${Index_3G}]   : ${CSID_C_3G_PREFER_MODE}"
+   echo "CSID_C_3G_MODEM_RESTART_ENABLE[${Index_3G}]    : ${CSID_C_3G_MODEM_RESTART_ENABLE}"
+   echo "CSID_C_3G_MODEM_RESTART_TIMES[${Index_3G}]     : ${CSID_C_3G_MODEM_RESTART_TIMES}" 
+   echo "CSID_C_3G_MULTIWAN_PPP_ONLY[${Index_3G}]       : ${CSID_C_3G_PPP_ONLY}"
+   
+   echo "CSID_C_3G_MULTIWAN_KEEP_ALIVE[${Index}]        : ${CSID_C_3G_MULTIWAN_KEEP_ALIVE}"
+   echo "CSID_C_3G_MULTIWAN_KA_PING_INTERVAL[${Index}]  : ${CSID_C_3G_MULTIWAN_KA_PING_INTERVAL}"
+   echo "CSID_C_3G_MULTIWAN_KA_PING_IP[${Index}]        : ${CSID_C_3G_MULTIWAN_KA_PING_IP}"
+
+   echo "CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL[${Index}]   : ${CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL}"
+   echo "CSID_C_3G_MULTIWAN_KA_LCP_TIMES[${Index}]      : ${CSID_C_3G_MULTIWAN_KA_LCP_TIMES}"
+
+
+   # Other options
+   echo "CSID_C_3G_MULTIWAN_IF_PRIDNS[${Index}] : ${CSID_C_3G_MULTIWAN_IF_PRIDNS}"
+   echo "CSID_C_3G_MULTIWAN_IF_SECDNS[${Index}] : ${CSID_C_3G_MULTIWAN_IF_SECDNS}"
+   #echo "CSID_C_3G_SERVICENAME[${Index}]       : ${CSID_C_3G_SERVICENAME}"
+   #echo "CSID_C_3G_PPP_LCP_INTERVAL[${Index}]  : ${CSID_C_3G_PPP_LCP_INTERVAL}"
+   #echo "CSID_C_3G_PPP_LCP_FAILURE[${Index}]   : ${CSID_C_3G_PPP_LCP_FAILURE}"
+   #echo "CSID_C_3G_IF_PRIDNS[${Index}]         : ${CSID_C_3G_IF_PRIDNS}"
+   #echo "CSID_C_3G_IF_SECDNS[${Index}]         : ${CSID_C_3G_IF_SECDNS}"
+   #echo "CSID_C_3G_MRU[${Index}]               : ${CSID_C_3G_MRU}"
+   #echo "CSID_C_3G_CID[${Index}]               : ${CSID_C_3G_CID}"
+   #echo "CSID_C_3G_PDP_TYPE[${Index}]          : ${CSID_C_3G_PDP_TYPE}"
+   #echo "CSID_C_3G_KEEP_ALIVE[${Index}]        : ${CSID_C_3G_KEEP_ALIVE}"
+}
+
+show_cnt_status() {
+   get_cnt_status ${Index}
+
+   #echo "CSID_S_LOCAL_LAN_IF_NAME       : ${CSID_S_LOCAL_LAN_IF_NAME}"
+   #echo "CSID_S_LOCAL_WAN_IP            : ${CSID_S_LOCAL_WAN_IP}"
+   #echo "CSID_S_LOCAL_WAN_CNT_FORCE     : ${CSID_S_LOCAL_WAN_CNT_FORCE}"
+   #echo ""
+   echo "CSID_S_USB_IF_IP[${Index}]            : ${CSID_S_USB_IF_IP}"
+   #echo "CSID_S_USB_IF_IPV6[${Index}]          : ${CSID_S_USB_IF_IPV6}"
+   echo "CSID_S_USB_IF_NM[${Index}]            : ${CSID_S_USB_IF_NM}"
+   echo "CSID_S_USB_IF_GW[${Index}]            : ${CSID_S_USB_IF_GW}"
+   echo "CSID_S_USB_IF_PRIDNS[${Index}]        : ${CSID_S_USB_IF_PRIDNS}"
+   echo "CSID_S_USB_IF_SECDNS[${Index}]        : ${CSID_S_USB_IF_SECDNS}"
+   echo "CSID_S_USB_CNT_IF_NAME[${Index}]      : ${CSID_S_USB_CNT_IF_NAME}"
+   echo "CSID_S_USB_CNT_STATUS[${Index}]       : ${CSID_S_USB_CNT_STATUS}"
+   echo "CSID_S_USB_CNT_TIME[${Index}]         : ${CSID_S_USB_CNT_TIME}"
+   echo "CSID_S_USB_CNT_ERR_CODE[${Index}]     : ${CSID_S_USB_CNT_ERR_CODE}"
+   echo "CSID_S_USB_CNT_NETWORK_NAME[${Index}] : ${CSID_S_USB_CNT_NETWORK_NAME}"
+   echo "CSID_S_USB_CNT_NETWORK_TYPE[${Index}] : ${CSID_S_USB_CNT_NETWORK_TYPE}"
+   echo "CSID_S_USB_SIGNAL_STR[${Index}]       : ${CSID_S_USB_SIGNAL_STR}"
+   echo "CSID_S_USB_PIN_STATUS[${Index}]       : ${CSID_S_USB_PIN_STATUS}"
+   echo "CSID_S_USB_MODEL_NAME[${Index}]       : ${CSID_S_USB_MODEL_NAME}"
+   echo "CSID_S_USB_CNT_DRIVER[${Index}]       : ${CSID_S_USB_CNT_DRIVER}"
+   echo "CSID_S_USB_MAC_ADDR[${Index}]         : ${CSID_S_USB_MAC_ADDR}"
+   echo ""
+   echo "CSID_S_USB_IF_IPV6[${Index}]          : ${CSID_S_USB_IF_IPV6}"
+   echo "CSID_S_USB_IF_GW_IPV6[${Index}]       : ${CSID_S_USB_IF_GW_IPV6}"
+   echo "CSID_S_USB_IF_PRIDNS_IPV6${Index}]    : ${CSID_S_USB_IF_PRIDNS_IPV6}"
+   echo "CSID_S_USB_IF_SECDNS_IPV6[${Index}]   : ${CSID_S_USB_IF_SECDNS_IPV6}"
+}
+
+show_usb_status() {
+   get_usb_status ${Index}
+   echo "CSID_S_USB_BUS[${Index}]              : ${CSID_S_USB_BUS}"
+   echo "CSID_S_USB_LEVEL[${Index}]            : ${CSID_S_USB_LEVEL}"
+   echo "CSID_S_USB_PORT[${Index}]             : ${CSID_S_USB_PORT}"
+   echo "CSID_S_USB_TYPE[${Index}]             : ${CSID_S_USB_TYPE}"
+   echo "CSID_S_USB_VENDOR_ID[${Index}]        : ${CSID_S_USB_VENDOR_ID_HEX} (${CSID_S_USB_VENDOR_ID})"
+   echo "CSID_S_USB_PRODUCT_ID[${Index}]       : ${CSID_S_USB_PRODUCT_ID_HEX} (${CSID_S_USB_PRODUCT_ID})"
+   echo "CSID_S_USB_DRIVER[${Index}]           : ${CSID_S_USB_DRIVER_TYPE}"
+   echo "CSID_S_USB_MODEM1[${Index}]           : ${CSID_S_USB_MODEM1}"
+   echo "CSID_S_USB_MODEM2[${Index}]           : ${CSID_S_USB_MODEM2}"
+   echo "CSID_S_USB_NDIS1_NAME[${Index}]       : ${CSID_S_USB_NDIS1_NAME}"
+   echo "CSID_S_USB_NDIS2_NAME[${Index}]       : ${CSID_S_USB_NDIS2_NAME}"
+   echo "CSID_S_USB_NDIS3_NAME[${Index}]       : ${CSID_S_USB_NDIS3_NAME}"
+   echo "CSID_S_USB_QMI_NODE1[${Index}]        : ${CSID_S_USB_QMI_NODE1}"
+   echo "CSID_S_USB_QMI_NODE2[${Index}]        : ${CSID_S_USB_QMI_NODE2}"
+   echo "CSID_S_USB_QMI_NODE3[${Index}]        : ${CSID_S_USB_QMI_NODE3}"
+   echo "CSID_S_USB_MAC_ADDR[${Index}]         : ${CSID_S_USB_MAC_ADDR}"
+   
+}
+
+show_3g_cnt_status() {
+    get_index ${Index} ${Index_3G}
+    get_general_status ${Index} ${Index_3G}
+    get_3g_cnt_status ${Index} ${Index_3G}
+ 	idx_3g="`printf "%x" $((${Index_3G}))`"
+ 	idx_3g=`expr $idx_3g + 1` 
+
+    echo "get_3g_cnt_status idx_3g=$idx_3g"
+ 
+	echo "CSID_S_3G_MULTIWAN_IF_IP[$idx_3g]           : ${CSID_S_3G_MULTIWAN_IF_IP}"
+	echo "CSID_S_3G_MULTIWAN_IF_NM[$idx_3g]           : ${CSID_S_3G_MULTIWAN_IF_NM}"
+    echo "CSID_S_3G_MULTIWAN_IF_GW[$idx_3g]           : ${CSID_S_3G_MULTIWAN_IF_GW}"
+	echo "CSID_S_3G_MULTIWAN_IF_PRIDNS[$idx_3g]       : ${CSID_S_3G_MULTIWAN_IF_PRIDNS}"
+	echo "CSID_S_3G_MULTIWAN_IF_SECDNS [$idx_3g]      : ${CSID_S_3G_MULTIWAN_IF_SECDNS}"
+	echo "CSID_S_3G_MULTIWAN_WAN_IF_NAME[$idx_3g]     : ${CSID_S_3G_MULTIWAN_WAN_IF_NAME}"
+	echo "CSID_S_3G_MULTIWAN_CNT_STATUS[$idx_3g]      : ${CSID_S_3G_MULTIWAN_CNT_STATUS}"
+	echo "CSID_S_3G_MULTIWAN_CNT_TIME[$idx_3g]        : ${CSID_S_3G_MULTIWAN_CNT_TIME}"
+ 	echo "CSID_S_3G_MULTIWAN_SIM_STATUS[$idx_3g]      : ${CSID_S_3G_MULTIWAN_SIM_STATUS}"
+	echo "CSID_S_3G_MULTIWAN_ERR_CODE[$idx_3g]        : ${CSID_S_3G_MULTIWAN_ERR_CODE}"
+	echo "CSID_S_3G_MULTIWAN_NETWORK_NAME[$idx_3g]    : ${CSID_S_3G_MULTIWAN_NETWORK_NAME}"
+	echo "CSID_S_3G_MULTIWAN_SERVICE_TYPE[$idx_3g]    : ${CSID_S_3G_MULTIWAN_SERVICE_TYPE}"
+    echo "CSID_S_3G_MULTIWAN_CARD_INFO[$idx_3g]       : ${CSID_S_3G_MULTIWAN_CARD_INFO}"
+    echo "CSID_S_3G_MULTIWAN_SIGNAL_STRENGTH[$idx_3g] : ${CSID_S_3G_MULTIWAN_SIGNAL_STRENGTH}"
+	echo "CSID_S_3G_MULTIWAN_SIGNAL_QUALITY[$idx_3g]  : ${CSID_S_3G_MULTIWAN_SIGNAL_QUALITY}"   
+	echo "CSID_S_3G_MULTIWAN_MAC_ADDR[$idx_3g]        : ${CSID_S_3G_MULTIWAN_MAC_ADDR}"   
+	
+    echo ""
+    echo "CSID_S_3G_MULTIWAN_IF_IP_IPV6[$idx_3g]      : ${CSID_S_3G_MULTIWAN_IF_IP_IPV6}"
+    echo "CSID_S_3G_MULTIWAN_IF_GW_IPV6[$idx_3g]      : ${CSID_S_3G_MULTIWAN_IF_GW_IPV6}"
+    echo "CSID_S_3G_MULTIWAN_IF_PRIDNS_IPV6[$idx_3g]  : ${CSID_S_3G_MULTIWAN_IF_PRIDNS_IPV6}"
+    echo "CSID_S_3G_MULTIWAN_IF_SECDNS_IPV6[$idx_3g]  : ${CSID_S_3G_MULTIWAN_IF_SECDNS_IPV6}"
+}
+
+show_3g_cnt_status0() {
+	get_3g_cnt_status0
+ 
+	echo "CSID_S_3G_IF_IP                       : ${CSID_S_3G_IF_IP}"
+	echo "CSID_S_3G_IF_NM                       : ${CSID_S_3G_IF_NM}"
+    echo "CSID_S_3G_IF_GW                       : ${CSID_S_3G_IF_GW}"
+	echo "CSID_S_3G_IF_PRIDNS                   : ${CSID_S_3G_IF_PRIDNS}"
+	echo "CSID_S_3G_IF_SECDNS                   : ${CSID_S_3G_IF_SECDNS}"
+	echo "CSID_S_3G_CNT_STATUS                  : ${CSID_S_3G_CNT_STATUS}"
+	echo "CSID_S_3G_CNT_TIME                    : ${CSID_S_3G_CNT_TIME}"
+	echo "CSID_S_3G_ERR_CODE                    : ${CSID_S_3G_ERR_CODE}"
+    echo "CSID_S_3G_WAN_IF_NAME                 : ${CSID_S_3G_WAN_IF_NAME}"
+	#echo "CSID_S_3G_NETWORK_NAME                : ${CSID_S_3G_NETWORK_NAME}"
+	#echo "CSID_S_3G_SERVICE_TYPE                : ${CSID_S_3G_SERVICE_TYPE}"
+	#echo "CSID_S_3G_SIGNAL_QUALITY              : ${CSID_S_3G_SIGNAL_QUALITY}"   
+} 
+
+pre_init() {
+   get_general_config ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   local DevModem1="${CSID_S_USB_MODEM1}"
+   local DevModem2="${CSID_S_USB_MODEM2}"
+   local PROFILE="${CSID_C_3G_PROFILE}"
+   local VENDORID="${CSID_S_USB_VENDOR_ID}"
+   local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+   local CNT_TYPE="${CSID_C_3G_CNT_TYPE}"
+   local IS_MODULE_DEV="$CSID_C_3G_MAPPING_DEVICE"
+
+   # init_start
+   #${ATCMD_PROG} ${DevModem1} 'AT'
+   #sleep 2
+ 
+    # for EVDO init
+    CDMA_PATH="/tmp/3G${Index_3G}_CDMA.log" 
+    if [ -r "$CDMA_PATH" -a "$IS_MODULE_DEV" != "1" ]; then
+        CDMA_ret=`cat $CDMA_PATH | grep 1`
+        if [ "$CDMA_ret" == 1 ]; then    
+            ${ATCMD_PROG} ${DevModem1} 'ATZ'
+            sleep 1
+            ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+            sleep 1
+        fi
+    fi
+ 
+   if [ "${PROFILE}" == "10" ] ; then # for INDIA_HARIER
+      if [ "${VENDORID}" == "5611" ] && [ "${PRODUCTID}" == "1" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "5845" ] && [ "${PRODUCTID}" == "25875" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "5845" ] && [ "${PRODUCTID}" == "25876" ]; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "5848" ] && [ "${PRODUCTID}" == "26627" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "5926" ] && [ "${PRODUCTID}" == "4096" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "65534" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "65535" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "6538" ] && [ "${PRODUCTID}" == "2" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "7903" ] && [ "${PRODUCTID}" == "24579" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "7903" ] && [ "${PRODUCTID}" == "24580" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "8479" ] && [ "${PRODUCTID}" == "26625" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      elif [ "${VENDORID}" == "8926" ] && [ "${PRODUCTID}" == "26625" ] ; then
+         ${ATCMD_PROG} ${DevModem1} 'AT+CRM=1'
+      fi
+      sleep 1
+   fi
+   if [ "${PROFILE}" == "16" ] ; then #for Identech
+      ${ATCMD_PROG} ${DevModem2} 'AT+CFUN=0'
+      sleep 3
+      ${ATCMD_PROG} ${DevModem2} 'AT+CFUN=1'
+      sleep 3
+      echo -e "AT+CFUN=1\n" > /tmp/identech
+   fi
+
+   if [ "${CSID_C_3G_PRE_COMMAND}" != "" ] ; then
+      echo -e "${CSID_C_3G_PRE_COMMAND}\n"
+      ${ATCMD_PROG} ${DevModem2} "${CSID_C_3G_PRE_COMMAND}" > /tmp/precommand_${Index_3G}
+      ret_precommand="`cat /tmp/precommand_${Index_3G}`"
+      logger -t "O3G/SCRIPT" "[PRE_COMM:${CSID_C_3G_PRE_COMMAND}]=$ret_precommand"
+      sleep 3
+   elif [ "${CSID_C_3G_MULTIWAN_PRE_COMMAND}" != "" ] ; then
+        pre_command ${Index_3G}
+   else
+      echo -e "no command\n" > /tmp/precommand_${Index_3G}
+   fi
+
+   if [ "${PROFILE}" == "15" ] ; then
+      if [ "${VENDORID}" == "8311" ] && [ "${PRODUCTID}" == "28672" ] ; then
+        if [ ! -e /tmp/3g_test ]; then
+          echo -e "AT^RESET\n" > /tmp/3g_test
+          ${ATCMD_PROG} ${DevModem2} 'AT^RESET' &
+          sleep 30
+          if [ "${CNT_TYPE}" == "1" ] ; then
+            exit
+          fi
+        fi 
+      fi
+   fi
+
+   if [ "${VENDORID}" == "1478" ] && [ "${PRODUCTID}" == "160" ]; then # must use modem
+      ${ATCMD_PROG} ${DevModem1} 'ATH'
+      sleep 2
+      ${ATCMD_PROG} ${DevModem1} 'ATH'
+      sleep 2
+
+   #elif [ "${VENDORID}" == "4817" ] && [ "${PRODUCTID}" == "5491" ]; then #Huawei ME909 Module
+   #  ${ATCMD_PROG} ${DevModem2} 'AT+CFUN=0'
+   #  sleep 3
+   #  ${ATCMD_PROG} ${DevModem2} 'AT+CFUN=1'
+   #  sleep 3 
+   elif [ "${VENDORID}" == "5848" ] && [ "${PRODUCTID}" == "16384" ]; then #ccu-700
+      ${ATCMD_PROG} ${DevModem1} 'ATZ' &
+      sleep 1
+      ${ATCMD_PROG} ${DevModem1} 'ATZ' &
+      sleep 1
+   elif [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "3" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'AT+CFUN=1'
+      sleep 1
+      ${ATCMD_PROG} ${DevModem2} 'AT+CREG=1'
+      sleep 1
+      ${ATCMD_PROG} ${DevModem2} 'AT+CGREG=1'
+      sleep 1
+
+   elif [ "${VENDORID}" == "7694" ] && [ "${PRODUCTID}" == "52766" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'ATH'
+
+   elif [ "${VENDORID}" == "7694" ] && [ "${PRODUCTID}" == "52759" ]; then
+      ${ATCMD_PROG} ${DevModem1} 'ATZ'
+
+   elif [ "${VENDORID}" == "8311" ] && [ "${PRODUCTID}" == "28688" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'ATH'
+
+   elif [ "${VENDORID}" == "8224" ] && [ "${PRODUCTID}" == "16384" ]; then
+        ${ATCMD_PROG} ${DevModem2} 'AT+CFUN=1'
+
+   elif [ "${VENDORID}" == "8973" ]; then
+      ${ATCMD_PROG} ${DevModem1} 'AT+CFUN=1'
+
+   elif [ "${VENDORID}" == "7111" ] && [ "${PRODUCTID}" == "33" ]; then # for module HE910
+      ${ATCMD_PROG} ${DevModem1} 'ATE0'
+   fi
+}
+
+post_init() {
+   get_general_config ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   local DevModem1="${CSID_S_USB_MODEM1}"
+   local DevModem2="${CSID_S_USB_MODEM2}"
+   local PROFILE="${CSID_C_3G_PROFILE}"
+   local VENDORID="${CSID_S_USB_VENDOR_ID}"
+   local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+   local CNT_TYPE="${CSID_C_3G_CNT_TYPE}"
+   local IS_MODULE_DEV="$CSID_C_3G_MAPPING_DEVICE"
+
+   # init_stop
+   if [ "${PRODUCTID}" == "8" ] ; then
+      if [ "${VENDORID}" == "6610" ] ; then
+         if [ "${PRODUCTID}" == "65533" ] || [ "${PRODUCTID}" == "65534" ] ; then
+            ${ATCMD_PROG} ${DevModem2} 'ATH'
+         fi
+      fi
+   fi
+      
+   if [ "${PRODUCTID}" == "10" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'ATH'
+   fi
+
+   if [ "${PRODUCTID}" == "15" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'ATH'&
+      sleep 2
+      killall -9 ${ATCMD_PROG}
+   fi
+
+   if [ "${PRODUCTID}" == "17" ] ; then
+      if [ "${VENDORID}" == "5848" ] ; then
+          if [ "${PRODUCTID}" == "26627" ] ; then
+            ${ATCMD_PROG} ${DevModem1} 'ATH'
+          fi
+      fi
+   fi
+
+   if [ "${VENDORID}" == "4817" ] && [ "${PRODUCTID}" == "5132" ]; then #Huawei EC1260-2/EC156
+      ${ATCMD_PROG} ${DevModem1} 'ATZ'
+   fi 
+   if [ "${VENDORID}" == "4817" ] && [ "${PRODUCTID}" == "5188" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'ATZ'
+   fi
+   if [ "${VENDORID}" == "8222" ] && [ "${PRODUCTID}" == "4130" ]; then     #Huawei CE682
+      ${ATCMD_PROG} ${DevModem1} 'ATZ'
+   fi 
+   #if [ "${VENDORID}" == "6538" ] && [ "${PRODUCTID}" == "2" ]; then
+   #   hotplug unload
+   #fi
+   if [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "112" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'ATH'
+   fi
+   #if [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "8194" ]; then
+   #   hotplug unload
+   #fi
+   if [ "${VENDORID}" == "7694" ] && [ "${PRODUCTID}" == "52759" ]; then
+      ${ATCMD_PROG} ${DevModem2} 'ATH'
+      sleep 1
+      ${ATCMD_PROG} ${DevModem2} 'ATH'
+   fi
+   if [ "${VENDORID}" == "7326" ] && [ "${PRODUCTID}" == "40448" ]; then     #C3500V
+        ${ATCMD_PROG} ${DevModem2} 'ATH'
+   fi
+   #if [ "${VENDORID}" == "8479" ] && [ "${PRODUCTID}" == "26625" ]; then
+   #   hotplug unload
+   #fi
+
+    # for EVDO init
+    CDMA_PATH="/tmp/3G${Index_3G}_CDMA.log" 
+    if [ -r "$CDMA_PATH" -a "$IS_MODULE_DEV" != "1" ]; then
+        CDMA_ret=`cat $CDMA_PATH | grep 1`
+        if [ "$CDMA_ret" == 1 ]; then    
+            ${ATCMD_PROG} ${DevModem2} 'ATH'
+            sleep 1
+        fi
+    fi 
+
+   return 0
+}

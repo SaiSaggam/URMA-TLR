@@ -1,0 +1,401 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+UDHCPC="udhcpc"
+QMI_PROG="Qmi_connect"
+
+# Set QMI Node
+    QC_DEV="$2"
+if [ "${QC_DEV}" == "" ]; then 
+   if [ "`lsmod | grep qmi_wwan`" != "" ]; then
+      QC_DEV="cdc-wdm0"
+   else
+      QC_DEV="qcqmi0"
+   fi
+fi
+
+# Set Interface
+if [ "$3" != "" ]; then
+   ETH="$3"
+else
+   ETH="usbnet0"
+fi
+
+get_index "$4" "$5"
+FileNameCode="${ETH}"
+UDHCPC_PID_FILE="/var/run/udhcpc.${FileNameCode}.pid"
+PIDFILE_CONNECT="/var/run/udhcpc.${FileNameCode}.pid.connect"
+DEMAND_FILE="/var/run/udhcpc.${FileNameCode}.demand"
+UDHCPC_DEFAULT_SCRIPT="/usr/bin/dhcp.script"
+QMIIP_LOG="/tmp/qmi_ip_${Index}"
+QMI_DAEMON_PID_FILE="/var/run/qmi_daemon_${Index}.pid"
+WNC_MAL_CNT_STATUS="/tmp/${Index_3G}_WNC_MAL_CNT_STATUS"
+APN_AUTO_DONE="/tmp/auto_apn_done_${Index_3G}"		#added by Blake@20150821, for ZyXEL 3301(CDG561ZY-0T1) customer request
+ 
+[ -f "/tmp/dhcp.script" ] && UDHCPC_DEFAULT_SCRIPT="/tmp/dhcp.script"
+HOSTNAME="`cat /etc/hostname`"
+if [ "${HOSTNAME}" == "" ]; then
+   HOSTNAME="Router"
+fi
+
+qmi_status()
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   TIME=0
+   TIMEOUT=10
+   while [ true ] ; do	
+      sl_get_IP_NM_GW_in_ifconfig ${ETH} IF_IP IF_NM IF_GW
+      #echo "$0 : IF_IP=${IF_IP} IF_NM=${IF_NM} IF_GW=${IF_GW}"	
+      if [ "${IF_IP}x" != "x" ] && [ "${IF_NM}x" != "x" ] && [ "${IF_GW}x" != "x" ]; then	
+         return 0		
+      else			
+         sleep 1
+         TIME=$((TIME+1))
+         if [ ${TIME} -gt ${TIMEOUT} ] ; then
+            return 1	
+         fi			
+      fi
+   done
+}
+
+qmi_stop()
+{
+    # Kill qmi_daemon
+    if [ -f "${QMI_DAEMON_PID_FILE}" ] || [ -r "${QMI_DAEMON_PID_FILE}" ] ; then 
+        local QMI_DAEMON_PID="`cat ${QMI_DAEMON_PID_FILE}`"
+        rm -f ${QMI_DAEMON_PID_FILE}
+        kill -15 ${QMI_DAEMON_PID} > /dev/null 2>&1
+    fi
+
+    local UDHCPC_PID_BY_PS="`ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1`"
+    kill ${UDHCPC_PID_BY_PS} > /dev/null 2>&1
+    if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+        UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+        rm -f ${UDHCPC_PID_FILE}
+        if [ "${UDHCPC_PID_BY_PS}" != "" ] && [ "${UDHCPC_PID}" != "${UDHCPC_PID_BY_PS}" ] ; then
+            kill ${UDHCPC_PID} > /dev/null 2>&1 || exit 1
+        fi
+    fi
+
+    #[ -f "${DEMAND_FILE}" ] && rm -f ${DEMAND_FILE}
+
+    #if [ -f "${PIDFILE_CONNECT}" ] ; then
+    #  CONNECT_PID="`cat ${PIDFILE_CONNECT}`"
+    #  kill -9 ${CONNECT_PID} > /dev/null 2>&1
+    #  rm -f ${PIDFILE_CONNECT} > /dev/null 2>&1	
+    #fi
+ 
+
+    # wrcsman "0x801e4001 0x05"
+    get_general_config ${Index} ${Index_3G}
+    #get_general_status
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+    get_3g_cnt_status ${Index} ${Index_3G}
+
+	if [ "${CSID_S_3G_WNC_MAL_API_ENABLE}" == "1" ]; then
+		if [ "${CSID_S_USB_IF_IP}" != "0.0.0.0" ] || [ "${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" != "" ]; then
+	    
+	        send_MALcmd ${Index_3G} disconnect
+	        ifconfig ${ETH} down
+	        clear_all_cnt_status ${Index}
+	    else
+	  	    write_cnt_status 0 ${Index}
+            write_cnt_status_ipv6 0 ${Index}
+	    fi
+		
+    else 
+	    # if [ "${CSID_S_USB_CNT_STATUS}" == "3" ] || [ "${CSID_S_USB_CNT_STATUS}" == "2" ]  && [ "${CSID_S_LOCAL_WAN_IP}" != "0.0.0.0" ]; then
+	    if [ "${CSID_S_USB_IF_IP}" != "0.0.0.0" ] || [ "${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" != "" ]; then
+	        # ${QMI_PROG} -d # Old
+	        ${QMI_PROG} -d "${QC_DEV}" "${Index_3G}" # New
+	        ifconfig ${ETH} down
+	        clear_all_cnt_status ${Index}
+	
+	        #wrcsman "0x801E0800 0x00 && \
+	        #         0x801E0900 0x00 && \
+	        #   	  0x801E1200 0x00"
+	    else
+		    write_cnt_status 0 ${Index}
+            write_cnt_status_ipv6 0 ${Index}
+	    fi
+    fi
+
+    # rm /var/config/QMI_SERVICE_WDS_clientID # Old, remove on New
+    rm $QMIIP_LOG
+    return 0
+}
+
+qmi_malstart()
+{
+    # in order to accept RA packet and create IPv6 address automatically
+    # thus, the IPv6 LTE connection can work
+    get_3g_cnt_status ${Index} ${Index_3G}
+    if [ "$CSID_S_3G_MULTIWAN_IF_IP_IPV6" == "" ];then
+        echo 1 > /proc/sys/net/ipv6/conf/${ETH}/autoconf
+        echo 1 > /proc/sys/net/ipv6/conf/${ETH}/accept_ra
+        echo 0 > /proc/sys/net/ipv6/conf/${ETH}/forwarding
+    fi
+
+    # set the LTE connect interface name
+    if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "1" ] || [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ];then    # for IPv6 LTE
+        if [ "$CSID_S_3G_MULTIWAN_IF_IP_IPV6" == "" ];then
+            write_if_name_v6 ${ETH} ${Index}
+        fi
+    fi
+
+    kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+
+    echo "send MAL cmd to mal_daemon with cmd [connect]"
+    echo "qmi-action connect IP_TYPE=$CSID_C_3G_MULTIWAN_IP_TYPE"
+
+    write_error_code 0 ${Index} # clean error code
+
+    if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+        ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+    else
+        ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu ${CSID_C_3G_MTU} up
+    fi
+    sleep 1
+
+    if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "1" ];then    # for IPv6 only
+        if [ "$CSID_S_3G_MULTIWAN_IF_IP_IPV6" == "" ];then
+            send_MALcmd ${Index_3G} connect 6 ${ETH}
+        fi
+    elif [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ]; then # for IPv4/IPv6
+        send_MALcmd ${Index_3G} connect 4 ${ETH}
+        if [ "$CSID_S_3G_MULTIWAN_IF_IP_IPV6" == "" ];then
+            send_MALcmd ${Index_3G} connect 6 ${ETH}
+        fi
+    else                                                # for IPv4
+        send_MALcmd ${Index_3G} connect 4 ${ETH}
+    fi
+
+    sleep 2
+#    if [ -f "${WNC_MAL_CNT_STATUS}" ] ; then 
+#        rm -f ${WNC_MAL_CNT_STATUS}
+#    else 
+#        logger -p 8.7 -t "O3G/qmi-action" "Not receive WNC_MAL_CNT_STATUS_CONNECTED event. Not try to get IP"
+#        write_cnt_status 3 ${Index}
+#
+#        [ -f "${APN_AUTO_DONE}" ] && rm -f ${APN_AUTO_DONE} 
+#
+#        exit 1
+#    fi
+
+    # run dhcpc only when client request IPv4
+    if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "0" ] || [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ]; then
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I $Index  # New
+        #sleep 6
+
+        # try to disconnecting when dhcpc has error and NO IPv6 address from server
+        if [ $? = 1 ] && [ "${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" == "" ]; then
+            logger -p 8.7 -t "O3G/qmi-action" "UDHCPC get IP fail, shutdown.."
+            write_cnt_status 3 ${Index}
+
+            [ -f "${APN_AUTO_DONE}" ] && rm -f ${APN_AUTO_DONE} 
+
+            exit 1
+        fi
+    fi
+
+    #get_general_status
+    get_cnt_status ${Index}
+    get_3g_cnt_status ${Index} ${Index_3G}
+    #sleep 2
+    echo "Got DHCP IP: ${CSID_S_USB_IF_IP}"
+    echo "Got DHCP IP: ${CSID_S_USB_IF_IP}" > ${QMIIP_LOG}
+	
+    echo "Got IPv6: ${CSID_S_3G_MULTIWAN_IF_IP_IPV6}"
+    echo "Got IPv6: ${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" > ${QMIIP_LOG}
+
+    # when IPv4 and IPv6 do NOT get IP from server at the same time,
+    # try to disconnecting the LTE connection
+    if [ "${CSID_S_USB_IF_IP}" == "" -o "${CSID_S_USB_IF_IP}" == "0.0.0.0" ] && [ "${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" == "" ]; then
+        write_cnt_status 3 ${Index}
+    else
+        # when getting IPv6 address, set the IPv6 is connected
+        if [ "${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" != "" ]; then
+            # CSID_S_3G_MULTIWAN_IPV6_CNT_STATUS
+            write_cnt_status_ipv6 2 ${Index}
+        fi
+
+        # when getting IPv4 address, set the IPv4 is connected
+        if [ "${CSID_S_USB_IF_IP}" != "" ] && [ "${CSID_S_USB_IF_IP}" != "0.0.0.0" ]; then
+            write_cnt_status 2 ${Index}
+        fi
+    fi
+    return $?
+} 
+
+qmi_start()
+{
+    get_general_config ${Index} ${Index_3G}
+    #get_general_status
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+ 
+    local DevModem="$CSID_S_USB_MODEM1"
+    #${ATCMD_PROG} $DevModem 'AT+CGDCONT=1,\"IP\",\"\"'
+    #send_ATcmd $DevModem 'AT+CGDCONT=1,"IP",""'
+
+    logger -p 8.7 -t "O3G/script/qmi-action" "APN:[${CSID_C_3G_APN}]"
+
+    if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "1" ];then    # for IPv6 only
+        IPTYPE_STR="IPV6"
+    elif [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ];then
+        IPTYPE_STR="IPV4V6"
+    else
+        IPTYPE_STR="IP"
+    fi
+
+	local FW_VERSION USED_CID
+	local TMP_FP="/tmp/detect_fw_version"
+	${ATCMD_PROG} ${DevModem} 'AT!IMPREF?' > ${TMP_FP}
+	cat ${TMP_FP} | grep "VERIZON"
+	FW_VERSION=$?
+	if [ "${FW_VERSION}" == "0" ]; then
+		USED_CID=3
+	else
+		USED_CID=1
+	fi
+	rm -f ${TMP_FP} 
+
+    if [ "${CSID_C_3G_APN}" != "" ]; then
+        ${ATCMD_PROG} ${DevModem} AT+CGDCONT=${USED_CID},\"${IPTYPE_STR}\",\"${CSID_C_3G_APN}\"
+    fi
+
+    kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+
+    #if CSID_C_3G_WNC_MAL_API_ENABLE is 1, use send_MALcmd
+	if [ "${CSID_S_3G_WNC_MAL_API_ENABLE}" == "1" ];then
+	    #echo "send MAL cmd to mal_daemon with cmd [connect]"
+        qmi_malstart
+		# $? = return value, send_MALcmd will return 0 if command done,discoonecting
+        #if [ "$?" != "0" ]; then
+        #   write_cnt_status 3 ${Index}
+        #   return 1
+        #fi			
+	else
+	    if [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" == "" ] && [ "${CSID_C_3G_PASSWORD}" == "" ]; then
+	        # ${QMI_PROG} -c "${CSID_C_3G_APN}" # Old
+	        ${QMI_PROG} -c "${QC_DEV}" "${CSID_C_3G_APN}" "${Index_3G}" # New
+	        if [ "$?" == "0" ]; then
+	            write_cnt_status 3 ${Index}
+	            return 1
+	        fi
+	    elif [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" != "" ] && [ "${CSID_C_3G_PASSWORD}" != "" ]; then
+	        # ${QMI_PROG} -c "${CSID_C_3G_APN}" "${CSID_C_3G_AUTHTYPE}" "${CSID_C_3G_USERNAME}" "${CSID_C_3G_PASSWORD}" # Old
+	        ${QMI_PROG} -c "${QC_DEV}" "${CSID_C_3G_APN}" "${CSID_C_3G_AUTHTYPE}" "${CSID_C_3G_USERNAME}" "${CSID_C_3G_PASSWORD}" "${Index_3G}" # New
+	        if [ "$?" == "0" ]; then
+	            write_cnt_status 3 ${Index}
+	            return 1
+	        fi
+	    else
+	        # ${QMI_PROG} -c # Old
+	        ${QMI_PROG} -c "${QC_DEV}" "${Index_3G}" # New
+	        if [ "$?" == "0" ]; then
+	            write_cnt_status 3 ${Index}
+	            return 1
+	        fi
+	    fi
+
+        write_error_code 0 ${Index} # clean error code
+        if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+            ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+        else
+            ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu ${CSID_C_3G_MTU} up
+        fi
+
+        sleep 2
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} # New
+        #sleep 6
+
+        if [ $? = 1 ] ; then
+            logger -p 8.7 -t "O3G/script/qmi-action" "UDHCPC get IP fail, shutdown.."
+            write_cnt_status 3 ${Index}
+            exit 1
+        fi
+
+        #get_general_status
+        get_cnt_status ${Index}
+        get_3g_cnt_status ${Index} ${Index_3G}
+        #sleep 2
+        echo "Got DHCP IP: ${CSID_S_USB_IF_IP}"
+        echo "Got DHCP IP: ${CSID_S_USB_IF_IP}" > ${QMIIP_LOG}
+		
+        echo "Got DHCP IP: ${CSID_S_3G_MULTIWAN_IF_IP_IPV6}"
+        echo "Got DHCP IP: ${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" > ${QMIIP_LOG}
+		
+        if [ "${CSID_S_USB_IF_IP}" != "" -a "${CSID_S_USB_IF_IP}" != "0.0.0.0" ] || [ "${CSID_S_3G_MULTIWAN_IF_IP_IPV6}" != "" ]; then
+            # start qmi_daemon
+            qmi_daemon -i ${Index} & > /dev/null 2>&1
+        else
+            write_cnt_status 3 ${Index}
+        fi            
+
+    fi
+
+    return 0
+}
+
+usage() {
+	 echo "$0 [start|stop|release|renew] [QMI_NODE_NAME] [IFName] [index] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+case "$1" in
+   start)
+      pre_init       
+      qmi_start
+      #if [ "$?" == "1" ] ; then
+      #   ${IFCFG_PROG} ${ETH} 0.0.0.0 
+      #   exit 1
+      #fi
+      exit 0
+      ;;
+
+   stop)
+      qmi_stop
+      exit 0
+      ;;
+
+   release)
+      #if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+      #   UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+      #   kill -USR2 ${UDHCPC_PID}
+      #fi
+      #write_dns_info "0.0.0.0" "" ${Index}
+      exit 0
+      ;;
+
+   renew)
+      #if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+      #   qmi_stop
+      #   qmi_start
+      #elif [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+      #   UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+      #   kill -USR1 ${UDHCPC_PID}
+      #   qmi_status	
+      #else
+      #   ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      #fi
+		
+      exit 0
+      ;;
+		
+	*)
+      usage
+      exit 1
+      ;;
+esac
+
+exit 0

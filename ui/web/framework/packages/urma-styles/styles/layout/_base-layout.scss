@@ -1,0 +1,51 @@
+//***********LAYOUT**********//
+//$spacing-unit: 15px;
+//$small: new-breakpoint(max-width 500px 8);
+//$medium: new-breakpoint(max-width 1000px 12);
+
+
+.config-main {
+//  @include outer-container;
+  @include clearfix;
+}
+section {
+  &.sidebar, &.main {
+    @include span-columns(6);
+  }
+  &.sidebar {
+    @include media($medium){
+      @include span-columns(4 of 8);
+    }
+    @include media($large){
+      @include span-columns(4 of 12);
+    }
+  }
+  &.main {
+    @include media($medium){
+      @include span-columns(4 of 8);
+    }
+    @include media($large){
+      @include span-columns(8 of 12);
+    }
+  }
+}
+
+.float-right {
+  float: right;
+}
+
+.indent {
+  margin-left: $spacing-unit;
+}
+
+.box {
+  margin-bottom: $spacing-unit;
+}
+
+.margin-top {
+  margin-top: $spacing-unit;
+}
+
+.center {
+  text-align: center;
+}

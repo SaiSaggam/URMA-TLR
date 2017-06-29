@@ -1,0 +1,585 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+PPPD="/usr/sbin/pppd"
+CHAT="/usr/bin/chat"
+PPPOE_PLUGIN="/etc/ppp/plugin/rp-pppoe.so"
+
+get_index "$2" "$3"
+FileNameCode="${Index}"
+PPP_CONFIG="/etc/ppp/3g${FileNameCode}.conf"
+CHAT_CONFIG="/etc/ppp/3g${FileNameCode}_chat"
+PEER_PATH="/etc/ppp/peers"
+PEER_FILE="3g${FileNameCode}"
+PEER_CONFIG="${PEER_PATH}/${PEER_FILE}"
+PIDFILE_PPPD="/var/run/ppp-3g${FileNameCode}.pid"
+PPP_RESOLV_CONF="/etc/ppp/resolv.conf"
+
+write_ppp_conf() {
+   echo $1 >> ${PPP_CONFIG}
+}
+
+gen_ppp_config() {
+   rm -f ${PPP_CONFIG}
+
+   logger -t "O3G/PPP_OPTION" -p 8.7 "Create ppp config file (${PPP_CONFIG})"
+   echo "O3G/PPP_OPTION: Create ppp config file (${PPP_CONFIG})"
+
+   write_ppp_conf "USER=${CSID_C_3G_USERNAME}"
+   write_ppp_conf "PW=${CSID_C_3G_PASSWORD}"
+   # if [ "${CSID_C_3G_USERNAME}" != "" ]; then
+   #   write_ppp_conf "USER=\"${CSID_C_3G_USERNAME}\""
+   #   write_ppp_conf "PW=\"${CSID_C_3G_PASSWORD}\""
+   # else
+   #   write_ppp_conf "USER=\"guest\""
+   #   write_ppp_conf "PW=\"guest\""
+   # fi
+
+   local IDLETIME="${CSID_C_3G_IDLETIME}"
+   if [ "${IDLETIME}" == "" ] || [ $((${IDLETIME})) -lt 0 ]; then
+      IDLETIME=300
+   fi
+
+   if [ "${CSID_S_LOCAL_WAN_CNT_FORCE}" != "" ] && [ "${CSID_S_LOCAL_WAN_CNT_FORCE}" == "1" ]; then
+      write_ppp_conf "DEMAND=${IDLETIME}"
+      write_ppp_conf "MANUAL=yes"
+   elif [ "${CSID_C_3G_CNT_TYPE}" != "" ] && [ "${CSID_C_3G_CNT_TYPE}" == "0" ]; then
+      write_ppp_conf "DEMAND=${IDLETIME}"
+      write_ppp_conf "MANUAL=no"
+   elif [ "${CSID_C_3G_CNT_TYPE}" != "" ] && [ "${CSID_C_3G_CNT_TYPE}" == "1" ]; then
+      write_ppp_conf "DEMAND=no"
+      write_ppp_conf "MANUAL=no"
+   elif [ "${CSID_C_3G_CNT_TYPE}" != "" ] && [ "${CSID_C_3G_CNT_TYPE}" == "2" ]; then
+      write_ppp_conf "DEMAND=${IDLETIME}"
+      write_ppp_conf "MANUAL=yes"
+   else
+      write_ppp_conf "DEMAND="
+      write_ppp_conf "MANUAL="
+   fi
+
+    local DNSTYPE="SERVER"
+    local DNS1=""
+    local DNS2=""
+   if [ "${CSID_C_3G_IF_PRIDNS}" != "" ] && [ "${CSID_C_3G_IF_PRIDNS}" != "0.0.0.0" ] &&
+      [ "${CSID_C_3G_MULTIWAN_AUTO_APN}" != "0" ]; then
+      write_ppp_conf "DNSTYPE=SPECIFY"
+      write_ppp_conf "PEERDNS=no"
+      DNSTYPE="SPECIFY"
+   elif [ "${CSID_C_3G_IF_SECDNS}" != "" ] && [ "${CSID_C_3G_IF_SECDNS}" != "0.0.0.0" ] &&
+        [ "${CSID_C_3G_MULTIWAN_AUTO_APN}" != "0" ]; then
+      write_ppp_conf "DNSTYPE=SPECIFY"
+      write_ppp_conf "PEERDNS=no"
+      DNSTYPE="SPECIFY"
+   else
+      write_ppp_conf "DNSTYPE=SERVER"
+      write_ppp_conf "PEERDNS=yes"
+   fi
+
+   if [ "${CSID_C_3G_IF_PRIDNS}" != "" ] && [ "${CSID_C_3G_IF_PRIDNS}" != "0.0.0.0" ] && 
+      [ "${CSID_C_3G_MULTIWAN_AUTO_APN}" != "0" ]; then
+      write_ppp_conf "DNS1=${CSID_C_3G_IF_PRIDNS}"
+      DNS1="${CSID_C_3G_IF_PRIDNS}"
+   else
+      write_ppp_conf "DNS1="
+   fi
+
+   if [ "${CSID_C_3G_IF_SECDNS}" != "" ] && [ "${CSID_C_3G_IF_SECDNS}" != "0.0.0.0" ] && 
+      [ "${CSID_C_3G_MULTIWAN_AUTO_APN}" != "0" ]; then
+      write_ppp_conf "DNS2=${CSID_C_3G_IF_SECDNS}"
+      DNS2="${CSID_C_3G_IF_SECDNS}"
+   else
+      write_ppp_conf "DNS2="
+   fi
+
+   write_ppp_conf "DEFAULTROUTE=no"  # Possibly set no in the future
+   write_ppp_conf "CONNECT_TIMEOUT=30"
+   write_ppp_conf "CONNECT_POLL=2"
+   write_ppp_conf "ACNAME="
+   write_ppp_conf "SERVICENAME=${CSID_C_3G_SERVICENAME}"
+   write_ppp_conf "PIDFILE=${PIDFILE_PPPD}"
+   write_ppp_conf "SYNCHRONOUS=no"
+   write_ppp_conf "CLAMPMSS=1412"
+
+#   if [ "${CSID_C_3G_PPP_LCP_INTERVAL}" != "" ] && [ ${CSID_C_3G_PPP_LCP_INTERVAL} -gt 0 ]; then
+#      write_ppp_conf "LCP_INTERVAL=${CSID_C_3G_PPP_LCP_INTERVAL}"
+   if [ "${CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL}" != "" ] && [ ${CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL} -gt 0 ]; then
+      write_ppp_conf "LCP_INTERVAL=${CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL}"
+   else
+      write_ppp_conf "LCP_INTERVAL=20"
+   fi
+
+#   if [ "${CSID_C_3G_PPP_LCP_FAILURE}" != "" ] && [ ${CSID_C_3G_PPP_LCP_FAILURE} -gt 0 ]; then
+#      write_ppp_conf "LCP_FAILURE=${CSID_C_3G_PPP_LCP_FAILURE}"
+   if [ "${CSID_C_3G_MULTIWAN_KA_LCP_TIMES}" != "" ] && [ ${CSID_C_3G_MULTIWAN_KA_LCP_TIMES} -gt 0 ]; then
+      write_ppp_conf "LCP_FAILURE=${CSID_C_3G_MULTIWAN_KA_LCP_TIMES}"
+   else
+      write_ppp_conf "LCP_FAILURE=3"
+   fi
+
+   write_ppp_conf "PPPOE_TIMEOUT=80"
+   write_ppp_conf "FIREWALL=NONE"
+   write_ppp_conf "LINUX_PLUGIN=${PPPOE_PLUGIN}"
+   write_ppp_conf "PPPOE_EXTRA=\"\""
+   write_ppp_conf "PPPD_EXTRA=\"linkname ${PEER_FILE}\""
+
+    # Jigger DNS if required...
+    if test "$DNSTYPE" = "SERVER" ; then
+        #rm -f /etc/resolv.conf /etc/ppp/resolv.conf
+        rm -f /etc/ppp/resolv.conf
+    elif test "$DNSTYPE" = "SPECIFY" ; then
+        #rm -f /etc/resolv.conf /etc/ppp/resolv.conf
+        rm -f /etc/ppp/resolv.conf
+    if [ "$DNS1" != "" -a "$DNS1" != "0.0.0.0" ] ||
+       [ "$DNS2" != "" -a "$DNS2" != "0.0.0.0" ]; then
+        sl_insert_dns_file ${PPP_RESOLV_CONF} ${DNS1} ${DNS2}
+        sl_insert_dns_file /etc/resolv.conf $DNS1 $DNS2
+    fi
+fi
+
+}
+
+write_chat_conf() {
+   echo $1 >> ${CHAT_CONFIG}
+}
+
+gen_chat_config() {
+   rm -f ${CHAT_CONFIG}
+
+   logger -t "O3G/PPP_OPTION" -p 8.7 "Create chat config file (${CHAT_CONFIG})"
+   echo "O3G/PPP_OPTION: Create chat config file (${CHAT_CONFIG})"
+
+   local VENDORID="${CSID_S_USB_VENDOR_ID}"
+   local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+   local PROFILE="" # `rdcsman 0x001e0030 u16`
+
+   write_chat_conf "ABORT 'BUSY'"
+   write_chat_conf "ABORT 'NO CARRIER'"
+   write_chat_conf "ABORT 'ERROR'"
+   write_chat_conf "TIMEOUT 10"
+   write_chat_conf "'' AT"
+
+   if [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+      [ "${VENDORID}" == "3011" ] && [ "${PRODUCTID}" == "1" ]; then
+      write_chat_conf "OK AT&FE0Q0V1&C1&D2S0=0"
+   fi
+
+   if [ "${CSID_C_3G_APN}" != "" ]; then
+      if [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] && 
+         [ "${VENDORID}" == "3011" ] && [ "${PRODUCTID}" == "1" ]; then
+         write_chat_conf "OK AT+CGDCONT=1,\"PPP\",\"${CSID_C_3G_APN}\",\"${CSID_C_3G_USERNAME}\",\"${CSID_C_3G_PASSWORD}\",0,0"
+      else
+         if [ "${CSID_C_3G_PDP_TYPE}" != "" ] && [ ${CSID_C_3G_PDP_TYPE} -ne 0 ]; then
+            write_chat_conf "OK AT+CGDCONT=${CSID_C_3G_CID},\"PPP\",\"${CSID_C_3G_APN}\""
+         else
+            write_chat_conf "OK AT+CGDCONT=${CSID_C_3G_CID},\"IP\",\"${CSID_C_3G_APN}\""
+         fi
+      fi
+   fi
+
+   if [ "${PROFILE}" != "" ] && [ "${PROFILE}" == "13" ]; then
+      if [ "${CSID_C_3G_APN}" == "" ]; then
+         write_chat_conf "OK AT+CGDCONT=1,\"IP\",\"\""
+      fi
+   fi
+
+   if [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+      [ "${VENDORID}" == "7326" ] && [ "${PRODUCTID}" == "38403" ]; then
+      if [ "${CSID_C_3G_DIALNUM}" != "" ]; then
+         write_chat_conf "'' ATDT${CSID_C_3G_DIALNUM}"
+      else
+         write_chat_conf "'' ATDT*99#"
+      fi
+   elif [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+        [ "${VENDORID}" == "6610" ] && [ "${PRODUCTID}" == "65534" ]; then
+      if [ "${CSID_C_3G_DIALNUM}" != "" ]; then
+         write_chat_conf "'' ATDT${CSID_C_3G_DIALNUM}"
+      else
+         write_chat_conf "'' ATDT*99#"
+      fi
+   else
+      if [ "${CSID_C_3G_DIALNUM}" != "" ]; then
+         write_chat_conf "OK ATDT${CSID_C_3G_DIALNUM}"
+      else
+         write_chat_conf "OK ATDT*99#"
+      fi
+   fi
+
+   if [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+      [ "${VENDORID}" == "8222" ] && [ "${PRODUCTID}" == "4104" ]; then
+      write_chat_conf "CONNECT ''"
+   elif [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+        [ "${VENDORID}" == "8222" ] && [ "${PRODUCTID}" == "4097" ]; then
+      write_chat_conf "CONNECT ''"
+   elif [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+        [ "${VENDORID}" == "8222" ] && [ "${PRODUCTID}" == "8201" ]; then
+      write_chat_conf "''"
+   elif [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+        [ "${VENDORID}" == "7433" ] && [ "${PRODUCTID}" == "44788" ]; then
+      write_chat_conf "''"
+   elif [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+        [ "${VENDORID}" == "7817" ] && [ "${PRODUCTID}" == "7702" ]; then
+      write_chat_conf "''"
+   elif [ "${VENDORID}" != "" ] && [ "${PRODUCTID}" != "" ] &&
+        [ "${VENDORID}" == "7326" ] && [ "${PRODUCTID}" == "38403" ]; then
+      write_chat_conf "'' \"\""
+   else
+      write_chat_conf "CONNECT \"\""
+   fi
+}
+
+write_peer_conf() {
+   echo $1 >> ${PEER_CONFIG}
+}
+
+gen_peer_config() {
+   if [ ! -d "${PEER_PATH}" ];then
+      mkdir ${PEER_PATH}
+   fi
+   rm -f ${PEER_CONFIG}
+
+   logger -t "O3G/PPP_OPTION" -p 8.7 "Create peer config file (${PEER_CONFIG})"
+   echo "O3G/PPP_OPTION: Create peer config file (${PEER_CONFIG})"
+
+   local VENDORID="${CSID_S_USB_VENDOR_ID_HEX}"
+   local PRODUCTID="${CSID_S_USB_PRODUCT_ID_HEX}"
+   local VENDORID_DEC="${CSID_S_USB_VENDOR_ID}"
+   local PRODUCTID_DEC="${CSID_S_USB_PRODUCT_ID}"
+
+   write_peer_conf "noauth"
+   # write_peer_conf "user \"${CSID_C_3G_USERNAME}\""
+   # write_peer_conf "password \"${CSID_C_3G_PASSWORD}\""
+   if [ "${CSID_C_3G_USERNAME}" != "" ]; then
+      write_peer_conf "user \"${CSID_C_3G_USERNAME}\""
+      write_peer_conf "password \"${CSID_C_3G_PASSWORD}\""
+   else
+      write_peer_conf "user \"guest\""
+      write_peer_conf "password \"guest\""
+   fi
+
+   write_peer_conf "nodetach"
+   write_peer_conf "debug"
+   write_peer_conf "lock"
+   write_peer_conf "crtscts"
+   # write_peer_conf "asyncmap ffffffff"
+
+   write_peer_conf "${CSID_S_USB_MODEM1}"
+
+	 # Set BAUDRATE
+	 if [ "${VENDORID}" == "12d1" ] && [ "${PRODUCTID}" == "1003" ]; then # HUAWEI E220
+      BAUDRATE="460800"
+	 elif [ "${VENDORID}" == "14E4" ] && [ "${PRODUCTID}" == "4325" ]; then	# SonyEricsson GC89
+	    BAUDRATE="57600"
+	 elif [ "${VENDORID}" == "af0" ] && [ "${PRODUCTID}" == "7601" ]; then # LightSpeed HSUPA-380P
+	    BAUDRATE="57600"
+	 elif [ "${VENDORID}" == "279" ] && [ "${PRODUCTID}" == "950b" ]; then # 
+	    BAUDRATE="57600"
+	 elif [ "${VENDORID}" == "1931" ] && [ "${PRODUCTID}" == "c" ]; then # Option
+      BAUDRATE="921600"
+	 elif [ "${VENDORID}" == "10c4" ] && [ "${PRODUCTID}" == "ea60" ]; then	# CP2102 for ZTE Phone (Telexcell)
+	    BAUDRATE="230400"
+	 elif [ "${VENDORID}" == "403" ] && [ "${PRODUCTID}" == "6001" ]; then # ftdi_sio
+	    BAUDRATE="115200"
+	 elif [ "${VENDORID}" == "67b" ] && [ "${PRODUCTID}" == "2303" ]; then # PL2303 for LG Phone (Telexcell)
+	    BAUDRATE="115200"
+	 else
+      BAUDRATE="460800"
+   fi
+   write_peer_conf "${BAUDRATE}"   
+
+   write_peer_conf "noipdefault"
+
+   if [ "${CSID_C_3G_MTU}" != "" ] && [ $((${CSID_C_3G_MTU})) -gt 0 ]; then
+      write_peer_conf "mtu ${CSID_C_3G_MTU}"
+   else
+      write_peer_conf "mtu 1500"      
+   fi
+   if [ "${CSID_C_3G_MRU}" != "" ] && [ $((${CSID_C_3G_MRU})) -gt 0 ]; then
+      write_peer_conf "mtu ${CSID_C_3G_MRU}"
+   else
+      write_peer_conf "mru 1500"      
+   fi
+
+   if [ "${CSID_C_3G_IF_PRIDNS}" == "" ] || [ "${CSID_C_3G_IF_PRIDNS}" == "0.0.0.0" ]; then
+      if [ "${CSID_C_3G_IF_SECDNS}" == "" ] || [ "${CSID_C_3G_IF_SECDNS}" == "0.0.0.0" ]; then
+         write_peer_conf "usepeerdns"
+      fi
+   fi
+
+   write_peer_conf "local"
+   write_peer_conf "noccp"
+
+    WrAuthStr=""
+
+    if [ "${CSID_C_3G_MULTIWAN_AUTHTYPE}" != "" ] && [ "${CSID_C_3G_AUTHTYPE}" == "1" ] ; then
+    #if [ "${CSID_C_3G_AUTHTYPE}" == "1" ] ; then
+        WrAuthStr="refuse-chap refuse-mschap refuse-mschap-v2 refuse-eap"
+    elif [ "${CSID_C_3G_MULTIWAN_AUTHTYPE}" != "" ] && [ "${CSID_C_3G_MULTIWAN_AUTHTYPE}" == "2" ] ; then
+    #elif [ "${CSID_C_3G_AUTHTYPE}" == "2" ] ; then
+        WrAuthStr="refuse-pap refuse-mschap refuse-mschap-v2 refuse-eap"
+    else
+        WrAuthStr=""
+    fi
+
+	 if [ "${VENDORID}" == "201e" ] && [ "${PRODUCTID}" == "1008" ]; then # Haier CM200
+      WrAuthStr="refuse-chap"
+   elif [ "${VENDORID}" == "201e" ] && [ "${PRODUCTID}" == "1001" ]; then # Haier CM200
+      WrAuthStr="refuse-chap"
+   fi
+
+   if [ "${WrAuthStr}" != "" ]; then
+      write_peer_conf "${WrAuthStr}"
+   fi
+
+#   if [ "${CSID_C_3G_KEEP_ALIVE}" != "" ] && [ "${CSID_C_3G_KEEP_ALIVE}" == "2" ] ; then
+   if [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" != "" ] && [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" == "2" ] ; then
+	    if [ "${VENDORID}" == "19d2" ] && [ "${PRODUCTID}" == "31" ]; then # ZTE 626/636
+		     :  # Do nothing
+	    else
+#         if [ "${CSID_C_3G_PPP_LCP_INTERVAL}" != "" ] && [ ${CSID_C_3G_PPP_LCP_INTERVAL} -gt 0 ]; then
+#            write_peer_conf "lcp-echo-interval ${CSID_C_3G_PPP_LCP_INTERVAL}"
+				 if [ "${CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL}" != "" ] && [ ${CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL} -gt 0 ]; then
+            write_peer_conf "lcp-echo-interval ${CSID_C_3G_MULTIWAN_KA_LCP_INTERVAL}"            
+         else
+            write_peer_conf "lcp-echo-interval 20"
+         fi
+
+#         if [ "${CSID_C_3G_PPP_LCP_FAILURE}" != "" ] && [ ${CSID_C_3G_PPP_LCP_FAILURE} -gt 0 ]; then
+#            write_peer_conf "lcp-echo-failure ${CSID_C_3G_PPP_LCP_FAILURE}"
+         if [ "${CSID_C_3G_MULTIWAN_KA_LCP_TIMES}" != "" ] && [ ${CSID_C_3G_MULTIWAN_KA_LCP_TIMES} -gt 0 ]; then
+            write_peer_conf "lcp-echo-failure ${CSID_C_3G_MULTIWAN_KA_LCP_TIMES}"
+            
+         else
+            write_peer_conf "lcp-echo-failure 3"
+         fi
+	    fi
+   fi
+
+	 #write_peer_conf "defaultroute"  # Possibly remove in the future
+
+	 if [ "${VENDORID_DEC}" != "4042" ] && [ "${PRODUCTID_DEC}" != "32772" ]; then # HUAWEI E220
+      write_peer_conf "novj"
+   fi
+
+   write_peer_conf "nobsdcomp"
+
+	 if [ "${VENDORID_DEC}" != "1057" ] && [ "${PRODUCTID_DEC}" != "1592" ]; then
+      write_peer_conf "nopcomp"
+      write_peer_conf "noaccomp"
+   fi
+
+   write_peer_conf "nodeflate"
+
+   write_peer_conf "linkname ${PEER_FILE}"
+
+	local DEMAND=""
+	local MANUAL=""
+	local IDLETIME="${CSID_C_3G_IDLETIME}"
+
+	local DemandOption=""
+
+	if [ "${DEMAND}" == "" ] ; then
+	     DEMAND="no"
+	fi
+
+    if [ "${DEMAND}" == "no" ]; then
+		DemandOption=""
+
+    elif [ "${MANUAL}" == "yes" ]; then
+		#manual connect
+ 
+	    if [ "${IDLETIME}" != "" ] && [ $((${IDLETIME})) -gt 0 ] ; then
+			if [ "${CSID_C_3G_CNT_TYPE}" != "" ] && [ "${CSID_C_3G_CNT_TYPE}" == "2" ] ; then
+				DemandOption="idle ${IDLETIME}"
+   
+			elif [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+  
+				DemandOption="demand nopersist idle ${IDLETIME} holdoff 3 ipcp-accept-remote ipcp-accept-local noipdefault ktune"
+		    fi
+		else
+    		DemandOption=""
+		fi
+	else
+    	#only on dial-on-deman, set pppd idle time
+		DemandOption="demand nopersist idle $DEMAND holdoff 3 ipcp-accept-remote ipcp-accept-local noipdefault ktune" # pppoe
+	fi
+ 
+	if [ "${DemandOption}" != "" ]; then
+    	write_peer_conf "${DemandOption}"
+	fi
+ 
+   write_peer_conf "connect \"${CHAT} -v -f ${CHAT_CONFIG}\""
+   write_peer_conf "disconnect '${CHAT} -v -t15 ABORT \"BUSY\" ABORT \"ERROR\" ABORT \"DIALTONE\" \"\" \"\\K\" \"\" \"ATH\" \'"
+}
+
+writeCSIDValues() {
+	 if [ -r "${PIDFILE_PPPD}" ] ; then
+		 sl_get_ppp_PID_IFname ${PIDFILE_PPPD} PPP_PID PPP_IF
+		 if [ "$?" != "0" ] || [ "${PPP_IF}" == "" ]; then
+		    return 1
+		 fi
+	 else
+	 	 return 1
+	 fi	
+
+	 sl_get_IP_NM_GW_in_ifconfig ${PPP_IF} IF_IP IF_NM IF_GW
+	 sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+	 sl_get_uptime CNTTIME
+
+	 if [ "${IF_IP}" == "" ] ; then
+		 # No IP
+     # clear_all_cnt_status ${Index}
+     # Disconnecting
+     write_cnt_status 3 ${Index}
+		 #ppp_stop
+	 elif [ "${IF_IP}" == "10.64.64.64" ] ; then
+		 # Got a fake IP address
+		 # clear_all_cnt_status ${Index}
+     # wait for traffic
+     write_cnt_status 5 ${Index}
+		 #ppp_stop
+	 else
+		 # Got a real IP address
+		 write_cnttime_info "${CNTTIME}" ${Index}
+		 write_if_name "${PPP_IF}" ${Index}
+		 write_if_info "${IF_IP}" "${IF_NM}" "${IF_GW}" ${Index}
+		 write_dns_info "${IF_DNS1}" "${IF_DNS2}" ${Index}
+		 write_cnt_status 2 ${Index}
+	 fi
+
+	 return 0
+}
+
+ppp_stop() {
+   # Ignore SIGTERM
+   trap "" 15
+
+   # Kill pppd, which should in turn kill 3g
+   if [ -r "${PIDFILE_PPPD}" ] ; then
+      sl_get_ppp_PID_IFname ${PIDFILE_PPPD} PPP_PID PPPD_IF
+      PPPX_PID="/var/run/${PPPD_IF}.pid"
+
+      echo "Killing pppd (${PPP_PID})"
+      kill -0 ${PPP_PID} > /dev/null 2>&1
+      [ "$?" == "0" ] && kill ${PPP_PID} > /dev/null 2>&1
+      [ "$?" != "0" ] && kill -9 ${PPP_PID} > /dev/null 2>&1
+
+      rm -f ${PIDFILE_PPPD} ${PPPX_PID}
+   fi
+
+    rm -f /var/run/ppp_auth_*
+
+   clear_all_cnt_status ${Index}
+
+}
+
+# Monitor connection
+monitor_connection() {
+   local TIME=0
+   local MAX_TIMEOUT=30
+   local Status=0
+   while [ true ] ; do
+      if [ -e "${PIDFILE_PPPD}" ] ; then
+         sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+         if [ "$?" == "0" ]; then
+            writeCSIDValues
+            get_cnt_status ${Index}
+            Status="${CSID_S_USB_CNT_STATUS}"
+         fi
+      fi
+
+      if [ "${Status}" == "2" ]; then
+         logger -p user.debug -t "O3G/SCRIPT" "Link is up and running on interface ${PPP_IF} (PID: ${PPP_PID})"
+         echo "O3G/SCRIPT: Link is up and running on interface ${PPP_IF}"
+         break;
+      elif [ "${Status}" == "3" ] && [ ! -e "${PIDFILE_PPPD}" ]; then
+         #echo "Link terminated!"
+         ppp_stop
+         exit 1
+      elif [ -f "/var/run/ppp_auth_fail" ] ; then
+         echo "Authentication fail!"
+         write_cnt_status 6 ${Index}
+         write_error_code 5 ${Index}
+         #ppp_stop
+         exit 1
+      else 
+         #if [ "$PPP_PID" != "" ]; then
+         #   kill -0 ${PPP_PID} 2>/dev/null 
+         #   if [ "$?" != "0" ]; then
+         #      logger -t "O3G/SCRIPT" "Connect fail!"
+         #      echo "O3G/SCRIPT: Connect fail!"
+         #      ppp_stop
+         #      exit 1
+         #   fi
+         #fi
+
+         if [ ${TIME} -gt ${MAX_TIMEOUT} ] ; then
+            logger -t "O3G/SCRIPT" "Connect Timeout!"
+            echo "O3G/SCRIPT: Connect Timeout!"
+            ppp_stop
+            exit 1
+         else
+            echo "3G connecting ... (Time: ${TIME}, Status: ${Status})"                
+            TIME=$((${TIME}+1))
+         fi	            
+      fi
+      sleep 1
+   done
+}
+
+ppp_start() {
+   if [ -e ${PIDFILE_PPPD} ] ; then
+      echo "3G PPP link was already running. Exit."
+      exit 1
+   fi
+
+   get_general_config ${Index} ${Index_3G}
+   get_general_status ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   #if [ "${CSID_S_LOCAL_WAN_CNT_FORCE}" == "1" ] ; then # amanda-add090821
+      # Rewrite connect manual force enable
+   #   ppp_stop
+      # Rewrite connect manual force disable
+      # wrcsman "0x8001000E 0x00"
+   #fi
+
+   # wrcsman "0x801e4001 0x00"
+
+   gen_ppp_config
+   gen_chat_config
+   gen_peer_config
+   sleep 1
+
+   if [ "${CSID_C_3G_MULTIWAN_SIMCARD_MODE}" == "3" ] ; then
+       IFNAME="cellular1"
+   else
+       IFNAME="cellular2"
+   fi
+
+   logger -p user.debug -t "O3G/SCRIPT" "PPP IFNAME: ${IFNAME}"
+   ${PPPD} call ${PEER_FILE} ifname ${IFNAME} &
+   sleep 6 #Important! it must be waited for pppd creating the pppx interface and pid
+
+   monitor_connection
+}
+
+usage() {
+	 echo "$0 [start|stop|restart] [index] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+   start)        pre_init; ppp_start ;;
+   stop)         post_init; ppp_stop;;
+   restart)      ppp_stop; ppp_start;;
+   *)            usage;;
+esac
+
+exit 0

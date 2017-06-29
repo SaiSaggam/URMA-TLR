@@ -1,0 +1,181 @@
+#!/bin/sh
+
+# Check if exist multiwan index
+VOIPWAN=$1
+TMP=$((VOIPWAN+1))
+
+# Paths to programs
+PPPD=pppd
+PPPOE=pppoe
+
+CONFIG=/etc/ppp/pppoe-voipwan.conf
+
+if test ! -f "$CONFIG" -o ! -r "$CONFIG" ; then
+    echo "$0: Cannot read configuration file '$CONFIG'" >& 2
+    exit 1
+fi
+
+export CONFIG
+. $CONFIG
+
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+
+if [ -n "$VOIPWAN" ] ; then
+	PIDFILE_PPPD="/var/run/ppp-pppoeVOIPWAN$VOIPWAN.pid"
+	CHECK_PPPOE_VOIP="/var/run/check_pppoe_voip"
+	echo 1 > $CHECK_PPPOE_VOIP
+fi
+
+PPPD_PID=0
+
+# MTU of Ethernet card attached to modem MUST be 1500.  This apparently
+# fails on some *BSD's, so we'll only do it under Linux
+#ifconfig $ETH up mtu 1500
+ifconfig $ETH up
+
+
+if test -n "$ACNAME" ; then
+    ACNAME="-C $ACNAME"
+fi
+
+if test -n "$SERVICENAME" ; then
+    SERVICENAMEOPT="-S $SERVICENAME"
+else
+    SERVICENAMEOPT=""
+fi
+
+if test "$CLAMPMSS" = "no" ; then
+    CLAMPMSS=""
+else
+    CLAMPMSS="-m $CLAMPMSS"
+fi
+
+# If DNSTYPE is SERVER, we must use "usepeerdns" option to pppd.
+if test "$DNSTYPE" = "SERVER" ; then
+    PEERDNS=yes
+    USEPEERDNS=yes
+fi
+
+if test "$PEERDNS" = "yes" ; then
+    PEERDNS="usepeerdns"
+else
+    PEERDNS=""
+fi
+
+# Backward config file compatibility -- PEERDNS used to be USEPEERDNS
+if test "$USEPEERDNS" = "yes" ; then
+    PEERDNS="usepeerdns"
+fi
+if test "$USEPEERDNS" = "no" ; then
+    PEERDNS=""
+fi
+
+
+# Backward config file compatibility
+if test "$DEMAND" = "" ; then
+    DEMAND=no
+fi
+
+if test "$DEMAND" = "no" ; then
+#auto-reconncet connect, do not setup pppd idle time
+    DEMAND_OPTIONS=""
+elif test "$MANUAL" = "yes" ; then
+#manual connect & force connect
+	if [ $DEMAND -gt 0 ] ; then
+        DEMAND_OPTIONS="idle $DEMAND"
+	else
+    	DEMAND_OPTIONS=""
+	fi		
+else
+#only on dial-on-deman, set pppd idle time
+    DEMAND_OPTIONS="demand nopersist idle $DEMAND holdoff 3 ipcp-accept-remote ipcp-accept-local noipdefault ktune"
+fi
+
+# If we're using kernel-mode PPPoE on Linux...
+if [ -n "$VOIPWAN" ] ; then
+	CUR_WANTYPE=`rdcsman 0x0001014$VOIPWAN u32`
+fi
+
+if test "$LINUX_PLUGIN" != "" ; then
+    PLUGIN_OPTS="plugin $LINUX_PLUGIN nic-$ETH"
+    
+    if [ $CUR_WANTYPE -eq 80 ] ; then
+    PLUGIN_OPTS="plugin $LINUX_PLUGIN nic-$ETH rp_pppoe_sess 0154:00:aa:bb:01:23:45 "
+    # 0154 is session id , 00:aa:bb:01:23:45 is trendchip adsl default mac address
+    fi
+    
+    if test -n "$SERVICENAME" ; then
+	PLUGIN_OPTS="$PLUGIN_OPTS rp_pppoe_service $SERVICENAME"
+    fi
+
+    # Interface name MUST BE LAST!!
+    PLUGIN_OPTS="$PLUGIN_OPTS $ETH"
+    #modprobe pppoe > /dev/null 2>&1
+fi
+
+if test "$DEFAULTROUTE" != "no" ; then
+    DEFAULTROUTE="defaultroute"
+else
+    DEFAULTROUTE=""
+fi
+
+if [ -n "$VOIPWAN" ] ; then
+	PPP_MTU_SIZE=`rdcsman 0x00040A1$TMP u32`
+fi
+
+if [ $PPP_MTU_SIZE -eq 0 ]; then
+	SET_MTU="mtu 1492 mru 1492"
+else
+	SET_MTU="mtu $PPP_MTU_SIZE mru $PPP_MTU_SIZE"
+fi
+
+#if [ -z $MULTIWAN ] ; then
+#	PPPD_EXTRA=
+#else
+#	PPPD_EXTRA="$PPPD_EXTRA name $USER remotename wan$TMP"
+#fi
+
+# Standard PPP options we always use
+PPP_STD_OPTIONS="$PLUGIN_OPTS noipdefault noauth default-asyncmap $DEFAULTROUTE hide-password nodetach $PEERDNS $SET_MTU noaccomp nodeflate nopcomp novj novjccomp user $USER lcp-echo-interval $LCP_INTERVAL lcp-echo-failure $LCP_FAILURE $PPPD_EXTRA"
+
+# Jigger DNS if required...
+if test "$DNSTYPE" = "SERVER" ; then
+    # Sorry, dude...
+
+	if [ ! -e /var/run/multiwan_enable ]; then
+       	
+		mv /etc/resolv.conf /etc/resolv.confwan
+	fi
+
+    #ln -s /etc/ppp/resolv.conf /etc/resolv.conf
+#elif test "$DNSTYPE" = "SPECIFY" ; then
+    # Sorry, dude...
+#    rm -f /etc/resolv.conf /etc/ppp/resolv.conf
+#    echo "nameserver $DNS1" > /etc/resolv.conf
+#    if test -n "$DNS2" ; then
+#	echo "nameserver $DNS2" >> /etc/resolv.conf
+#    fi
+fi
+
+
+echo $$ > $PIDFILE_CONNECT
+echo "DEMAND_OPT -> $DEMAND_OPTIONS"
+	$PPPD $PPP_STD_OPTIONS $DEMAND_OPTIONS &
+
+    wait
+
+	# if CNTTYPE != PPPOE_CNT_TYPE_MANUAL or CNT_TYPE=dial-on-deman
+	if [ -n "$VOIPWAN" ] ; then
+		CNT_TYPE=`rdcsman 0x0001014$VOIPWAN u32`
+
+		if [ $MANUAL != "yes" -o $CNT_TYPE -eq 0 ] ; then
+			#killed by commander 
+		    wrcsman "0x8004071$TMP 0x03 && \
+					0x8001027$VOIPWAN 0x03"
+			rm -rf $PIDFILE_CONNECT		 
+		fi
+	fi
+
+	exit
+

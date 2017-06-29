@@ -1,0 +1,10 @@
+filan
+procan
+socat
+vc_tcp_client
+vc_tcp_listen
+vc_udp_mode
+/Makefile
+config.h
+doc/socat.1
+doc/socat.html

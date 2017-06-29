@@ -1,0 +1,16 @@
+# OS files
+.DS_Store
+
+# IDE files
+.idea/
+
+# Generated files from tooling, builds, etc.
+dist/
+mdist/
+# node_modules directories and symbolic link files
+node_modules/
+node_modules
+*.log
+app/tests/nightwatch/logs
+app/tests/nightwatch/reports
+app/tests/spacejam/reports

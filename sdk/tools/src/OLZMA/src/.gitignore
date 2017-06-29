@@ -1,0 +1,7 @@
+Makefile
+/config.h
+/stamp-h1
+/src/lzma/lzma
+/src/lzmadec/lzmadec
+/src/lzmainfo/lzmainfo
+/autom4te.cache

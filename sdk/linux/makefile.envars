@@ -1,0 +1,31 @@
+#
+# Makefile to export important environment variables
+#
+# (Corner DE core file)
+
+export TOPDIR ?= $(shell cd ..; pwd)
+export TARGET ?= mipsel-linux-uclibc
+
+ifndef TOOLPATH
+	export TOOLPATH := $(shell cat $(TOPDIR)/TOOLPATH)
+	export PATH     := $(TOOLPATH):$(PATH)
+endif
+
+#
+
+-include $(TOPDIR)/project_config/project.config
+
+ifeq ($(TC3262),1)
+-include $(TOPDIR)/project_config/project.cflags
+endif
+
+export COMPO_BASE   := $(TOPDIR)/linux/src
+export INSTALL_ROOT := $(TOPDIR)/linux/root
+
+#
+
+ifneq ($(wildcard makefile.compo),)
+export FULL_COPY := 1
+endif
+
+ENABLE_MULTI_WAN =0

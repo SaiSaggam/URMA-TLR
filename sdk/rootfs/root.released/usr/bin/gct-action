@@ -1,0 +1,263 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+UDHCPC="udhcpc"
+
+# Set Interface
+if [ "$2" != "" ]; then
+   ETH="$2"
+else
+   ETH="usbnet0"
+fi
+
+get_index "$3" "$4"
+FileNameCode="${ETH}"
+DEMAND_FILE="/var/run/udhcpc.${FileNameCode}.demand"
+TMPFIL="/tmp/gct-connect-${FileNameCode}"
+GIPFIL="/tmp/get_ip.${FileNameCode}"
+CNTFIL="/tmp/getinfo-${FileNameCode}"
+LOG="/tmp/gct-action-${FileNameCode}.log"
+
+cdc_ether_status()
+{
+   get_general_config ${Index} ${Index_3G}
+   get_general_status ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   TIME=0
+   TIMEOUT=10
+   while [ true ] ; do	
+      sl_get_IP_NM_GW_in_ifconfig ${ETH} IF_IP IF_NM IF_GW
+      #echo "$0 : IF_IP=${IF_IP} IF_NM=${IF_NM} IF_GW=${IF_GW}"	
+      if [ "${IF_IP}x" != "x" ] && [ "${IF_NM}x" != "x" ] && [ "${IF_GW}x" != "x" ]; then	
+         return 0		
+      else			
+         sleep 1
+         TIME=$((TIME+1))
+         if [ ${TIME} -gt ${TIMEOUT} ] ; then
+            return 1	
+         fi			
+      fi
+   done
+}
+
+get_gct_info()
+{
+    local get_IP="$1"
+    netmask="255.255.255.252"
+    GW=$get_IP
+ 
+    local count=`cat $CNTFIL | grep 'IP' | cut -d '.' -f 4`
+    mod=`expr ${count} % 4`
+ 
+    if [ $mod = "1" ] ; then
+        count=`expr $count + 2`
+        i=${GW%.*}
+        GW=$i.$count
+ 
+    elif [ $mod = "2" ] ; then
+        count=`expr $count + 1`
+        i=${GW%.*}
+        GW=$i.$count
+ 
+    elif [ $mod = "0" ] || [ $mod = "3" ] ; then
+      netmask="255.255.255.248"
+			mod=`expr ${count} % 8`
+			if [ $mod = "0" ] || [ $mod = "7" ]; then
+				netmask="255.255.255.240"
+				mod=`expr ${count} % 16`
+				if [ $mod = "0" ] || [ $mod = "15" ]; then
+					netmask="255.255.255.224"
+					mod=`expr ${count} % 32`
+					if [ $mod = "0" ] || [ $mod = "31" ]; then
+						netmask="255.255.255.192"
+						mod=`expr ${count} % 64`
+						if [ $mod = "0" ] || [ $mod = "63" ]; then
+							netmask="255.255.255.128"
+							mod=`expr ${count} % 128`
+							if [ $mod = "0" ] || [ $mod = "127" ]; then
+								netmask="255.255.255.0"
+							fi
+						fi
+					fi
+				fi
+			fi
+        count=`expr $count + 1`
+        i=${GW%.*}
+        GW=$i.$count
+    fi
+ 
+    IF_GW=$GW
+    IF_NM=$netmask
+
+    echo "Submask:$netmask" >> $CNTFIL
+    echo "Gateway:$GW" >> $CNTFIL 
+    
+}
+
+gct_start()
+{
+    get_general_config ${Index} ${Index_3G}
+    get_general_status ${Index} ${Index_3G}
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+
+    # wrcsman "0x801e4001 0x01"
+    
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+    local DevModem1="${CSID_S_USB_MODEM1}"
+    local DevModem2="${CSID_S_USB_MODEM2}"
+
+	${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+
+    ${ATCMD_PROG} ${DevModem1} 'AT+CREG=1'
+	if [ "${CSID_C_3G_APN}" != "" ]; then
+        ${ATCMD_PROG} ${DevModem1} AT+CGDCONT=1,\"IP\",\"${CSID_C_3G_APN}\" > ${LOG}
+    fi
+    ${ATCMD_PROG} ${DevModem1} 'AT+CFUN=1'
+    ${ATCMD_PROG} ${DevModem1} 'AT+COPS=0,,,7'
+	CNT="0"
+	RET="1" 
+	while [ "$RET" -eq "1" -a "$CNT" -le "3" ]; do
+    	${ATCMD_PROG} ${DevModem1} 'AT+CGACT=1,1'
+    	echo "AT+CGACT=1,1"
+		CNT=$((CNT+1));
+    	sleep 1
+    	${ATCMD_PROG} ${DevModem1} 'AT+CGACT?' -t 3 > /tmp/cgact-${FileNameCode}
+    	sleep 1
+		cat /tmp/cgact-${FileNameCode} | grep "1,1"
+		RET=$?
+	done;
+    ${ATCMD_PROG} ${DevModem1} 'AT+CGCONTRDP=1 ' > ${TMPFIL}
+	
+    tmpfil="`cat ${TMPFIL}`"
+    logger -t "O3G/SCRIPT" -p 8.7 "tmpfil:${tmpfil}"
+    #	sleep 1
+
+    PIP=`cat ${TMPFIL} | grep '+CGCONTRDP:' | cut -d, -f4| cut -d\" -f2`
+    IF_DNS1=`cat ${TMPFIL} | grep '+CGCONTRDP:' | cut -d, -f6 | cut -d\" -f2`
+    IF_DNS2=`cat ${TMPFIL} | grep '+CGCONTRDP:' | cut -d, -f7 | cut -d\" -f2`
+    logger -t "O3G/SCRIPT" -p 8.7 "pip:${PIP}"
+
+    if [ "${PIP}" == "" ]; then
+    	${ATCMD_PROG} ${DevModem1} 'AT+CGCONTRDP=1 ' > ${TMPFIL}
+    	PIP=`cat ${TMPFIL} | grep '+CGCONTRDP:' | cut -d, -f4| cut -d\" -f2`
+    	IF_DNS1=`cat ${TMPFIL} | grep '+CGCONTRDP:' | cut -d, -f6 | cut -d\" -f2`
+    	IF_DNS2=`cat ${TMPFIL} | grep '+CGCONTRDP:' | cut -d, -f7 | cut -d\" -f2`
+		if [ "${PIP}" == "" ]; then
+		    write_cnt_status 3 ${Index}
+		fi
+    fi
+        # ${ATCMD_PROG} ${DevModem1} 'AT$NWQMISTATUS' > ${TMPFIL}
+        # sleep 1
+	if [ "${PIP}" != "" ]; then
+    	write_error_code 0 ${Index} # clean error code
+      	echo "IP:$PIP" > $CNTFIL
+		get_gct_info ${PIP}
+		if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+	    	${IFCFG_PROG} ${ETH} ${PIP} mtu 1500 up
+    	else
+        	${IFCFG_PROG} ${ETH} ${PIP} mtu ${CSID_C_3G_MTU} up
+    	fi
+	fi
+    if [ "i${IF_DNS1}" != "" ]; then
+		echo "nameserver $IF_DNS1" > /etc/resolv.conf
+	fi
+    if [ "i${IF_DNS2}" != "" ]; then
+		echo "nameserver $IF_DNS2" >> /etc/resolv.conf
+	fi
+    sl_get_uptime CNTTIME
+    write_cnttime_info "${CNTTIME}" ${Index}
+	write_if_name ${ETH} ${Index}
+	write_if_info "${PIP}" "${IF_NM}" "${IF_GW}" ${Index}
+	write_dns_info "${IF_DNS1}" "${IF_DNS2}" ${Index}
+	write_cnt_status 2 ${Index}
+	route add default dev ${ETH} ## gw ${i} ?
+
+    return $?
+}
+
+gct_stop()
+{
+    get_general_config ${Index} ${Index_3G}
+    get_config ${Index} ${Index_3G}
+    get_usb_status ${Index}
+
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+
+    local DevModem1="${CSID_S_USB_MODEM1}"
+    local DevModem2="${CSID_S_USB_MODEM2}"
+
+    ${ATCMD_PROG} ${DevModem1} 'AT+CGACT=0,1'
+    echo "shut down link..."
+ 
+    [ -f "$GIPFIL" ] && rm -f $GIPFIL
+    [ -f "$CNTFIL" ] && rm -f $CNTFIL 
+
+    [ -f "${DEMAND_FILE}" ] && rm -f ${DEMAND_FILE}
+    [ -f "$TMPFIL" ] && rm -f $TMPFIL
+
+
+    ${IFCFG_PROG} ${ETH} down
+
+    clear_all_cnt_status ${Index}
+    write_cnt_status 0 ${Index}
+
+    #wrcsman "0x8001000E 0x01"
+
+    return 0
+}
+
+usage() {
+	 echo "$0 [start|stop|release|renew] [IFName] [index] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+   start)
+      pre_init     
+      gct_start
+      if [ "$?" == "1" ] ; then
+			   logger -t "O3G/SCRIPT" -p 8.7 "connect fail!!\n"
+			   ${IFCFG_PROG} ${ETH} 0.0.0.0 
+			   write_cnt_status 3 ${Index}
+         exit 1
+      fi
+      exit 0
+      ;;
+
+   stop)
+      gct_stop
+      exit 0
+      ;;
+
+   release)
+      gct_stop
+      exit 0
+      ;;
+
+   renew)
+      gct_stop
+      if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+         gct_start
+      fi
+
+      exit 0
+      ;;
+		
+	*)
+      usage
+      exit 1
+      ;;
+esac
+
+exit 0		

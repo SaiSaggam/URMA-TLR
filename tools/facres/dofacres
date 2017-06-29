@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# Factory Reset.. Delete loads of files. Clear log.. and reboot the unit.
+
+CONFIG_FAC="/usr/config/config.fac"
+CONFIG_PATH="/home/digi/user"
+USER_CONFIG_FAC=${CONFIG_PATH}/config.fac
+VAR_USER_CONFIG_FAC="/var/config.fac"
+CONFIGFILE="/home/digi/configfile"
+TLR_LOGFILE="/home/digi/user/tlr.log"
+TLR_SYSLOGFILE="/home/digi/user/system.log"
+SSH_KEY_PATH="/home/digi/ssh"
+
+rm -f ${TLR_LOGFILE}
+rm -f ${TLR_SYSLOGFILE}
+rm -f ${CONFIGFILE}
+rm -f ${VAR_USER_CONFIG_FAC}
+rm -rf ${SSH_KEY_PATH}/*
+
+rm -f ${VAR_USER_CONFIG_FAC}
+if [ -e ${USER_CONFIG_FAC} ]; then
+# Remember a copy of user config.fac 
+    cp ${USER_CONFIG_FAC} ${VAR_USER_CONFIG_FAC}
+fi
+# Remove all of user files and directories
+rm -rf ${CONFIG_PATH}/*
+if [ -e ${VAR_USER_CONFIG_FAC} ]; then
+# Restore copy if saved.
+    mv ${VAR_USER_CONFIG_FAC} ${USER_CONFIG_FAC}
+    # Add write permission to "users" group
+    /bin/chown root:users ${USER_CONFIG_FAC}
+    /bin/chmod 0664 ${USER_CONFIG_FAC}
+fi
+logger -p user.notice "Factory reset"
+
+reboot
+exit 0
+
+
+
+

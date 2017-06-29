@@ -1,0 +1,203 @@
+#!/bin/sh
+
+. /usr/bin/pptpc-header
+
+ROMID="`rdcsman $CSID_S_SYS_INFO_ROM_ID str`"
+CUSTOMER="`expr substr $ROMID 1 3`"
+
+wr_ppp_opts()
+{
+    echo "$1" >> $PPP_OPTS 
+}
+
+
+# The options of pptp connection applied for pppd 
+# the location of option: /etc/ppp/option.pptpc
+gen_ppp_options()
+{
+    rm -f $PPP_OPTS > /dev/null 2>&1
+
+    if [ "$KERNEL_MODE" != "1" ] || [ "`uname -r | grep 2.6.36`" == "" ]; then
+       wr_ppp_opts "lock"
+    fi                
+
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_USER $i`
+    user=`rdcsman $addr str`
+    wr_ppp_opts "user \"$user\""
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_PASSWORD $i`
+    passwd=`rdcsman $addr str`
+    wr_ppp_opts "password \"$passwd\""      
+
+    wr_ppp_opts "linkname pptpc-$TUN_IDX" 
+    wr_ppp_opts "noipdefault"             
+    #wr_ppp_opts "mtu 1500"               
+    wr_ppp_opts "holdoff 3"               
+    wr_ppp_opts "nodetach"                
+    wr_ppp_opts "noaccomp"                
+    wr_ppp_opts "nopcomp"                
+    wr_ppp_opts "nobsdcomp"               
+    wr_ppp_opts "nodeflate"              
+    wr_ppp_opts "novj"                    
+    wr_ppp_opts "novjccomp"               
+ 
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_LOCAL_IP $TUN_IDX`
+    local_ip="`rdcsman $addr ipv4`"
+    [ "$local_ip" == "0.0.0.0" ] && local_ip=""
+
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_REMOTE_IP $TUN_IDX`
+    remote_ip="`rdcsman $addr ipv4`"
+    [ "$remote_ip" == "0.0.0.0" ] && remote_ip=""
+        
+    if [ ! -z "$local_ip" ] || [ ! -z "$remote_ip" ]; then
+        wr_ppp_opts "$local_ip:$remote_ip" 
+    fi
+
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_LCP_TYPE $TUN_IDX`
+    lcp_type=`rdcsman $addr u8`
+    if [ $lcp_type -eq $PPTP_LCP_TYPE_AUTO ]; then 
+        addr=`get_csid_addr $CSID_C_PPTP_CLI_QOS_ENABLE 0`
+        pptpc_qos_enable=`rdcsman $addr u8`    
+        if [ $pptpc_qos_enable -eq 1 ]; then
+            wr_ppp_opts "lcp-echo-interval 2" 
+            wr_ppp_opts "lcp-echo-failure 90" 
+        else        
+            # WAN Type:    
+            #  16 -> LOCAL_WANTYPE_3G        0x10
+            #  17 -> LOCAL_WANTYPE_IBURST    0x11
+            #  21 -> LOCAL_WANTYPE_FLASHOFDM 0x15
+            #  22 -> LOCAL_WANTYPE_S3G       0x16
+            #  64 -> LOCAL_WANTYPE_PPPOE     0x40
+            #  144 -> LOCAL_WANTYPE_DIALUP   0x90
+            addr=`get_csid_addr $CSID_C_LOCAL_WANTYPE 0`
+            wan_type="`rdcsman $addr u32`"  
+            if [ $wan_type -eq 16 ] || [ $wan_type -eq 17 ] ||
+               [ $wan_type -eq 21 ] || [ $wan_type -eq 22 ] ||
+               [ $wan_type -eq 64 ] || [ $wan_type -eq 144 ]; then
+                wr_ppp_opts "lcp-echo-interval 2"  
+                wr_ppp_opts "lcp-echo-failure 90"  
+            else
+                wr_ppp_opts "lcp-echo-interval 30" 
+                wr_ppp_opts "lcp-echo-failure 6"   
+            fi   
+        fi
+    elif [ $lcp_type -eq $PPTP_LCP_TYPE_MANUAL ]; then 
+        addr=`get_csid_addr $CSID_C_PPTP_CLI_LCP_INTERVAL $TUN_IDX`
+        lcp_interval=`rdcsman $addr u8`
+
+        addr=`get_csid_addr $CSID_C_PPTP_CLI_LCP_FAILURE $TUN_IDX`
+        lcp_failure=`rdcsman $addr u8`
+ 
+        wr_ppp_opts "lcp-echo-interval $lcp_interval"  
+        wr_ppp_opts "lcp-echo-failure $lcp_failure"    
+    elif [ $lcp_type -eq $PPTP_LCP_TYPE_DISABLE ]; then 
+        echo "Disable LCP Echo Request !"
+    else
+        echo "Unknow LCP Echo Request Type !"
+    fi
+
+    wr_ppp_opts "noauth"     
+    wr_ppp_opts "refuse-eap" 
+ 
+    # For cutomer TeleWell 
+    if [ "$CUSTOMER" = "TLW" ]; then
+        logger -p 8.7 -t "pptpc" "Write extra PPP options for TeleWell "
+        wr_ppp_opts "mtu 1460"               
+        wr_ppp_opts "refuse-mschap-v2"
+    fi   
+
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_MPPE $TUN_IDX`
+    used_mppe=`rdcsman $addr u8` 
+
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_DO_AUTH $TUN_IDX`
+    do_auth=`rdcsman $addr u8` 
+    if [ $do_auth -eq 1 ]; then
+        addr=`get_csid_addr $CSID_C_PPTP_CLI_AUTH_PAP $TUN_IDX`
+        rej_auth=`rdcsman $addr u8` 
+        if [ $rej_auth -eq $PPTP_AUTH_REJECT ] || [ $used_mppe -eq 1 ]; then
+            wr_ppp_opts "refuse-pap" 
+        fi
+ 
+        addr=`get_csid_addr $CSID_C_PPTP_CLI_AUTH_CHAP $TUN_IDX`
+        rej_auth=`rdcsman $addr u8` 
+        if [ $rej_auth -eq $PPTP_AUTH_REJECT ] || [ $used_mppe -eq 1 ]; then
+            wr_ppp_opts "refuse-chap"
+        fi                          
+
+        addr=`get_csid_addr $CSID_C_PPTP_CLI_AUTH_MSCHAP $TUN_IDX`
+        rej_auth=`rdcsman $addr u8` 
+        if [ $rej_auth -eq $PPTP_AUTH_REJECT ]; then
+            wr_ppp_opts "refuse-mschap" 
+        fi                          
+                 
+        addr=`get_csid_addr $CSID_C_PPTP_CLI_AUTH_MSCHAPV2 $TUN_IDX`
+        rej_auth=`rdcsman $addr u8` 
+        if [ $rej_auth -eq $PPTP_AUTH_REJECT ]; then
+            wr_ppp_opts "refuse-mschap-v2" 
+        fi                          
+    fi       
+
+    MPPE_40=`rdcsman 0x00054101 u16`
+    MPPE_56=`rdcsman 0x00054102 u16`
+    MPPE_128=`rdcsman 0x00054103 u16`
+    if [ $used_mppe -eq 1 ]; then
+        if [ $do_auth -eq 0 ]; then
+            wr_ppp_opts "refuse-pap"          
+            wr_ppp_opts "refuse-chap"         
+        fi
+    #    wr_ppp_opts "mppe required,stateless" 
+	  if [ "$MPPE_40" = "1" ] ; then    
+		if [ "$MPPE_56" = "1" ] ; then  
+			if [ "$MPPE_128" = "1" ] ; then
+        			wr_ppp_opts "mppe required,stateless" 
+			else
+				wr_ppp_opts "mppe required,stateless,no128"
+			fi
+		else
+			if [ "$MPPE_128" = "1" ] ; then
+        			wr_ppp_opts "mppe required,stateless,no56"
+			else
+				wr_ppp_opts "mppe required,stateless,no56,no128"
+			fi
+		fi
+	  else
+		if [ "$MPPE_56" = "1" ] ; then
+			if [ "$MPPE_128" = "1" ] ; then
+				wr_ppp_opts "mppe required,stateless,no40"
+			else
+				wr_ppp_opts "mppe required,stateless,no40,no128"
+			fi
+		else
+			if [ "$MPPE_128" = "1" ] ; then
+				wr_ppp_opts "mppe required,stateless,no40,no56"
+			else
+				wr_ppp_opts "mppe required,stateless"
+			fi
+		fi
+	  fi
+
+    else
+        if [ "$KERNEL_MODE" != "1" ]; then
+           wr_ppp_opts "sync"
+        fi
+        wr_ppp_opts "noccp"  
+        wr_ppp_opts "nomppe" 
+        wr_ppp_opts "nomppc" 
+    fi
+
+    addr=`get_csid_addr $CSID_C_PPTP_CLI_CONNECT_TYPE $TUN_IDX`
+    cnt_type=`rdcsman $addr u8`
+    if [ $cnt_type -eq 0 ]; then
+        wr_ppp_opts "idle 600"           
+        wr_ppp_opts "nopersist"          
+        wr_ppp_opts "ipcp-accept-remote" 
+        wr_ppp_opts "ipcp-accept-local"  
+        wr_ppp_opts "ktune"              
+    fi                     
+}
+
+# Detect the connection between PPTP Server and PPTP Client
+test_pns_exist()
+{
+    return # Do nothing now !
+}
+ 

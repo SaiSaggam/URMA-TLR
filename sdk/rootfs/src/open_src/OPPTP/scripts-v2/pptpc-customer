@@ -1,0 +1,480 @@
+#!/bin/sh
+
+if [ -f "/tmp/pptpc-header" ]; then
+   . /tmp/pptpc-header
+elif [ -f "/usr/bin/pptpc-header" ]; then
+   . /usr/bin/pptpc-header
+fi
+
+wr_ppp_opts()
+{
+   echo "$1" >> $PEERS_FILE
+}
+
+# The options of pptp wantype connection applied for pppd
+# the location of option: /etc/ppp/peers/pptp$MULTIWAN
+gen_wantype_pptp_options() {
+   [ ! -d $PEERS_DIR ] && mkdir -p $PEERS_DIR
+   rm -f $PEERS_FILE > /dev/null 2>&1
+
+   check_kernel_mode
+   local KERNEL_MODE="$?"
+   check_kernel_version_2_6_36
+   local KERNEL_VERSION_2_6_36="$?"
+   get_port_config
+   local pptpd_port="$C_PPTP_PORT_DEFAULT"
+   local pptpd_default_port="$C_PPTP_PORT_DEFAULT"
+   #local pptpd_local_bind_addr="0.0.0.0"
+   local PPTP_PNSSERVER="$C_PPTP_PNS_SERVER_IP"
+   #local pptp_socket_file="$PPTP_SOCKET_FILE"
+   local used_mppe="$C_PPTP_ENABLE_MPPE"
+   local linkname="$PPTP_LINKNAME"
+   local pptp_user="$C_PPTP_USER"
+   local pptp_pass="$C_PPTP_PASS"
+   #local ccp_enable=""
+   local PPTP_AUTH_REJECT="2" # Constant
+   local do_auth="1"
+   local auth_pap="0"
+   local auth_chap="0"
+   local auth_mschap="0"
+   local auth_mschapv2="0"
+   local mppe_enable_40="$C_PPTP_ENABLE_MPPE_40"
+   local mppe_enable_56="$C_PPTP_ENABLE_MPPE_56"
+   local mppe_enable_128="$C_PPTP_ENABLE_MPPE_128"
+   local CNTTYPE="$C_PPTP_CNTTYPE"
+   local IDLETIME="$C_PPTP_IDLETIME"
+   local MTU_SIZE="$C_PPTP_MTU"
+   #local local_ip=""
+   #local remote_ip=""
+   #local PPTP_LCP_TYPE_AUTO=0 # Constant
+   #local PPTP_LCP_TYPE_MANUAL=1 # Constant
+   #local PPTP_LCP_TYPE_DISABLE=2 # Constant
+   #local lcp_type="$PPTP_LCP_TYPE_MANUAL"
+   #local pptpc_qos_enable="$C_PPTP_CLI_QOS_ENABLE"
+   #local wan_type=""
+
+   #get_local_config
+   #wan_type="$C_LOCAL_WANTYPE"
+   #if [ -z "$wan_type" ] || [ "$wan_type" == "0" ]; then
+   #   for i in $WAN_LIST
+   #   do
+   #      get_local_config $i
+   #      wan_type="$C_LOCAL_WANTYPE"
+   #      [ -n "$wan_type" ] && [ $wan_type -gt 0 ] && break
+   #   done
+   #fi
+
+   local lcp_interval="20"
+   local lcp_failure="6"
+   local PPP_PRIDNS="$C_PPTP_PRIDNS"
+   local PPP_SECDNS="$C_PPTP_SECDNS"
+   local up_script="/etc/ppp/ip-up-$linkname"
+   local down_script="/etc/ppp/ip-down-$linkname"
+   #get_sys_rom_info
+   #get_local_config $MULTIWAN
+   #local hostname="$C_LOCAL_HOSTNAME"
+   #local romid="$S_SYS_INFO_ROM_ID"
+
+   if [ -n "$KERNEL_MODE" ] && [ "$KERNEL_MODE" != "0" ]; then
+      wr_ppp_opts "plugin \"pptp.so\" pptp_server $PPTP_PNSSERVER"
+   else
+      if [ -n "$used_mppe" ] && [ "$used_mppe" != "0" ]; then
+         wr_ppp_opts "pty \"pptp $PPTP_PNSSERVER --nolaunchpppd --loglevel 0\""
+      else
+         wr_ppp_opts "pty \"pptp $PPTP_PNSSERVER --nolaunchpppd --loglevel 0 --sync\""
+      fi
+   fi
+
+   wr_ppp_opts "linkname $linkname"
+
+   # Add pppd arguments (username, password) instead of checking pap-secret or chap-secrets (Issues for Login Security)
+   wr_ppp_opts "user \"$pptp_user\""
+   wr_ppp_opts "password \"$pptp_pass\""
+
+   wr_ppp_opts "hide-password"
+   wr_ppp_opts "noipdefault"
+   wr_ppp_opts "nodetach"
+   wr_ppp_opts "noaccomp"
+   wr_ppp_opts "nopcomp"
+
+   #if [ -n "$ccp_enable" ] && [ "$ccp_enable" != "0" ]; then
+   #   wr_ppp_opts "bsdcomp 9,15"
+   #   wr_ppp_opts "deflate 9,15"
+   #   wr_ppp_opts "predictor1"
+   #   wr_ppp_opts "lzs"
+   #else
+      wr_ppp_opts "nobsdcomp"
+      wr_ppp_opts "nodeflate"
+   #fi
+
+   wr_ppp_opts "novj"
+   wr_ppp_opts "novjccomp"
+   wr_ppp_opts "noauth"
+
+   if [ -n "$do_auth" ] && [ "$do_auth" != "0" ]; then
+      if [ -n "$auth_pap" -a "$auth_pap" == "$PPTP_AUTH_REJECT" ] || [ -n "$used_mppe" -a "$used_mppe" != "0" ]; then
+         wr_ppp_opts "refuse-pap"
+      fi
+      if [ -n "$auth_chap" -a "$auth_chap" == "$PPTP_AUTH_REJECT" ] || [ -n "$used_mppe" -a "$used_mppe" != "0" ]; then
+         wr_ppp_opts "refuse-chap"
+      fi
+      if [ -n "$auth_mschap" ] && [ "$auth_mschap" == "$PPTP_AUTH_REJECT" ]; then
+         wr_ppp_opts "refuse-mschap"
+      fi
+      if [ -n "$auth_mschapv2" ] && [ "$auth_mschapv2" == "$PPTP_AUTH_REJECT" ]; then
+         wr_ppp_opts "refuse-mschap-v2"
+      fi
+   fi
+
+   wr_ppp_opts "refuse-eap"
+   wr_ppp_opts "default-asyncmap"
+
+   wr_ppp_opts "debug"
+   # wr_ppp_opts "dump"
+   wr_ppp_opts "logfd 2"
+
+   if [ -z "$KERNEL_MODE" -o "$KERNEL_MODE" == "0" ]; then #|| [ -z "$KERNEL_VERSION_2_6_36" -o "$KERNEL_VERSION_2_6_36" == "0" ]; then
+      wr_ppp_opts "lock"
+   fi
+
+   if [ -n "$used_mppe" ] && [ "$used_mppe" != "0" ]; then
+      local mppe_opts="mppe required,stateless"
+      [ -n "$used_mppe" ] && [ "$mppe_enable_40" == "0" ] && mppe_opts="$mppe_opts,no40"
+      [ -n "$used_mppe" ] && [ "$mppe_enable_56" == "0" ] && mppe_opts="$mppe_opts,no56"
+      [ -n "$used_mppe" ] && [ "$mppe_enable_128" == "0" ] && mppe_opts="$mppe_opts,no128"
+      [ -z "$used_mppe" -o "$mppe_opts" == "mppe required,stateless,no40,no56,no128" ] && mppe_opts="mppe required,stateless"
+      wr_ppp_opts "$mppe_opts"
+   else
+      if [ -z "$KERNEL_MODE" ] || [ "$KERNEL_MODE" == "0" ]; then
+         wr_ppp_opts "sync"
+      fi
+      wr_ppp_opts "noccp"
+      wr_ppp_opts "nomppe"
+      wr_ppp_opts "nomppc"
+   fi
+
+   if [ -n "$CNTTYPE" ] && [ "$CNTTYPE" != "1" ]; then # NOT Auto
+      wr_ppp_opts "holdoff 3"
+      wr_ppp_opts "nopersist"
+      wr_ppp_opts "ipcp-accept-remote"
+      wr_ppp_opts "ipcp-accept-local"
+      wr_ppp_opts "ktune"
+
+      if [ -n "$IDLETIME" ] && [ $((IDLETIME)) -gt 0 ]; then
+         wr_ppp_opts "idle $IDLETIME"
+      else
+         wr_ppp_opts "idle 600"
+      fi
+   fi
+
+   if [ -z "$MTU_SIZE" ] || [ $((MTU_SIZE)) -le 0 ] ; then
+      wr_ppp_opts "mtu 1460"
+   else
+      wr_ppp_opts "mtu $MTU_SIZE"
+   fi
+
+   #[ "$local_ip" == "0.0.0.0" ] && local_ip=""
+   #[ "$remote_ip" == "0.0.0.0" ] && remote_ip=""
+   #if [ -n "$local_ip" ] || [ -n "$remote_ip" ]; then
+   #   wr_ppp_opts "$local_ip:$remote_ip"
+   #fi
+
+   #if [ -z "$lcp_type" ] || [ "$lcp_type" == "$PPTP_LCP_TYPE_AUTO" ]; then
+   #   if [ -n "$pptpc_qos_enable" ] && [ "$pptpc_qos_enable" != "0" ]; then
+   #      wr_ppp_opts "lcp-echo-interval 2"
+   #      wr_ppp_opts "lcp-echo-failure 90"
+   #   else
+   #      # WAN Type:
+   #      #  16 -> LOCAL_WANTYPE_3G        0x10
+   #      #  17 -> LOCAL_WANTYPE_IBURST    0x11
+   #      #  21 -> LOCAL_WANTYPE_FLASHOFDM 0x15
+   #      #  22 -> LOCAL_WANTYPE_S3G       0x16
+   #      #  64 -> LOCAL_WANTYPE_PPPOE     0x40
+   #      #  144 -> LOCAL_WANTYPE_DIALUP   0x90
+   #      if [ -z "$wan_type" ]; then
+   #         wr_ppp_opts "lcp-echo-interval 30"
+   #         wr_ppp_opts "lcp-echo-failure 6"
+   #      elif [ "$wan_type" == "16" ] || [ "$wan_type" == "17" ] ||
+   #         [ "$wan_type" == "21" ] || [ "$wan_type" == "22" ] ||
+   #         [ "$wan_type" == "64" ] || [ "$wan_type" == "144" ]; then
+   #         wr_ppp_opts "lcp-echo-interval 2"
+   #         wr_ppp_opts "lcp-echo-failure 90"
+   #      else
+   #         wr_ppp_opts "lcp-echo-interval 30"
+   #         wr_ppp_opts "lcp-echo-failure 6"
+   #      fi
+   #   fi
+   #elif [ "$lcp_type" == "$PPTP_LCP_TYPE_MANUAL" ]; then
+      if [ -z "$lcp_interval" ] || [ $((lcp_interval)) -le 0 ]; then
+         lcp_interval="20"
+      fi
+
+      if [ -z "$lcp_failure" ] || [ $((lcp_failure)) -le 0 ]; then
+         lcp_failure="6"
+      fi
+
+      wr_ppp_opts "lcp-echo-interval $lcp_interval"
+      wr_ppp_opts "lcp-echo-failure $lcp_failure"
+   #elif [ "$lcp_type" == "$PPTP_LCP_TYPE_DISABLE" ]; then
+   #   : # echo "Disable LCP Echo Request !"
+   #else
+   #   : # echo "Unknow LCP Echo Request Type !"
+   #fi
+
+   if [ -z "$PPP_PRIDNS" -o "$PPP_PRIDNS" == "0.0.0.0" ] && [ -z "$PPP_SECDNS" -o "$PPP_SECDNS" == "0.0.0.0" ]; then
+      wr_ppp_opts "usepeerdns"
+   fi
+
+   echo "#!/bin/sh" > $up_script
+   echo "#!/bin/sh" > $down_script
+   if [ -f "/tmp/pptp-action" ]; then
+      echo "/tmp/pptp-action ip-up \$*" >> $up_script
+      echo "/tmp/pptp-action ip-down \$*" >> $down_script
+   elif [ -f "/usr/bin/pptp-action" ]; then
+      echo "/usr/bin/pptp-action ip-up \$*" >> $up_script
+      echo "/usr/bin/pptp-action ip-down \$*" >> $down_script
+   fi
+   chmod +x $up_script
+   chmod +x $down_script
+
+   wr_ppp_opts "ip-up $up_script"
+   wr_ppp_opts "ip-down $down_script"
+   wr_ppp_opts "ipparam $linkname"
+}
+
+# The options of pptp client connection applied for pppd 
+# the location of option: /etc/ppp/option.pptpc
+gen_pptpc_options() {
+   [ ! -d $PEERS_DIR ] && mkdir -p $PEERS_DIR
+   rm -f $PEERS_FILE > /dev/null 2>&1
+
+   check_kernel_mode
+   local KERNEL_MODE="$?"
+   check_kernel_version_2_6_36
+   local KERNEL_VERSION_2_6_36="$?"
+   get_port_config
+   local pptpd_port="$C_PPTP_PORT_DEFAULT"
+   local pptpd_default_port="$C_PPTP_PORT_DEFAULT"
+   #local pptpd_local_bind_addr="0.0.0.0"
+   local PPTP_PNSSERVER="$C_PPTP_CLI_PEERIP"
+   #local pptp_socket_file="$PPTP_SOCKET_FILE"
+   local used_mppe="$C_PPTP_CLI_MPPE"
+   local linkname="$PPTP_LINKNAME"
+   local pptp_user="$C_PPTP_CLI_USER"
+   local pptp_pass="$C_PPTP_CLI_PASSWORD"
+   #local ccp_enable=""
+   local PPTP_AUTH_REJECT="2" # Constant
+   local do_auth="$C_PPTP_CLI_DO_AUTH"
+   local auth_pap="$C_PPTP_CLI_AUTH_PAP"
+   local auth_chap="$C_PPTP_CLI_AUTH_CHAP"
+   local auth_mschap="$C_PPTP_CLI_AUTH_MSCHAP"
+   local auth_mschapv2="$C_PPTP_CLI_AUTH_MSCHAPV2"
+   local mppe_enable_40="1"
+   local mppe_enable_56="1"
+   local mppe_enable_128="1"
+   local CNTTYPE="$C_PPTP_CLI_CONNECT_TYPE"
+   local IDLETIME="$C_PPTP_CLI_IDLETIME"
+   local MTU_SIZE=""
+   local local_ip="$C_PPTP_CLI_LOCAL_IP"
+   local remote_ip="$C_PPTP_CLI_REMOTE_IP"
+   local PPTP_LCP_TYPE_AUTO="0" # Constant
+   local PPTP_LCP_TYPE_MANUAL="1" # Constant
+   local PPTP_LCP_TYPE_DISABLE="2" # Constant
+   local lcp_type="$C_PPTP_CLI_LCP_TYPE"
+   local pptpc_qos_enable="$C_PPTP_CLI_QOS_ENABLE"
+   local wan_type=""
+
+   get_local_config
+   wan_type="$C_LOCAL_WANTYPE"
+   if [ -z "$wan_type" ] || [ "$wan_type" == "0" ]; then
+      for i in $WAN_LIST
+      do
+         get_local_config $i
+         wan_type="$C_LOCAL_WANTYPE"
+         [ -n "$wan_type" ] && [ $wan_type -gt 0 ] && break
+      done
+   fi
+
+   local lcp_interval="$C_PPTP_CLI_LCP_INTERVAL"
+   local lcp_failure="$C_PPTP_CLI_LCP_FAILURE"
+   #local PPP_PRIDNS=""
+   #local PPP_SECDNS=""
+   #local up_script="/etc/ppp/ip-up-$linkname"
+   #local down_script="/etc/ppp/ip-down-$linkname"
+   get_sys_rom_info
+   local hostname="pptpc"
+   #local romid="$S_SYS_INFO_ROM_ID"
+
+   # For Cutomer TeleWell
+   if [ -n "$S_SYS_INFO_ROM_ID_CUSTOMER_INFO" ] && [ "$S_SYS_INFO_ROM_ID_CUSTOMER_INFO" == "TLW" ]; then
+      logger -p 8.7 -t "pptpc" "Write extra PPP options for TeleWell "
+      MTU_SIZE="1460"
+      auth_mschapv2="$PPTP_AUTH_REJECT"
+   fi
+
+   if [ -n "$KERNEL_MODE" ] && [ "$KERNEL_MODE" != "0" ]; then
+      wr_ppp_opts "plugin \"pptp.so\" pptp_server $PPTP_PNSSERVER"
+   else
+      if [ -n "$used_mppe" ] && [ "$used_mppe" != "0" ]; then
+         wr_ppp_opts "pty \"pptp $PPTP_PNSSERVER --nolaunchpppd --loglevel 0\""
+      else
+         wr_ppp_opts "pty \"pptp $PPTP_PNSSERVER --nolaunchpppd --loglevel 0 --sync\""
+      fi
+   fi
+
+   wr_ppp_opts "linkname $linkname"
+
+   # Add pppd arguments (username, password) instead of checking pap-secret or chap-secrets (Issues for Login Security)
+   wr_ppp_opts "user \"$pptp_user\""
+   wr_ppp_opts "password \"$pptp_pass\""
+
+   wr_ppp_opts "hide-password"
+   wr_ppp_opts "noipdefault"
+   wr_ppp_opts "nodetach"
+   wr_ppp_opts "noaccomp"
+   wr_ppp_opts "nopcomp"
+
+   #if [ -n "$ccp_enable" ] && [ "$ccp_enable" != "0" ]; then
+   #   wr_ppp_opts "bsdcomp 9,15"
+   #   wr_ppp_opts "deflate 9,15"
+   #   wr_ppp_opts "predictor1"
+   #   wr_ppp_opts "lzs"
+   #else
+      wr_ppp_opts "nobsdcomp"
+      wr_ppp_opts "nodeflate"
+   #fi
+
+   wr_ppp_opts "novj"
+   wr_ppp_opts "novjccomp"
+   wr_ppp_opts "noauth"
+
+   if [ -n "$do_auth" ] && [ "$do_auth" != "0" ]; then
+      if [ -n "$auth_pap" -a "$auth_pap" == "$PPTP_AUTH_REJECT" ] || [ -n "$used_mppe" -a "$used_mppe" != "0" ]; then
+         wr_ppp_opts "refuse-pap"
+      fi
+      if [ -n "$auth_chap" -a "$auth_chap" == "$PPTP_AUTH_REJECT" ] || [ -n "$used_mppe" -a "$used_mppe" != "0" ]; then
+         wr_ppp_opts "refuse-chap"
+      fi
+      if [ -n "$auth_mschap" ] && [ "$auth_mschap" == "$PPTP_AUTH_REJECT" ]; then
+         wr_ppp_opts "refuse-mschap"
+      fi
+      if [ -n "$auth_mschapv2" ] && [ "$auth_mschapv2" == "$PPTP_AUTH_REJECT" ]; then
+         wr_ppp_opts "refuse-mschap-v2"
+      fi
+   fi
+
+   wr_ppp_opts "refuse-eap"
+   wr_ppp_opts "default-asyncmap"
+
+   if [ -z "$KERNEL_MODE" -o "$KERNEL_MODE" == "0" ]; then #|| [ -z "$KERNEL_VERSION_2_6_36" -o "$KERNEL_VERSION_2_6_36" == "0" ]; then
+      wr_ppp_opts "lock"
+   fi
+
+   wr_ppp_opts "debug"
+   # wr_ppp_opts "dump"
+   wr_ppp_opts "logfd 2"
+
+   if [ -n "$used_mppe" ] && [ "$used_mppe" != "0" ]; then
+      local mppe_opts="mppe required,stateless"
+      [ -n "$used_mppe" ] && [ "$mppe_enable_40" == "0" ] && mppe_opts="$mppe_opts,no40"
+      [ -n "$used_mppe" ] && [ "$mppe_enable_56" == "0" ] && mppe_opts="$mppe_opts,no56"
+      [ -n "$used_mppe" ] && [ "$mppe_enable_128" == "0" ] && mppe_opts="$mppe_opts,no128"
+      [ -z "$used_mppe" -o "$mppe_opts" == "mppe required,stateless,no40,no56,no128" ] && mppe_opts="mppe required,stateless"
+      wr_ppp_opts "$mppe_opts"
+   else
+      if [ -z "$KERNEL_MODE" ] || [ "$KERNEL_MODE" == "0" ]; then
+         wr_ppp_opts "sync"
+      fi
+      wr_ppp_opts "noccp"
+      wr_ppp_opts "nomppe"
+      wr_ppp_opts "nomppc"
+   fi
+
+   if [ -n "$CNTTYPE" ] && [ "$CNTTYPE" != "1" ]; then # NOT Auto
+      wr_ppp_opts "holdoff 3"
+      wr_ppp_opts "nopersist"
+      wr_ppp_opts "ipcp-accept-remote"
+      wr_ppp_opts "ipcp-accept-local"
+      wr_ppp_opts "ktune"
+
+      if [ -n "$IDLETIME" ] && [ $((IDLETIME)) -gt 0 ]; then
+         wr_ppp_opts "idle $IDLETIME"
+      else
+         wr_ppp_opts "idle 600"
+      fi
+   fi
+
+   if [ -z "$MTU_SIZE" ] || [ $((MTU_SIZE)) -le 0 ] ; then
+      : # wr_ppp_opts "mtu 1410"
+   else
+      wr_ppp_opts "mtu $MTU_SIZE"
+   fi
+
+   [ "$local_ip" == "0.0.0.0" ] && local_ip=""
+   [ "$remote_ip" == "0.0.0.0" ] && remote_ip=""
+   if [ -n "$local_ip" ] || [ -n "$remote_ip" ]; then
+      wr_ppp_opts "$local_ip:$remote_ip"
+   fi
+
+   if [ -z "$lcp_type" ] || [ "$lcp_type" == "$PPTP_LCP_TYPE_AUTO" ]; then
+      if [ -n "$pptpc_qos_enable" ] && [ "$pptpc_qos_enable" != "0" ]; then
+         wr_ppp_opts "lcp-echo-interval 2"
+         wr_ppp_opts "lcp-echo-failure 90"
+      else
+         # WAN Type:
+         #  16 -> LOCAL_WANTYPE_3G        0x10
+         #  17 -> LOCAL_WANTYPE_IBURST    0x11
+         #  21 -> LOCAL_WANTYPE_FLASHOFDM 0x15
+         #  22 -> LOCAL_WANTYPE_S3G       0x16
+         #  64 -> LOCAL_WANTYPE_PPPOE     0x40
+         #  144 -> LOCAL_WANTYPE_DIALUP   0x90
+         if [ -z "$wan_type" ]; then
+            wr_ppp_opts "lcp-echo-interval 30"
+            wr_ppp_opts "lcp-echo-failure 6"
+         elif [ "$wan_type" == "16" ] || [ "$wan_type" == "17" ] ||
+            [ "$wan_type" == "21" ] || [ "$wan_type" == "22" ] ||
+            [ "$wan_type" == "64" ] || [ "$wan_type" == "144" ]; then
+            wr_ppp_opts "lcp-echo-interval 2"
+            wr_ppp_opts "lcp-echo-failure 90"
+         else
+            wr_ppp_opts "lcp-echo-interval 30"
+            wr_ppp_opts "lcp-echo-failure 6"
+         fi
+      fi
+   elif [ "$lcp_type" == "$PPTP_LCP_TYPE_MANUAL" ]; then
+      if [ -z "$lcp_interval" ] || [ $((lcp_interval)) -le 0 ]; then
+         lcp_interval="$C_PPTP_CLI_LCP_INTERVAL"
+      fi
+
+      if [ -z "$lcp_failure" ] || [ $((lcp_failure)) -le 0 ]; then
+         lcp_failure="$C_PPTP_CLI_LCP_FAILURE"
+      fi
+
+      wr_ppp_opts "lcp-echo-interval $lcp_interval"
+      wr_ppp_opts "lcp-echo-failure $lcp_failure"
+   #elif [ "$lcp_type" == "$PPTP_LCP_TYPE_DISABLE" ]; then
+   #   : # echo "Disable LCP Echo Request !"
+   #else
+   #   : # echo "Unknow LCP Echo Request Type !"
+   fi
+
+   #if [ -z "$PPP_PRIDNS" -o "$PPP_PRIDNS" == "0.0.0.0" ] && [ -z "$PPP_SECDNS" -o "$PPP_SECDNS" == "0.0.0.0" ]; then
+   #   wr_ppp_opts "usepeerdns"
+   #fi
+
+   #echo "#!/bin/sh" > $up_script
+   #echo "#!/bin/sh" > $down_script
+   #if [ -f "/tmp/pptp-action" ]; then
+   #   echo "/tmp/pptp-action ip-up \$*" >> $up_script
+   #   echo "/tmp/pptp-action ip-down \$*" >> $down_script
+   #elif [ -f "/usr/bin/pptp-action" ]; then
+   #   echo "/usr/bin/pptp-action ip-up \$*" >> $up_script
+   #   echo "/usr/bin/pptp-action ip-down \$*" >> $down_script
+   #fi
+   #chmod +x $up_script
+   #chmod +x $down_script
+
+   #wr_ppp_opts "ip-up $up_script"
+   #wr_ppp_opts "ip-down $down_script"
+   wr_ppp_opts "ipparam $linkname"
+}

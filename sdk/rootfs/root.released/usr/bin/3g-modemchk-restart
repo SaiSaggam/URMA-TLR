@@ -1,0 +1,204 @@
+#!/bin/sh
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+get_index "$2" "$3" 
+get_config ${Index} ${Index_3G}
+
+gpio=`rdcsman 0x001e0033 u8` # for one usb
+ACTIVE_GPIO=`rdcsman 0x001e276${Index_3G} u8`
+MODULE_PWR_TYPE=`rdcsman 0x001e277${Index_3G} u8`
+MAL_ENABLE=`rdcsman 0x801e5030 u8`
+
+MALDAEMON="mal_daemon"
+MALDAEMON_PID_FILE="/var/run/mal_daemon_${Index}.pid"
+
+QMUXD="qmuxd"
+QMUXD_PID_FILE=""
+
+MALD="mald"
+MALD_PID_FILE="/var/run/mald_pid_${Index}"
+
+QMI_DAEMON_PID_FILE="/var/run/qmi_daemon_${Index}.pid"
+
+APN_LIST_COUNT_FILE_PATH="/tmp/auto_apn_list_count_${Index_3G}"
+APN_ACTIVATED_FILE_PATH="/tmp/auto_apn_activated_${Index_3G}"
+APN_AUTO_DONE="/tmp/auto_apn_done_${Index_3G}"
+
+rm_driver_first_to_prevent_panic ()
+{
+	local CHK_VENDORID="`rdcsman 0x8055004${Index} u16`"
+	local CHK_PRODUCTID="`rdcsman 0x8055005${Index} u16`"
+
+	# for D18Qx, driver option and driver qmi_wwan
+	if [ "${CHK_VENDORID}" == "5173" ] && [ "${CHK_PRODUCTID}" == "53633" ] ; then
+		rmmod option
+		rmmod usb_wwan
+		rmmod usbserial
+
+		rmmod qmi_wwan
+		rmmod cdc_wdm
+		rmmod usbnet
+		rmmod mii
+	fi
+}
+
+kill_process ()
+{
+    if [ $MAL_ENABLE -eq "1" ];then
+        logger -t "O3G/SCRIPT" -p 8.7 "Kill MAL process!!"
+
+        # Kill MAL_daemon
+        #killall `ps | grep ${MALDAEMON} | cut -dr -f1` > /dev/null 2>&1
+        if [ -f "${MALDAEMON_PID_FILE}" ] || [ -r "${MALDAEMON_PID_FILE}" ] ; then
+            MALDAEMON_PID="`cat ${MALDAEMON_PID_FILE}`"
+            rm -f ${MALDAEMON_PID_FILE}
+            kill ${MALDAEMON_PID} > /dev/null 2>&1
+        fi
+
+        # Kill QMUXD
+        killall `ps | grep ${QMUXD}` > /dev/null 2>&1
+
+        # Kill MALD
+        #killall `ps | grep ${MALD}` > /dev/null 2>&1
+        if [ -f "${MALD_PID_FILE}" ] || [ -r "${MALD_PID_FILE}" ] ; then
+            MALD_PID="`cat ${MALD_PID_FILE}`"
+            rm -f ${MALD_PID_FILE}
+            kill ${MALD_PID} > /dev/null 2>&1
+        fi
+    fi
+
+    # Kill qmi_daemon
+    if [ -f "${QMI_DAEMON_PID_FILE}" ] || [ -r "${QMI_DAEMON_PID_FILE}" ] ; then 
+        logger -t "O3G/SCRIPT" -p 8.7 "Kill QMI daemon!!"
+        local QMI_DAEMON_PID="`cat ${QMI_DAEMON_PID_FILE}`"
+        rm -f ${QMI_DAEMON_PID_FILE}
+        kill -15 ${QMI_DAEMON_PID} > /dev/null 2>&1
+    fi
+}
+
+check_connect_fail ()
+{
+    CSID_S_3G_MODEM_RESTART_COUNT=`rdcsman 0x801e712${Index_3G} u32`
+    MODEMCHK_RESTART_PATH="/tmp/modem_restart_count_${Index_3G}" 
+
+    # If try times is 0 to write deafault 3 times
+    if [ $CSID_C_3G_MODEM_RESTART_TIMES -eq "0" ];then
+        wrcsman "0x001e274${Index_3G} 3"
+    fi 
+
+    local connect_fail_count=$CSID_S_3G_MODEM_RESTART_COUNT
+    local max_retry=$CSID_C_3G_MODEM_RESTART_TIMES
+
+    if [ "$CSID_C_3G_MULTIWAN_AUTO_APN" == "0" ];then		# auto APN
+        if [ -f ${APN_LIST_COUNT_FILE_PATH} ];then
+            local apn_list_count=`cat "${APN_LIST_COUNT_FILE_PATH}"`
+            max_retry=`expr ${max_retry} \* ${apn_list_count}`
+        fi
+    fi
+
+    connect_fail_count=`expr $connect_fail_count + 1`
+
+    if [ "$connect_fail_count" -gt "$max_retry" ];then
+        #3g-multi-action stop ${Index_3G}
+        logger -t "O3G/SCRIPT" -p 8.7 "Can't get 3G IP, need to reset modem!!"
+        kill_process
+
+        local rm_driver_before_power_off=`rdcsman 0x001e2717 u16`
+        if [ "${rm_driver_before_power_off}" == "1" ]; then
+            rm_driver_first_to_prevent_panic
+        fi
+		
+        if [ "$MODULE_PWR_TYPE" -eq "1" ] ; then    #I2C type
+            if [ "${Index_3G}" -eq "1" ] ; then
+                # For 3G2
+                /usr/bin/ctrl-74138 stop-ext
+                sleep 8
+                /usr/bin/ctrl-74138 start-ext
+            else
+                # For 3G1
+                /usr/bin/ctrl-74138 stop
+                sleep 8
+                /usr/bin/ctrl-74138 start
+            fi
+        else                                        #gpio type
+            if [ "$ACTIVE_GPIO" -eq "1" ] ; then
+                gpio l $gpio 0 4000 0 1 4000
+                sleep 8
+                gpio l $gpio 4000 0 1 0 4000
+            else
+                gpio l $gpio 4000 0 1 0 4000
+                sleep 8
+                gpio l $gpio 0 4000 0 1 4000
+            fi
+        fi
+
+        wrcsman "0x801e712${Index_3G} 0"
+        rm -f $MODEMCHK_RESTART_PATH
+        sleep 2
+
+        [ -f "${APN_LIST_COUNT_FILE_PATH}" ] && rm -f "${APN_LIST_COUNT_FILE_PATH}"
+        [ -f "${APN_ACTIVATED_FILE_PATH}" ] && rm -f "${APN_ACTIVATED_FILE_PATH}"
+        [ -f "${APN_AUTO_DONE}" ] && rm -f "${APN_AUTO_DONE}"
+
+        exit 1
+    else
+        logger -p user.debug -t "O3G/SCRIPT" "Modem restart connect_count=$connect_fail_count"
+        echo "$connect_fail_count" > $MODEMCHK_RESTART_PATH
+        wrcsman "0x801e712${Index_3G} $connect_fail_count"
+    fi
+
+    return 0
+}
+
+restart_modem(){
+    logger -t "O3G/SCRIPT" -p 8.7 "Can't get 3G network name, reset modem!!"
+    kill_process
+
+    if [ "$MODULE_PWR_TYPE" -eq "1" ] ; then
+        # Power I2C type
+        if [ "${Index_3G}" -eq "1" ] ; then
+            # For 3G2
+            /usr/bin/ctrl-74138 stop-ext
+            sleep 8
+            /usr/bin/ctrl-74138 start-ext
+        else
+            # For 3G1
+            /usr/bin/ctrl-74138 stop
+            sleep 8
+            /usr/bin/ctrl-74138 start
+        fi
+    else
+        # Power GPIO type
+        if [ "$ACTIVE_GPIO" -eq "1" ] ; then
+            gpio l $gpio 0 4000 0 1 4000
+            killall send_ATcmd 
+            sleep 8
+            gpio l $gpio 4000 0 1 0 4000
+        else
+            gpio l $gpio 4000 0 1 0 4000
+            killall send_ATcmd
+            sleep 8
+            gpio l $gpio 0 4000 0 1 4000
+        fi 
+    fi
+    sleep 2
+    return 0
+}
+
+usage() {
+	 echo "$0 [cntstart|resmodem] [index_usb] [index_3g]"
+	 exit 1
+}
+
+# --------------- main --------------- 
+[ -z "$1" ] && usage;
+
+case "$1" in
+    cntstart)       check_connect_fail ;;
+    resmodem)       restart_modem ;;
+    *)              usage;;
+esac
+
+exit 0 
+

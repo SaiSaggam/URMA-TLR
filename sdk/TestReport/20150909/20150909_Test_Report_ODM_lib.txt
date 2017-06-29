@@ -1,0 +1,163 @@
+***************
+TEST 1.
+Goal: test the ODM library
+***************
+1. run odmtest, check the result.
+------------------------
+get_odm_ECN: ret=13, ECN=[200909100001]
+get_odm_PV: ret=1, PV=[1]
+get_odm_ModelName: ret=18, ModelName=[WiFi Access Point]
+get_odm_EIDRule: ret=2, EIDRule=[1e04]
+get_odm_DefIP: ret=4, DefIP=[192.168.123.254]
+get_odm_ROMID: ret=13, ROMID=[DGI6E4006001]
+get_odm_FMID: ret=2, FMID=[6e40]
+get_odm_MAC: ret=6, MAC=[00:50:18:12:34:56]
+get_valid_MAC(0): ret=6, MAC=[00:50:18:12:34:56]
+get_valid_MAC(1): ret=6, MAC=[00:50:18:12:34:57]
+get_valid_MAC(5): ret=6, MAC=[00:50:18:12:34:5B]
+------------------------
+
+
+
+
+
+
+and here is the source codes for odmtest:
+/************************************
+//
+// Example program to show how to use ODM library
+//
+//			-- Lily 20150723
+//
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "odm.h"
+
+int main()
+{
+	int ret;
+	unsigned char buf[MAX_LEN]={0};
+	unsigned short pv=0;
+	unsigned int eid=0, fmid=0;
+
+	memset(buf,0x0,sizeof(buf));
+	ret = get_odm_ECN((char *)buf, sizeof(buf));
+	if(ret<=0)
+	{
+		printf("ODMtest: ECN get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_ECN: ret=%d, ECN=[%s]\n", ret, buf);
+	}
+
+	pv = 0;
+	ret = get_odm_PV(&pv, sizeof(pv));
+	if(ret<=0)
+	{
+		printf("ODMtest: PV get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_PV: ret=%d, PV=[%d]\n", ret, pv);
+	}
+
+	memset(buf,0x0,sizeof(buf));
+	ret = get_odm_ModelName((char *)buf, sizeof(buf));
+	if(ret<=0)
+	{
+		printf("ODMtest: ModelName get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_ModelName: ret=%d, ModelName=[%s]\n", ret, buf);
+	}
+
+	eid = 0;
+	ret = get_odm_EIDRule(&eid, sizeof(eid));
+	if(ret<=0)
+	{
+		printf("ODMtest: EIDRule get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_EIDRule: ret=%d, EIDRule=[%x]\n", ret, eid);
+	}
+
+	memset(buf,0x0,sizeof(buf));
+	ret = get_odm_DefIP(buf, sizeof(buf));
+	if(ret<=0)
+	{
+		printf("ODMtest: DefIP get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_DefIP: ret=%d, DefIP=[%d.%d.%d.%d]\n", ret, buf[0],buf[1],buf[2],buf[3]);
+	}
+
+	memset(buf,0x0,sizeof(buf));
+	ret = get_odm_ROMID((char *)buf, sizeof(buf));
+	if(ret<=0)
+	{
+		printf("ODMtest: ROMID get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_ROMID: ret=%d, ROMID=[%s]\n", ret, buf);
+	}
+
+	fmid = 0;
+	ret = get_odm_FMID(&fmid, sizeof(fmid));
+	if(ret<=0)
+	{
+		printf("ODMtest: FMID get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_FMID: ret=%d, FMID=[%x]\n", ret, fmid);
+	}
+
+	memset(buf,0x0,sizeof(buf));
+	ret = get_odm_MAC(buf, sizeof(buf));
+	if(ret<=0)
+	{
+		printf("ODMtest: MAC get failed.\n");
+	}
+	else
+	{
+		printf("get_odm_MAC: ret=%d, MAC=[%02X:%02X:%02X:%02X:%02X:%02X]\n", ret, buf[0],buf[1],buf[2],buf[3],buf[4],buf[5]);
+	}
+
+	memset(buf,0x0,sizeof(buf));
+	ret = get_valid_MAC(0, buf, 6);
+	if(ret<=0)
+	{
+		printf("ODMtest: valid MAC[0] get failed.\n");
+	}
+	else
+	{
+		printf("get_valid_MAC(0): ret=%d, MAC=[%02X:%02X:%02X:%02X:%02X:%02X]\n", ret, buf[0],buf[1],buf[2],buf[3],buf[4],buf[5]);
+	}
+	ret = get_valid_MAC(1, buf, 6);
+	if(ret<=0)
+	{
+		printf("ODMtest: valid MAC[1] get failed.\n");
+	}
+	else
+	{
+		printf("get_valid_MAC(1): ret=%d, MAC=[%02X:%02X:%02X:%02X:%02X:%02X]\n", ret, buf[0],buf[1],buf[2],buf[3],buf[4],buf[5]);
+	}
+	ret = get_valid_MAC(5, buf, 6);
+	if(ret<=0)
+	{
+		printf("ODMtest: valid MAC[5] get failed.\n");
+	}
+	else
+	{
+		printf("get_valid_MAC(5): ret=%d, MAC=[%02X:%02X:%02X:%02X:%02X:%02X]\n", ret, buf[0],buf[1],buf[2],buf[3],buf[4],buf[5]);
+	}
+
+	return 0;
+}

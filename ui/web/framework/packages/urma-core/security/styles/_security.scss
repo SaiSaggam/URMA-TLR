@@ -1,0 +1,38 @@
+.login {
+  @include span-columns(6);
+  margin-top: $spacing-unit;
+  @include media($medium){
+    @include span-columns(8 of 8);
+  }
+  @include media($large){
+    @include span-columns(6 of 12);
+    float: right;
+  }
+}
+
+.login-buttons {
+  width: 100%;
+  .box {
+    width: 100%;
+    @include media($large){
+      &:first-child,
+      &:nth-child(2){
+        float: left;
+        width: 38%;
+        margin-right: 2%;
+      }
+      &:nth-child(3),
+      &:nth-child(4){
+        float: right;
+        width: 20%;
+      }
+      button {
+        width: 100%;
+        margin-top: 4px;
+      }
+      input {
+        margin-bottom: 0;
+      }
+    }
+  }
+}

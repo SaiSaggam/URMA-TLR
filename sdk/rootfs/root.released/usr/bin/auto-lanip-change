@@ -1,0 +1,69 @@
+#!/bin/sh
+
+if [ `rdcsman 0x80010007 u16` != 2 ]; then 
+    echo "Only check for Main WAN, or Main WAN don't connect !"
+    exit 0
+fi
+
+wan_type=`rdcsman 0x00010003 u32`
+if [ "$wan_type" !=  "0" ] && 
+   [ "$wan_type" != "19" ] &&
+   [ "$wan_type" != "32" ]; then 
+    echo "Only Support WAN Type Static/DHCP/WISP ! (WAN Type: $wan_type)"
+    exit 0
+fi
+
+lan_ip="`rdcsman 0x00010004 ipv4`"
+lan_mask="`rdcsman 0x00010005 ipv4`"
+
+ip1_1=$((`echo $lan_ip| cut -d "." -f1` & `echo $lan_mask| cut -d "." -f1`))
+ip1_2=$((`echo $lan_ip| cut -d "." -f2` & `echo $lan_mask| cut -d "." -f2`))
+ip1_3=$((`echo $lan_ip| cut -d "." -f3` & `echo $lan_mask| cut -d "." -f3`))
+ip1_4=$((`echo $lan_ip| cut -d "." -f4` & `echo $lan_mask| cut -d "." -f4`))
+
+wan_ip="`rdcsman 0x0080010002 ipv4`"
+wan_nm="`rdcsman 0x0080010003 ipv4`"
+
+ip2_1=$((`echo $wan_ip | cut -d "." -f1` & `echo $wan_nm | cut -d "." -f1`))
+ip2_2=$((`echo $wan_ip | cut -d "." -f2` & `echo $wan_nm | cut -d "." -f2`))
+ip2_3=$((`echo $wan_ip | cut -d "." -f3` & `echo $wan_nm | cut -d "." -f3`))
+ip2_4=$((`echo $wan_ip | cut -d "." -f4` & `echo $wan_nm | cut -d "." -f4`))
+
+if [ "$ip1_1" = "$ip2_1" ] && [ "$ip1_2" = "$ip2_2" ] &&
+   [ "$ip1_3" = "$ip2_3" ] && [ "$ip1_4" = "$ip2_4" ]; then
+    logger -t "WAN/LAN IP Check" "WAN IP range is conflicted with the LAN IP range"
+    echo "WAN/LAN IP Check" "WAN IP range is conflicted with the LAN IP range"
+#    if [ "$ip1_3" = "100" ]; then
+#        ip3_3=$(($ip1_3-100));
+#    else
+#        ip3_3=$(($ip1_3+100));
+#    fi
+#    ip3_4=$((`echo $lan_ip| cut -d "." -f4`));
+#    if [ $ip3_3 -ge 255 ]; then
+#        ip3_3=$(($ip3_3-254));
+#    fi
+#    wrcsman "0x00010004 {$ip1_1.$ip1_2.$ip3_3.$ip3_4}"
+
+    # here is for ZyXEL DMZ setting
+    dmz_ip="`rdcsman 0x00150009 ipv4`"
+    if [ $lan_ip == $dmz_ip ]; then
+        wrcsman "0x00150009 {10.0.0.1}"
+    fi
+    wrcsman "0x00010004 {10.0.0.1}"
+    wrcsman "0x00010005 {255.255.255.0}"
+
+#    change_dhcpd_ip_pool;    #force to change ip pool now
+
+    wrcsman "0x8001000a 1" # LAN Alter
+#    if [ "$wan_type" == "19" ]; then
+#        wrcsman "0x80365007 1" #set WISP to connecting
+#    fi  
+    if [ "$wan_type" == "0" ]; then
+        wrcsman "0x80035007 1" #set DHCP to connecting
+    fi  
+    #wrcsman "0x80010009 1" # WAN Alter
+else 
+    echo "No WAN/LAN IP conflict !"
+fi                         
+
+

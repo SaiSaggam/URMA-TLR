@@ -1,0 +1,208 @@
+#!/bin/sh
+# Paths to programs
+. /usr/bin/scriptlib
+
+DUAL_ACCESS=`rdcsman 0x00043000 u8`
+WAN=`rdcsman 0x8000F231 str`
+PPPOE_TYPE=`rdcsman 0x00010003 u32`
+RUNNING="/var/run/pppoe-action-running"
+# Make sure only one default script running.
+while :
+do
+    if [ ! -f "$RUNNING" ] || [ "$1" = "stop" ]; then
+        break
+    fi
+    echo "exist $RUNNING"
+    sleep 1
+done
+echo 1 > $RUNNING
+
+# Check if exist multiwan index
+if [ -n $2 ] ; then
+    MULTIWAN=$2
+else
+    MULTIWAN=
+fi
+
+if [ -z $MULTIWAN ] ; then
+	ETH=`rdcsman 0x8000F231 str`
+	CNT_FORCE=`rdcsman 0x8001000E u32`
+else
+	TMP1=`printf "%x" $((MULTIWAN+1))`
+	TMP2=`printf "%x" $((MULTIWAN+2))`
+	MULTIHEX=`printf "%x" $MULTIWAN`
+
+	ETH=`rdcsman 0x8000F36$TMP2 str`
+	CNT_FORCE=`rdcsman 0x800101C$MULTIHEX u32`
+fi
+
+#ORG_CNT_TYPE=`rdcsman 0x80040900 u16`
+usage () {
+    echo "$0 [start|stop|restart|status]"
+    rm $RUNNING
+    exit 1
+}
+
+regenerateConfig () {
+	if [ -z $MULTIWAN ] ; then
+        local account="`rdcsman 0x00040100 str`" #CSID_C_PPPOE_USER 
+        local passwd="`rdcsman 0x00040200 str`" #CSID_C_PPPOE_PASSWORD
+        #sl_insert_secrets_file "$account" "$passwd"
+
+        local oldsvname="`rdcsman 0x00040600 str`"
+        echo "$oldsvname" > /etc/ppp/pppoe.servname
+        #sed -i 's/\\/\\\\/g' /etc/ppp/pppoe.servname #fix servicename with slash
+        #local newsvname="`cat /etc/ppp/pppoe.servname`"
+        #wrcsman "0x00040600 \"$newsvname"
+
+		uvm /usr/uo/pppoe.conf.uo > /etc/ppp/pppoe.conf
+
+        #wrcsman "0x00040600 \"$oldsvname"
+	else
+#        uvm /usr/uo/pap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/pap-secrets 
+#		uvm /usr/uo/chap-secrets.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/chap-secrets            
+		uvm /usr/uo/pppoe.conf.uo 1 $MULTIWAN $MULTIWAN > /etc/ppp/pppoe.conf
+	fi
+#	chmod 600 /etc/ppp/*-secrets
+}
+
+
+# main ##########################################################
+
+[ -z "$1" ] && usage 
+
+case "$1" in
+    start)
+
+		if [ -z $MULTIWAN ] ; then
+			if [ $CNT_FORCE -eq 1 ] ; then # Connect manual force enable
+				pppoe-stop
+				wrcsman "0x8001000E 0x00"
+			fi
+
+		 	echo "Bringing up PPPoE link"  
+            regenerateConfig
+			pppoe-start
+			if [ $? = 0 ] ; then
+				rm -f $RUNNING
+				exit 0
+			else
+				wrcsman "0x80040700 0x03 && \
+						 0x80010007 0x03"			
+				rm -f $RUNNING
+				exit 1
+			fi
+		else
+            regenerateConfig
+			if [ $CNT_FORCE -eq 1 ] ; then #rewrite connect manual force enable
+				pppoe-stop $MULTIWAN
+			fi
+
+		 	echo "Bringing up PPPoE link"  
+			if [ $CNT_FORCE -eq 1 ] ; then #rewrite connect manual force disable
+				wrcsman "0x800101C$MULTIHEX 0x00"
+			fi
+
+			pppoe-start $MULTIWAN
+			if [ $? = 0 ] ; then
+				rm -f $RUNNING
+				exit 0
+			else
+				wrcsman "0x8004070$TMP1     0x03 && \
+				  	     0x8001016$MULTIHEX 0x03"			
+				rm -f $RUNNING
+				exit 1
+			fi
+		fi		
+    	;;
+
+    stop)
+		regenerateConfig
+	    echo "Shutting down PPPoE link"
+		if [ -z $MULTIWAN ] ; then
+			pppoe-stop 
+			RET=$?
+		
+			LOADSHARING=`rdcsman 0x004301c0 u32`
+            FAILOVER_STATUS=`rdcsman 0x80430600 u32`
+			#if [ $LOADSHARING -eq 0 -a $FAILOVER_STATUS -eq 0 ] ; then
+			if [ $LOADSHARING -eq 0 ] ; then
+				wrcsman "0x80040100 0x00 && \
+						 0x80040200 0x00 && \
+						 0x80040300 0x00 && \
+						 0x80040400 0x00 && \
+						 0x80040500 0x00 && \
+						 0x80040600 0x00 && \
+						 0x80040700 0x00 && \
+						 0x80010002 0x00 && \
+						 0x80010003 0x00 && \
+						 0x80010004 0x00 && \
+						 0x80010005 0x00 && \
+						 0x80010006 0x00 && \
+						 0x80010007 0x00"
+			else
+				LOADSHARING_WANTYPE=`rdcsman 0x0043000b u32`
+				if [ $LOADSHARING_WANTYPE -eq 6 ] ; then
+					wrcsman "0x80040200 0x00 && \
+							 0x80040300 0x00 && \
+							 0x80040400 0x00 && \
+							 0x80040500 0x00 && \
+							 0x80040600 0x00 && \
+							 0x80040700 0x00"
+				fi
+			fi
+		else
+			pppoe-stop $MULTIWAN > /dev/null 2>&1
+			RET=$?
+		
+			wrcsman "0x8004010$TMP1 0x00 && \
+					 0x8004020$TMP1 0x00 && \
+					 0x8004030$TMP1 0x00 && \
+					 0x8004040$TMP1 0x00 && \
+					 0x8004050$TMP1 0x00 && \
+					 0x8004060$TMP1 0x00 && \
+					 0x8004070$TMP1 0x00 && \
+					 0x8001011$MULTIHEX 0x00 && \
+					 0x8001012$MULTIHEX 0x00 && \
+					 0x8001013$MULTIHEX 0x00 && \
+					 0x8001014$MULTIHEX 0x00 && \
+					 0x8001015$MULTIHEX 0x00 && \
+					 0x8001016$MULTIHEX 0x00"
+		fi
+		if [ "$DUAL_ACCESS" = "0" ];then
+			ifconfig $ETH 0.0.0.0
+		fi
+		rm -f $RUNNING
+
+		exit $RET
+			
+        ;;
+
+    restart)
+		rm $RUNNING
+		if [ -z $MULTIWAN ] ; then
+			$0 stop
+			$0 start
+		else
+			$0 stop $MULTIWAN
+			$0 start $MULTIWAN
+		fi
+		;;
+
+    status)
+		regenerateConfig
+		if [ -z $MULTIWAN ] ; then
+			pppoe-status
+		else
+			pppoe-status $MULTIWAN
+		fi
+		;;
+
+    *)
+        usage
+        ;;
+esac
+
+rm -f $RUNNING
+exit 0
+

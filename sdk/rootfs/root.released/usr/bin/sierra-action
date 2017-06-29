@@ -1,0 +1,296 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+UDHCPC="udhcpc"
+
+# Set Interface
+if [ "$2" != "" ]; then
+   ETH="$2"
+else
+   ETH="usbnet0"
+fi
+
+get_index "$3" "$4"
+FileNameCode="${ETH}"
+UDHCPC_PID_FILE="/var/run/udhcpc.${FileNameCode}.pid"
+PIDFILE_CONNECT="/var/run/udhcpc.${FileNameCode}.pid.connect"
+DEMAND_FILE="/var/run/udhcpc.${FileNameCode}.demand"
+UDHCPC_DEFAULT_SCRIPT="/usr/bin/dhcp.script"
+[ -f "/tmp/dhcp.script" ] && UDHCPC_DEFAULT_SCRIPT="/tmp/dhcp.script"
+HOSTNAME="`cat /etc/hostname`"
+if [ "${HOSTNAME}" == "" ]; then
+   HOSTNAME="Router"
+fi
+TMPFIL="/tmp/sierra-connect-${FileNameCode}"
+AT_LOG="/tmp/sierra-action-${FileNameCode}.log"
+runTime="0"
+
+sierra_status()
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   TIME=0
+   TIMEOUT=10
+   while [ true ] ; do	
+      sl_get_IP_NM_GW_in_ifconfig ${ETH} IF_IP IF_NM IF_GW
+      #echo "$0 : IF_IP=${IF_IP} IF_NM=${IF_NM} IF_GW=${IF_GW}"	
+      if [ "${IF_IP}x" != "x" ] && [ "${IF_NM}x" != "x" ] && [ "${IF_GW}x" != "x" ]; then	
+         return 0		
+      else			
+         sleep 1
+         TIME=$((TIME+1))
+         if [ ${TIME} -gt ${TIMEOUT} ] ; then
+            return 1	
+         fi			
+      fi
+   done
+}
+
+sierra_stop()
+{
+   get_general_config ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+
+   echo -e "stop" > /var/sierra_stop
+   rm -rf /tmp/sierra_dhcp_up
+   kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+
+   ${ATCMD_PROG} ${DevModem} AT!SCACT=0,1
+   echo "AT!SCACT=0,1"
+   sleep 2 
+
+   [ -f "${DEMAND_FILE}" ] && rm -f ${DEMAND_FILE}
+   [ -f "${TMPFIL}" ] && rm -f ${TMPFIL}
+   [ -f "${AT_LOG}" ] && rm -f ${AT_LOG}
+    	
+   if [ -f "${PIDFILE_CONNECT}" ] ; then
+      CONNECT_PID="`cat ${PIDFILE_CONNECT}`"
+      kill ${CONNECT_PID} > /dev/null 2>&1
+      rm -f ${PIDFILE_CONNECT} > /dev/null 2>&1	
+   fi
+   	
+   if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+      UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+      rm -f ${UDHCPC_PID_FILE}
+      kill ${UDHCPC_PID} > /dev/null 2>&1 || exit 1
+   fi
+		
+   ${IFCFG_PROG} ${ETH} 0.0.0.0
+   ${IFCFG_PROG} ${ETH} down
+		 		
+   if [ "${CSID_C_FAILOVER_LOADSHARING_ENABLE}" == "1" ] ; then
+      logger -p 8.7 -t "sierra dhcpc" "Load Sharing Don't do sierra-action update flag !\""
+      exit 0 
+   fi
+
+   clear_all_cnt_status ${Index}
+   write_cnt_status 0 ${Index}
+
+	 #wrcsman "0x801E0800 0x00 && \
+	 #		0x801E0900 0x00 && \
+	 #		0x801E1200"
+
+   rm -rf /tmp/sierra_dhcp_up
+
+	 return 0
+}
+
+sierra_start()
+{
+	get_general_config ${Index} ${Index_3G}
+	#get_general_status ${Index} ${Index_3G}
+	get_config ${Index} ${Index_3G}
+	get_usb_status ${Index}
+
+ 	local DevModem="${CSID_S_USB_MODEM1}"
+	local DevModem2="${CSID_S_USB_MODEM2}"
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"        
+
+	# wrcsman "0x801e4001 0x01"
+	local ProfileInfo=""
+	if [ "${CSID_C_3G_APN}" == "connect" ]; then
+	    ProfileInfo="Optus Connect"
+	elif [ "${CSID_C_3G_APN}" == "yesbusiness" ];then
+	    ProfileInfo="Optus Business"
+	elif [ "${CSID_C_3G_APN}" == "connectme" ];then
+	    ProfileInfo="Optus BYO"
+	elif [ "${CSID_C_3G_APN}" == "preconnect" ];then
+	    ProfileInfo="Optus Prepaid"
+	elif [ "${CSID_C_3G_APN}" == "connectcap" ];then
+	    ProfileInfo="Optus ConnectCap"
+	else
+	    ProfileInfo=${CSID_C_3G_APN}
+	fi
+
+	kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+
+	${ATCMD_PROG} ${DevModem} 'AT+CGATT=0'
+	sleep 2
+	${ATCMD_PROG} ${DevModem} 'AT+CGATT=1'
+	
+	if [ "${CSID_C_3G_APN}" != "" ]; then
+ 	    logger -p 8.7 -t "sierra-action" "Sierra APN=${CSID_C_3G_APN}"
+	    ${ATCMD_PROG} ${DevModem} "AT+CGDCONT=1,\"IP\",\"${CSID_C_3G_APN}\""
+	    sleep 2
+	    ${ATCMD_PROG} ${DevModem} "AT!SCPROF=1,\"${ProfileInfo}\",0,0,0,0"
+	fi
+	
+	if [ "${CSID_C_3G_USERNAME}" != "" ] && [ "${CSID_C_3G_PASSWORD}" != "" ]; then
+	    if [ "${CSID_C_3G_AUTHTYPE}" == "2" ]; then
+		    ${ATCMD_PROG} ${DevModem} AT\$QCPDPP=1,${CSID_C_3G_AUTHTYPE},${CSID_C_3G_PASSWORD},${CSID_C_3G_USERNAME}
+	    else
+		    ${ATCMD_PROG} ${DevModem} AT\$QCPDPP=1,1,${CSID_C_3G_PASSWORD},${CSID_C_3G_USERNAME}
+	    fi
+	fi
+
+	rm -f ${TMPFIL}
+	${ATCMD_PROG} ${DevModem} ATZ
+	${ATCMD_PROG} ${DevModem} AT!SCACT=0,1
+	echo "AT!SCACT=0,1"
+	sleep 2
+	${ATCMD_PROG} ${DevModem} AT!SCDFTPROF=1 
+    sleep 2
+	while [ true ] ; do
+		if [ $runTime -eq 3 ]|| [ "$AT_RET" != "" ]; then
+            break
+        fi
+        echo "AT!SCACT=1,1"
+        #${ATCMD_PROG} ${DevModem} AT!SCACT=1,1 > ${AT_LOG}
+        send_ATcmd ${DevModem} AT!SCACT=1,1 > ${AT_LOG} #/tmp/sierra-action-${FileNameCode}.log
+        sleep 2
+        AT_RET="`cat ${AT_LOG} | grep OK`"
+        runTime=`expr $runTime + 1`
+	done
+	
+	AT_RET="`cat ${AT_LOG} | grep OK`"
+	if [ "${AT_RET}" == "" ]; then
+	    logger -p 8.7 -t "sierra-action" "Sierra connection failed"
+	#    exit 1
+	fi
+	
+	sleep 2
+	${ATCMD_PROG} ${DevModem} AT!SCPADDR=1 > ${TMPFIL}
+	echo "AT!SCPADDR=1"
+	sleep 2
+	#PIP="`cat ${TMPFIL} | grep '!SCPADDR:' | cut -d, -f2  | cut -d\" -f2`"
+	PIP="` grep '!SCPADDR: 1' ${TMPFIL} | cut -d '\"' -f2`" 
+	if [ "${PIP}" == "" ]; then
+        ${ATCMD_PROG} ${DevModem} AT!SCPADDR=1 > ${TMPFIL}
+        sleep 3
+        PIP="`cat ${TMPFIL} | grep '!SCPADDR:' | cut -d, -f2  | cut -d\" -f2`"
+	fi
+
+	#echo ${PIP} > /tmp/amanda_pip
+	#if [ "${PIP}" == "" ]; then
+	#   rm -f ${TMPFIL}
+	#   echo 0 > /var/run/3g_link_status	
+	#   if [ "${BACKUP}" == "" ]; then
+	# 		   sleep 2
+	#      echo 93 > /var/run/monitor.fifo
+	#   fi
+	#   sierra_stop
+	#   write_cnt_status 0 ${Index}
+	#   exit	
+	#fi
+
+    # echo "Got IP: ${PIP}"
+    # echo "ifconfig ${ETH} ${PIP} netmask 255.255.255.0 up"
+
+    write_error_code 0 ${Index} # clean error code
+    if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+        ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+    else
+        ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu ${CSID_C_3G_MTU} up
+    fi
+ 
+    sleep 3
+
+    if [ "${CSID_S_LOCAL_WAN_CNT_FORCE}" == "1" ]; then
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    	wrcsman "0x8001000e 0x00"
+    elif [ "${CSID_C_3G_CNT_TYPE}" == "0" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G on demand
+        # udhcpc-connect-sierra &
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    elif [ "${CSID_C_3G_CNT_TYPE}" == "2" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G manually
+        # udhcpc-connect-sierra &
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    else
+        ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+    fi
+
+    # sl_get_IP_NM_GW_in_ifconfig ${IFNAME} IF_IP IF_NM IF_GW
+
+    CSID_S_USB_IF_IP=`rdcsman 0x805500f$Index ipv4`
+    if [ "${PIP}" != "${CSID_S_USB_IF_IP}" ] ; then
+        logger -p 8.7 -t "sierra dhcpc" "connect error sierra-action stop\""
+        sierra_stop
+    fi 
+
+    echo "Got DHCP IP: ${CSID_S_USB_IF_IP}"
+
+    route add default dev ${ETH}
+
+    return $?
+}
+
+usage() {
+	 echo "$0 [start|stop|release|renew] [IFName] [index_usb] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+
+case "$1" in
+	 start)
+      pre_init
+      sierra_start
+      if [ "$?" == "1" ] ; then
+         ${IFCFG_PROG} ${ETH} 0.0.0.0 
+         exit 1
+      fi
+      exit 0
+      ;;
+
+   stop)
+      sierra_stop
+      post_init
+      ;;
+
+   release)
+      if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -USR2 ${UDHCPC_PID}
+      fi
+      write_dns_info "0.0.0.0" "" ${Index}
+      exit 0
+      ;;
+
+   renew)
+      if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+         sierra_stop
+         sierra_start
+      elif [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -USR1 ${UDHCPC_PID}
+         sierra_status	
+      else
+         ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      fi 
+
+      exit 0
+      ;;
+
+	 *)
+      usage
+      exit 1
+      ;;
+esac
+
+exit 0			

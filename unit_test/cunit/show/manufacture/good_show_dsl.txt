@@ -1,0 +1,10 @@
+DSL Status and Statistics
+ -------------------------
+ Description      : 
+ Admin Status     : Up
+ Oper Status      : Down
+ HW Version       : T14.F7_12.0
+ FW Version       : 3.22.14.0_A60394
+ System FW ID     : 3.6.20.0(Y09.ZZ.5)3.22.13.0 20151216_v035  [Dec 16 2015 16:59:11]
+
+ Line Status      : Down

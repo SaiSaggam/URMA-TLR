@@ -1,0 +1,92 @@
+#!/bin/sh
+
+#if [ -z "$1" ] || [ -z "$2" ]; then
+if [ -z "$1" ]; then
+   echo "you need specified arguements"
+   exit 1
+fi
+
+ACTION="$1"
+#TUN_IDX="$2"
+#ONDEMAND_PID="/var/run/pptpc-ondemand-$TUN_IDX.pid"
+PPTP_ONDEMAND_PID="/var/run/PPTP-ondemand.pid"
+if [ -f "/tmp/pptpc-header" ]; then
+   . /tmp/pptpc-header
+elif [ -f "/usr/bin/pptpc-header" ]; then
+   . /usr/bin/pptpc-header
+fi
+
+start_ondemand()
+{
+   #get_pptpc_tunnel_config $TUN_IDX
+
+   #ROUTEING="$C_PPTP_CLI_ROUTE"
+   #if [ "$ROUTEING" == "" ]; then
+      #ROUTEING="0.0.0.0/0"
+   #fi
+
+   #if [ -z "`ps | grep "pptp-ondemand -sub $ROUTEING -tun $TUN_IDX" | grep -v grep`" ]; then
+      #echo "pptp-ondemand -sub $ROUTEING -tun $TUN_IDX"
+      #pptp-ondemand -sub $ROUTEING -tun $TUN_IDX &
+   #fi
+   if [ -f "$PPTP_ONDEMAND_PID" ]; then
+      echo "pptp_ondemand is running, need to restart it!!"
+      #kill -3 `cat $PPTP_ONDEMAND_PID` > /dev/null 2>&1
+	  #echo "Delete $PPTP_ONDEMAND_PID"
+      #rm $PPTP_ONDEMAND_PID
+	  stop_ondemand
+	fi
+    echo "ondemand_pptp start"
+    ondemand_pptp start &
+}
+
+stop_ondemand()
+{
+   #if [ -f "$ONDEMAND_PID" ]; then
+      #kill `cat $ONDEMAND_PID` > /dev/null 2>&1
+   #fi
+   echo "ondemand_pptp stop"
+   if [ -f "$PPTP_ONDEMAND_PID" ]; then
+      echo "Kill pptp_ondemand process"
+      kill -3 `cat $PPTP_ONDEMAND_PID` > /dev/null 2>&1
+	  echo "Delete $PPTP_ONDEMAND_PID"
+      rm $PPTP_ONDEMAND_PID
+   fi
+}
+
+help_command()
+{
+    echo "start -> Start pptp client ondemand"
+    echo "stop ->Stop pptp client ondemand"
+    echo "restart -> Restart pptp client ondemand"
+    echo "show -> Show pptp client ondemand info"
+    echo "help ->Show all action command"
+}
+
+show_info()
+{
+   if [ -f "$PPTP_ONDEMAND_PID" ]; then
+      pid=`cat $PPTP_ONDEMAND_PID`
+      echo "PPTP_ONDEMAND_PID path : $PPTP_ONDEMAND_PID"
+      echo "pptp ondemand process id: $pid"
+   else
+      echo "pptp ondemand is not running !"
+   fi
+}
+
+main()
+{
+   case "$ACTION" in
+      restart) stop_ondemand; start_ondemand;;
+      start) start_ondemand ;;
+      stop) stop_ondemand ;;
+      show) show_info ;;
+      help) help_command ;;
+      *) exit 1 ;;
+   esac
+}
+
+#
+# Main
+#
+main

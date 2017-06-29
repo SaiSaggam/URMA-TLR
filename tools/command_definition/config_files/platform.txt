@@ -1,0 +1,32 @@
+DEVICE_CLOUD_USERNAME "waltham"
+DEVICE_CLOUD_PASSWORD "!Waltham?"
+DEVICE_CLOUD_URL  "test.idigi.com"
+SOFTWARE_FIRMWARE_VERSION  "1.0.0.3"
+
+platform lr54 "LR54"
+    define INC_DSL     0
+    define INC_WIFI_80211_2_4GHZ  0
+    define INC_WIFI_80211_5_0GHZ  0
+    define NB_SERIAL   1
+    define NB_ETHERNET 4
+
+platform lr54w "LR54W"
+    define INC_DSL     0
+    define INC_WIFI_80211_2_4GHZ  4
+    define INC_WIFI_80211_5_0GHZ  4
+    define NB_SERIAL   1
+    define NB_ETHERNET 4
+
+platform lr54d "LR54D"
+    define INC_DSL    1
+    define INC_WIFI_80211_2_4GHZ  0
+    define INC_WIFI_80211_5_0GHZ  0
+    define NB_SERIAL   1
+    define NB_ETHERNET 4
+
+platform lr54dwc1 "LR54DWC1"
+    define INC_DSL    1
+    define INC_WIFI_80211_2_4GHZ  4
+    define INC_WIFI_80211_5_0GHZ  4
+    define NB_SERIAL   4
+    define NB_ETHERNET 4

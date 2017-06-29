@@ -1,0 +1,88 @@
+**** Setup Environment to run the TestHarness for Cloud Connector for Java
+1º Disable the "User Control System":
+	Go to Control Panel -> User Accounts -> Change User Account Control Settings -> Move to "Never Notify"
+	Save and restart the PC
+
+2º Install Git :
+	Download from http://git-scm.com/download/win
+	Install Git with the option "Use Git and optional Unix tools from the Windows Command Prompt"
+
+3º Install Python:
+	Download from https://www.python.org/downloads/
+	Install Python v2.7.8 for all users, with the option "Add python.exe to Path"
+
+4º Install Java JDK 1.7:
+	Download from http://download.oracle.com/otn-pub/java/jdk/7u65-b19/jdk-7u65-windows-i586.exe
+	Install JDK 1.7 (JDK+JRE)
+	Add to the System Path the JAVA_HOME variable:
+		Go to Control Panel-> System and Security -> System -> Advanced System Settings -> Environment Variables...
+		Add into "User variables" a new one for "JAVA_HOME" for the path "C:\Program Files\Java\jdk1.7.0_65\"
+		Append into "System variables" to "PATH" the JDK folder "C:\Program Files\Java\jdk1.7.0_65\bin\;C:\Python27\;%SystemRoot%\......"
+		
+5º Install ANT:
+	Download from http://ftp.fau.de/apache//ant/binaries/apache-ant-1.9.4-bin.zip
+	Unzip the file on "C:\apache-ant-1.7.1"
+	Add to the System Path the ANT_HOME variable:
+		Go to Control Panel-> System and Security -> System -> Advanced System Settings -> Environment Variables...
+		Add into "User variables" a new one for "ANT_HOME" for the path "C:\apache-ant-1.9.4\"
+		Append into "System variables" to "PATH" the ANT folder "C:\apache-ant-1.9.4\bin\;C:\Program Files\Java\jdk1.7.0_65\bin\;C:\Python27\;%SystemRoot%\......"
+	
+6º Install Setuptools:
+	Download Setuptools for Windows from https://bootstrap.pypa.io/ez_setup.py
+	Install setuptools executing "python ez_setup.py"
+	Add to the System Path the extra tools from Python Scripts folder:
+		Go to Control Panel-> System and Security -> System -> Advanced System Settings -> Environment Variables...
+		Append into "System variables" to "PATH" the Python Scripts folder "C:\apache-ant-1.9.4\bin\;C:\Program Files\Java\jdk1.7.0_65\bin\;C:\Python27\Scripts;C:\Python27\;%SystemRoot%\......"
+	
+	
+	
+	
+**** Get and Setup the TestHarness for Cloud Connector for Java
+7º Clone the TestHarness repository from Git/Stash:	
+	Create root directory "C:\CC4J\"
+	Clone TestHarness inside this directory with "git clone https://xxxxxxxxx@stash.digi.com/scm/cc/cc_testharness.git"
+	
+
+8º Create the Python environment with all needed packages:	
+	Go to "C:\CC4J\cc_testHarness\python"
+	Execute "C:\CC4J\cc_testharness\python> python bootstrap"
+	Finally execute "C:\CC4J\cc_testharness\python> bin\buildout.exe install"
+
+
+9º Execute TestHarness Validation:	
+	Go to "C:\CC4J\cc_testHarness\"
+	Execute "C:\CC4J\cc_testharness> python\bin\python.exe cc_test.py --platform java --help"
+
+
+
+**** Get a SSH key and setup Git/Stash to use it
+10º Create a new SSH RSA key:
+	Go to "C:\Users\sa\.ssh"
+	Execute the following command line: "C:\Program Files\Git\bin\ssh-keygen" -t rsa -C "XXXXXX.XXXXXX@digi.com"
+		C:\Users\sa\.ssh>"C:\Program Files\Git\bin\ssh-keygen" -t rsa -C "Arturo.Buzarra@digi.com"
+		Generating public/private rsa key pair.
+		Enter file in which to save the key (//.ssh/id_rsa): C:\Users\sa\.ssh\id_rsa
+		Enter passphrase (empty for no passphrase):
+		Enter same passphrase again:
+		Your identification has been saved in C:\Users\sa\.ssh\id_rsa.
+		Your public key has been saved in C:\Users\sa\.ssh\id_rsa.pub.
+		The key fingerprint is:
+			XX:XX:XX:XX:XX:........:XX XXXXXX.XXXXXX@digi.com
+
+11º Obtain the public key to upload to Git/Stash:
+	Go to "C:\Users\sa\.ssh"
+	Execute the following command line: "C:\Program Files\Git\bin\ssh-keygen" -y
+	Enter file in which the key is (//.ssh/id_rsa): C:\Users\sa\.ssh\id_rsa
+	Enter passphrase:
+	ssh-rsa AAAAB3NzaC.......................EsgQ==
+	
+12º Go to Git/Stash and paste the "ssh-rsa AAAAB3NzaC.......................EsgQ==" key
+
+
+
+
+WARNING!! if CC4J does not works fine try the following steps:
+- Install manually the pywin32 library for python from http://sourceforge.net/projects/pywin32/files/pywin32/
+- Install with "easy_install pywin32"
+- Install with "easy_install winpexpect"
+- Use the egg file for pywin32

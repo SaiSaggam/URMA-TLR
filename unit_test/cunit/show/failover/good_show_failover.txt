@@ -1,0 +1,40 @@
+failover1 valid:yes
+failover1 primary:eth4
+failover1 primary_status:Up
+failover1 secondary:cellular1
+failover1 secondary_status:Up
+failover1 current:eth4
+failover1 detection method:passive
+failover1 last ping received:1457098919
+
+failover3 valid:yes
+failover3 primary:eth1
+failover3 primary_status:Up
+failover3 secondary:eth4
+failover3 secondary_status:Up
+failover3 current:eth4
+failover3 detection method:probe
+failover3 last ping received:14
+failover3 failing over in:3
+failover3 switch back in:30
+
+failover5 valid:yes
+failover5 primary:eth1
+failover5 primary_status:Up
+failover5 secondary:eth4
+failover5 secondary_status:Up
+failover5 current:eth4
+failover5 detection method:probe
+failover5 last ping received:19
+failover5 failing over in:3
+
+failover9 valid:yes
+failover9 primary:eth1
+failover9 primary_status:Up
+failover9 secondary:eth4
+failover9 secondary_status:Up
+failover9 current:eth4
+failover9 detection method:probe
+failover9 last ping received:9
+failover9 failing over in:30
+failover9 switch back in:30

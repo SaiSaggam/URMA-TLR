@@ -1,0 +1,31 @@
+Status of IKE charon daemon (strongSwan 5.3.2, Linux 2.6.36, mips):
+  uptime: 25 minutes, since Mar 27 16:00:34 2000
+  malloc: sbrk 331776, mmap 0, used 243184, free 88592
+  worker threads: 7 of 16 idle, 5/0/4/0 working, job queue: 0/0/0/0, scheduled: 140
+  loaded plugins: charon test-vectors pkcs11 aes des blowfish rc2 sha1 sha2 md4 md5 random nonce x509 revocation constraints pubkey pkcs1 pkcs7 pkcs8 pkcs12 pgp dnskey sshkey pem openssl fips-prf gmp agent xcbc cmac hmac ctr ccm gcm attr kernel-libipsec kernel-pfkey kernel-netlink resolve socket-default socket-dynamic farp stroke vici updown eap-identity eap-md5 xauth-generic xauth-eap dhcp whitelist duplicheck addrblock
+Listening IP addresses:
+  10.52.18.180
+  100.101.102.1
+  10.105.250.159
+Connections:
+      ipsec1:  %any...10.52.18.109  IKEv1 Aggressive
+      ipsec1:   local:  [tlrfirst] uses pre-shared key authentication
+      ipsec1:   remote: [wr212] uses pre-shared key authentication
+      ipsec1:   child:  100.100.102.0/24 === 100.100.101.0/24 TUNNEL
+      ipsec2:  %any...10.52.18.109  IKEv1 Aggressive
+      ipsec2:   local:  [tlrsecond] uses pre-shared key authentication
+      ipsec2:   remote: [wr211] uses pre-shared key authentication
+      ipsec2:   child:  100.101.102.0/24 === 100.101.101.0/24 TUNNEL
+Security Associations (2 up, 0 connecting):
+      ipsec2[24]: ESTABLISHED 4 minutes ago, 10.52.18.180[tlrsecond]...10.52.18.109[wr211]
+      ipsec2[24]: IKEv1 SPIs: 9f9b5ffdcb8af689_i* ab180424f22847ea_r, pre-shared key reauthentication in 43 minutes
+      ipsec2[24]: IKE proposal: AES_CBC_128/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_1536
+      ipsec2{46}:  INSTALLED, TUNNEL, reqid 46, ESP in UDP SPIs: 95951d73_i 1c4ad15c_o
+      ipsec2{46}:  AES_CBC_128/HMAC_SHA1_96, 0 bytes_i, 0 bytes_o, rekeying in 39 minutes
+      ipsec2{46}:   100.101.102.0/24 === 100.101.101.0/24 
+      ipsec1[1]: ESTABLISHED 25 minutes ago, 10.52.18.180[tlrfirst]...10.52.18.109[wr212]
+      ipsec1[1]: IKEv1 SPIs: 301baf7d152f2ff4_i* 4d491a97ca8851ba_r, pre-shared key reauthentication in 19 minutes
+      ipsec1[1]: IKE proposal: AES_CBC_128/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_1536
+      ipsec1{1}:  INSTALLED, TUNNEL, reqid 1, ESP in UDP SPIs: 6d0d1719_i 1c4ad12f_o
+      ipsec1{1}:  AES_CBC_128/HMAC_SHA1_96, 0 bytes_i, 0 bytes_o, rekeying in 17 minutes
+      ipsec1{1}:   100.100.102.0/24 === 100.100.101.0/24 

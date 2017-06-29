@@ -1,0 +1,4 @@
+{
+  "srcDistPath" : "../urma-seed/dist",
+  "pyDistPath" : "./device_dist"
+}

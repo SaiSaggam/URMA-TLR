@@ -1,0 +1,84 @@
+#!/bin/sh
+
+IFCONFIG=/sbin/ifconfig
+ROUTE="route"
+RESOLV_CONF="/etc/resolv.conf"
+ETH=`rdcsman 0x8000F231 str`
+
+
+fixip_start()
+{
+	IF_IP=`rdcsman 0x00110001 ipv4`
+	IF_NM=`rdcsman 0x00110002 ipv4`
+	IF_GW=`rdcsman 0x00110003 ipv4`
+	IF_DNS1=`rdcsman 0x00110004 ipv4`
+	IF_DNS2=`rdcsman 0x00110005 ipv4`
+	MTU_SIZE=`rdcsman 0x00110009 u16`
+	
+	if [ $MTU_SIZE -eq 0 ] ; then
+		$IFCONFIG $ETH $IF_IP netmask $IF_NM
+	else
+		$IFCONFIG $ETH $IF_IP netmask $IF_NM mtu $MTU_SIZE
+	fi
+	
+	$ROUTE add default gw $IF_GW dev $ETH
+	
+	rm -f $RESOLV_CONF
+	
+	echo "nameserver $IF_DNS1" > $RESOLV_CONF
+    echo "nameserver $IF_DNS2" >> $RESOLV_CONF
+    
+    # write to csid_local 
+	wrcsman "0x80010002 {$IF_IP} && \
+			0x80010003 {$IF_NM} && \
+			0x80010004 {$IF_GW} && \
+			0x80010005 {$IF_DNS1} && \
+			0x80010006 {$IF_DNS2} && \
+			0x8001000B \"$ETH && \
+			0x80010007 0x02 "
+}
+
+
+fixip_stop()
+{
+	$IFCONFIG $ETH 0.0.0.0
+	
+	wrcsman "0x80010002 0x00 && \
+			0x80010003 0x00 && \
+			0x80010004 0x00 && \
+			0x80010005 0x00 && \
+			0x80010006 0x00 && \
+			0x80010007 0x00"
+}
+
+
+usage () {
+        echo "$0 [start|stop]"
+        exit 1
+}
+
+# main ##########################################################
+
+[ -z "$1" ] && usage
+
+case "$1" in
+
+	start)
+		
+		fixip_start
+		
+		;;
+	
+	stop)
+		
+		fixip_stop
+		
+		;;
+			
+	*)
+		exit 1
+esac
+
+exit 0		
+
+

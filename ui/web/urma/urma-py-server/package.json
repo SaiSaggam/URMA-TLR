@@ -1,0 +1,23 @@
+{
+  "name": "urma-py-server",
+  "version": "0.0.1",
+  "description": "Unified Remote Management Architecture (URMA) python reference server",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@stash.digi.com/idigi/URMA-py-server.git"
+  },
+  "author": "",
+  "contributers": [
+    "Dave Hutchison <dave.hutchison@digi.com>",
+    "Dana Immertreu <dana.immertreau@digi.com>",
+    "Jeff Ryan <jeff.ryan@digi.com>"
+  ],
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "gulp": "^3.9.0"
+  }
+}

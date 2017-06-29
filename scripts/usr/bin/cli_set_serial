@@ -1,0 +1,103 @@
+#!/bin/sh
+
+# set -x
+
+format_err() {
+  echo "Syntax: apply_serial -i <instance>"
+}
+
+get_serial_port() {
+
+   device=""
+   if [ "$1" == 1 ]; then
+     device="/dev/ttyUSB3"
+   elif [ "$1" == 2 ]; then
+     device="/dev/ttyUSB2"
+   elif [ "$1" == 3 ]; then
+     device="/dev/ttyUSB1"
+   elif [ "$1" == 4 ]; then
+     device="/dev/ttyUSB0"
+   fi
+   
+   device_port=$device
+}
+
+if [ $# -ne 2 ]; then
+  echo "Invalid arguments"
+  format_err
+  exit 1
+  
+elif [ "$1" != "-i" ]; then
+  echo "Invalid option"
+  format_err
+  exit 1
+    
+else
+  get_serial_port $2
+
+  if [ -z $device_port ]; then
+    echo "Invalid instance: $2"
+    exit 1
+  fi
+  
+  stty_port="stty -F ${device_port}"
+  
+  cmd=$stty_port
+  
+  baud=`/usr/bin/uci_get serial serial $2 baud`
+  cmd="$cmd speed $baud"
+  
+  databits=`/usr/bin/uci_get serial serial $2 databits`
+  if [[ "$databits" == "7" ]] || [[ "$databits" == "8" ]] ; then
+    cmd="$cmd cs$databits"
+  else
+    echo "Invalid data bits: $databits"
+    exit 1
+  fi
+    
+  parity=`/usr/bin/uci_get serial serial $2 parity`
+  if [ "$parity" == "none" ]; then
+    cmd="$cmd -parenb"
+  elif [ "$parity" == "odd" ]; then
+    cmd="$cmd parenb parodd -parstk"
+  elif [ "$parity" == "event" ]; then
+    cmd="$cmd parenb -parodd -parstk"
+  elif [ "$parity" == "mark" ]; then
+    cmd="$cmd parenb parodd parstk"
+  elif [ "$parity" == "space" ]; then
+    cmd="$cmd parenb -parodd parstk"
+  else
+    echo "Invalid parity: $parity"
+    exit 1
+  fi  
+
+  stopbits=`/usr/bin/uci_get serial serial $2 stopbits`
+  if [ "$stopbits" == "1" ]; then
+    cmd="$cmd -cstopb"
+  elif [ "$stopbits" == "2" ]; then
+    cmd="$cmd cstopb"
+  else
+    echo "Invalid stop bits: $stopbits"
+    exit 1
+  fi
+  
+  flowcontrol=`/usr/bin/uci_get serial serial $2 flowcontrol`
+  # do I need ixany
+  if [ "$flowcontrol" == "hardware" ]; then
+    cmd="$cmd crtscts"
+  elif [ "$flowcontrol" == "software" ]; then
+    cmd="$cmd -crtscts ixon ixoff"
+  elif [ "$flowcontrol" == "none" ]; then
+    cmd="$cmd -crtscts -ixon -ixoff"
+  else
+    echo "Invalid flow control: $flowcontrol"
+    exit 1
+  fi
+  
+#  echo $cmd
+  
+  $cmd >/dev/null 2>&1
+fi
+
+exit 0
+

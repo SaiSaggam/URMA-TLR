@@ -1,0 +1,32 @@
+# Meteor packages used by this project, one per line.
+# Check this file (and the other files in this directory) into your repository.
+#
+# 'meteor add' and 'meteor remove' will edit this file for you,
+# but you can also edit it by hand.
+
+http
+accounts-password
+vjau:xml2js
+jag:pince
+meteorhacks:picker
+meteor-base
+mobile-experience
+session
+tracker
+logging
+reload
+ejson
+spacebars
+check
+fourseven:scss
+wolves:bourbon
+wolves:bitters
+wolves:neat
+digi:urma-core
+react-meteor-data
+jquery
+standard-minifier-css
+standard-minifier-js
+mongo
+ecmascript
+es5-shim

@@ -1,0 +1,38 @@
+globalerror load_fail "Load fail"
+globalerror save_fail "Save fail"
+globalerror memory_fail "Insufficient memory"
+
+globalerror reboot_fail "Reboot fail"
+globalerror do_command_fail "Do Command fail"
+globalerror set_factory_default_fail "Set Factory Default fail"
+
+# Device info that shows up in Device Cloud device summary
+# Device Cloud queries this system setting to display the information in root folder
+group setting system 2 "System"
+    element description "Description" type string max 63
+    element contact "Contact" type string max 63
+    element location "Location" type string max 63
+    error invalid_length "Invalid Length"
+ 
+# Device Cloud Password
+# Device Manager uses this devicesecurity setting for password authentication
+# Note, as with all password, password type is a write-only field
+# To include the devicesecurity setting, change devicesecurity.c.optional 
+# to devicesecurity.c and uncomment out the device_security functions in
+# remote_setting_table in remote_config_cb.c and in remote_config_cb.h.
+# Rerun ConfigGenerator.jar tool to regenerate remote_config.h.
+# Then, rebuild the application.
+#group setting devicesecurity "Device Cloud device security"
+#  element identityVerificationForm "Connection security" type enum
+#      value simple "No connection security"
+#      value password "Connection is password authenticated"
+#  element password "Device connection password" type password max 133
+
+# Device location
+# State configuration for GPS
+# Must setup the following group for Latitude and Longitude to be shown in Device Cloud.
+group state gps_stats 2 "GPS"
+    element latitude "Latitude" type string access read_only
+    element longitude "Longitude" type string access read_only
+
+ 

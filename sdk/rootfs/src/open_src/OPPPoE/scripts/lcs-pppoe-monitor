@@ -1,0 +1,79 @@
+#!/bin/sh
+
+#. /tmp/lcs-pppoe-header
+. /usr/bin/lcs-pppoe-header 
+PID_FILE="/var/run/lcs-pppoe-monitor.pid"
+
+start()
+{
+    local iface="$1"
+    local idle_time="`rdcsman $CSID_C_PPPOE_LCS_IDLETIME u32`" 
+    if [ "$idle_time" = "0" ]; then
+        logger -p 8.7 -t lcs-pppoe-monitor "No Idle time, Connection by manual !"
+        echo "No Idle time, Connection by manual !"
+        lcs-pppoe-monitor stop
+        return;
+    fi
+
+    local count=""
+    local rx=""
+    local last_rx=""
+    local tx=""
+    local last_tx=""
+    while [ true ]; do
+        rx="`cat $NETDEV | grep $iface | awk '{print $3}'`"
+        tx="`cat $NETDEV | grep $iface | awk '{print $11}'`"
+        
+        if [ "$rx" != "$last_rx" ] || [ "$tx" != "$last_tx" ]; then 
+            count="$idle_time"                    
+        fi
+
+        last_rx="$rx"
+        last_tx="$tx"
+        if [ "$count" = "0" ]; then
+            logger -p 8.7 -t lcs-pppoe-monitor "Idle time reach !"
+            echo "Idle time reach !"
+            break
+        fi
+
+        count=$((count-1))
+        sleep 1                
+    done  
+    lcs-pppoe stop  
+    lcs-pppoe-monitor stop  
+    return;
+}
+
+stop()
+{
+    if [ -e $PID_FILE ]; then
+        kill `cat $PID_FILE`
+        rm -f $PID_FILE
+    fi
+    return
+}
+
+usage()
+{
+    echo "Usage :"
+    echo "  -> $0 start [iface]"
+    echo "  -> $0 stop"
+    echo ""
+}
+
+if [ "$1" = "start" ]; then
+    if [ -e $PID_FILE ] || [ "$2" = "" ]; then
+        usage;
+        exit 0
+    else         
+        start "$2" &
+        echo $! > $PID_FILE    
+    fi    
+elif [ "$1" = "stop" ]; then
+    stop;
+else
+    usage;
+fi    
+
+
+

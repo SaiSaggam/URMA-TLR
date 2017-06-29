@@ -1,0 +1,18 @@
+#library functions to assist with getting pppoe scripts running
+#this is purely for debug purposes.
+
+get_dsl_status() {
+    mkdir -p /ram/dsl/$1
+    if [ -f /ram/dsl/$1/status ] ; then
+        status=`cat /ram/dsl/$1/status`
+    else
+        status=0
+    fi
+    echo $((status))
+}
+
+set_dsl_status() {
+    mkdir -p /ram/dsl/$1
+    echo $2 > /ram/dsl/$1/status
+}
+

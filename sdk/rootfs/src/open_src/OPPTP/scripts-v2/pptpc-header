@@ -1,0 +1,757 @@
+#!/bin/sh
+
+[ -f "/usr/bin/scriptlib" ] && . /usr/bin/scriptlib
+
+MAX_MULTIWAN="10"
+WAN_LIST="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16"
+MAX_TUNNEL="22"
+TUN_LIST="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21"
+
+check_kernel_mode() {
+   local KERNEL_MODE="0"
+   if [ -f "/lib/pptp.so" ]; then
+      KERNEL_MODE=`rdcsman 0x00050003 u16`
+      if [ "$KERNEL_MODE" == "0" ]; then
+         KERNEL_MODE="1"
+      elif [ $((KERNEL_MODE)) -gt 1 ]; then
+         KERNEL_MODE="0"
+      fi
+   fi
+   return $KERNEL_MODE
+}
+
+check_kernel_version_2_6_36() {
+   if [ "`uname -r | grep 2.6.36`" != "" ]; then
+      return 1
+   else
+      return 0
+   fi
+}
+
+#check_used_listen_port() {
+#   local ConfigFiles="/etc/ppp/peers/*"
+#   local TCPPort="$1"
+#
+#   if [ "`grep \"listen-port $TCPPort\" $ConfigFiles 2>/dev/null`" != "" ]; then
+#      return 1
+#   else
+#      return 0
+#   fi
+#}
+
+check_exist_interface() {
+   local ETH="$1"
+   if [ "$ETH" != "" ] && [ "`ifconfig $ETH 2>&1 | grep Ethernet`" != "" ]; then
+      return 1
+   else
+      return 0
+   fi
+}
+
+# Read Wantype PPTP Configs
+get_wantype_pptp_config() {
+   local HANDLE_RUSSIAN="/var/run/russian_p1wan_support"
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      C_PPTP_CNTTYPE="`rdcsman 0x00050900 u32`"
+      C_PPTP_CNTTYPE_UI="`rdcsman 0x00050911 u32`"
+      C_PPTP_NAT_DISABLE="`rdcsman 0x00050002 u32`"
+      C_PPTP_RUSSIAN_MODE="0"
+      C_PPTP_RUSSIAN_MODE_SUPPORT="0"
+      if [ -f "$HANDLE_RUSSIAN" ]; then
+         C_PPTP_RUSSIAN_MODE_SUPPORT="1"
+         C_LOCAL_WANTYPE_RUSSIAN_MODE_DISABLE="`rdcsman 0x0001002B u32`"
+         if [ "$C_LOCAL_WANTYPE_RUSSIAN_MODE_DISABLE" == "0" ]; then
+            C_PPTP_RUSSIAN_MODE="1"
+         fi
+      fi
+      C_PPTP_PHASE1_TYPE="`rdcsman 0x00050e00 u32`"
+      if [ -z "$C_PPTP_PHASE1_TYPE" ] || [ "$C_PPTP_PHASE1_TYPE" == "0" ]; then
+         C_PHASE1_TYPE_STR="DYNAMIC"
+      else
+         C_PHASE1_TYPE_STR="STATIC"
+      fi
+      C_PPTP_P1FIXED_IP="`rdcsman 0x00050300 ipv4`"
+      C_PPTP_P1FIXED_NM="`rdcsman 0x00050400 ipv4`"
+      C_PPTP_P1FIXED_GW="`rdcsman 0x00050500 ipv4`"
+      C_PPTP_P1FIXED_PRIDNS="`rdcsman 0x00050700 ipv4`"
+      C_PPTP_P1FIXED_SECDNS="`rdcsman 0x00050800 ipv4`"
+      C_PPTP_PNS_SERVER="`rdcsman 0x00050600 str`"
+      C_PPTP_PNS_SERVER_IP="$C_PPTP_PNS_SERVER"
+      C_PPTP_AUTHTYPE="`rdcsman 0x00050d00 u32`"
+      C_PPTP_HOLDOFFTIME="`rdcsman 0x00050c00 u32`" 
+      C_PPTP_CNT_ID="`rdcsman 0x00050f00 u32`"
+      C_PPTP_USER="`rdcsman 0x00050100 str`"
+      C_PPTP_PASS="`rdcsman 0x00050200 str`"
+      C_PPTP_MTU="`rdcsman 0x00050a00 u32`"
+      C_PPTP_IDLETIME="`rdcsman 0x00050b00 u32`"
+      C_PPTP_ENABLE_MPPE="`rdcsman 0x00054100 u32`"
+      C_PPTP_ENABLE_MPPE_40="`rdcsman 0x00054101 u32`"
+      C_PPTP_ENABLE_MPPE_56="`rdcsman 0x00054102 u32`"
+      C_PPTP_ENABLE_MPPE_128="`rdcsman 0x00054103 u32`"
+      C_PPTP_PRIDNS="`rdcsman 0x00053100 ipv4`"
+      C_PPTP_SECDNS="`rdcsman 0x00053200 ipv4`"
+   else
+      C_PPTP_CNTTYPE="`rdcsman 0x0005090$TMP1 u32`"
+      C_PPTP_CNTTYPE_UI="`rdcsman 0x0005092$TMP u32`"
+      C_PPTP_NAT_DISABLE="`rdcsman 0x0005002$TMP u32`"
+      C_PPTP_RUSSIAN_MODE="0"
+      C_PPTP_RUSSIAN_MODE_SUPPORT="0"
+      if [ -f "$HANDLE_RUSSIAN" ]; then
+         C_PPTP_RUSSIAN_MODE_SUPPORT="1"
+         C_LOCAL_WANTYPE_RUSSIAN_MODE_DISABLE="`rdcsman 0x0001002B u32`" # Undefine for Multiwan (Use LOCAL Version)
+         if [ "$C_LOCAL_WANTYPE_RUSSIAN_MODE_DISABLE" == "0" ]; then
+            C_PPTP_RUSSIAN_MODE="1"
+         fi
+      fi
+      C_PPTP_PHASE1_TYPE="`rdcsman 0x00050e0$TMP1 u32`"
+      if [ -z "$C_PPTP_PHASE1_TYPE" ] || [ "$C_PPTP_PHASE1_TYPE" == "0" ]; then
+         C_PHASE1_TYPE_STR="DYNAMIC"
+      else
+         C_PHASE1_TYPE_STR="STATIC"
+      fi
+      C_PPTP_P1FIXED_IP="`rdcsman 0x0005030$TMP1 ipv4`"
+      C_PPTP_P1FIXED_NM="`rdcsman 0x0005040$TMP1 ipv4`"
+      C_PPTP_P1FIXED_GW="`rdcsman 0x0005050$TMP1 ipv4`"
+      C_PPTP_P1FIXED_PRIDNS="`rdcsman 0x0005070$TMP1 ipv4`"
+      C_PPTP_P1FIXED_SECDNS="`rdcsman 0x0005080$TMP1 ipv4`"
+      C_PPTP_PNS_SERVER="`rdcsman 0x0005060$TMP1 str`"
+      C_PPTP_PNS_SERVER_IP="$C_PPTP_PNS_SERVER"
+      C_PPTP_AUTHTYPE="`rdcsman 0x00050d0$TMP1 u32`"
+      C_PPTP_HOLDOFFTIME="`rdcsman 0x00050c0$TMP1 u32`" 
+      C_PPTP_CNT_ID="`rdcsman 0x00050f0$TMP1 u32`"
+      C_PPTP_USER="`rdcsman 0x0005010$TMP1 str`"
+      C_PPTP_PASS="`rdcsman 0x0005020$TMP1 str`"
+      C_PPTP_MTU="`rdcsman 0x00050a0$TMP1 u32`"
+      C_PPTP_IDLETIME="`rdcsman 0x00050b0$TMP1 u32`"
+      C_PPTP_ENABLE_MPPE="`rdcsman 0x00054100 u32`" # Undefine for Multiwan (Use LOCAL Version)
+      C_PPTP_ENABLE_MPPE_40="`rdcsman 0x00054101 u32`" # Undefine for Multiwan (Use LOCAL Version)
+      C_PPTP_ENABLE_MPPE_56="`rdcsman 0x00054102 u32`" # Undefine for Multiwan (Use LOCAL Version)
+      C_PPTP_ENABLE_MPPE_128="`rdcsman 0x00054103 u32`" # Undefine for Multiwan (Use LOCAL Version)
+      C_PPTP_PRIDNS="`rdcsman 0x0005310$TMP1 ipv4`"
+      C_PPTP_SECDNS="`rdcsman 0x0005320$TMP1 ipv4`"
+   fi
+}
+
+get_port_config() {
+   C_PPTP_PORT_DEFAULT="1723"
+   C_PPTP_PORT="$C_PPTP_PORT_DEFAULT"
+
+   #local Times="0"
+   #local MaxRetry="$(($MAX_MULTIWAN+$MAX_TUNNEL))"
+   #while [ $Times -lt $MaxRetry ];
+   #do
+   #   check_used_listen_port $C_PPTP_PORT
+   #   [ "$?" == "0" ] && break
+   #   if [ -z "$C_PPTP_PORT" ] || [ $C_PPTP_PORT -ge 65536 ]; then
+   #      C_PPTP_PORT="$C_PPTP_PORT_DEFAULT"
+   #   else
+   #      C_PPTP_PORT="$((C_PPTP_PORT+1))"
+   #   fi
+   #   Times="$((Times+1))"
+   #done
+}
+
+get_local_config() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      C_LOCAL_WANTYPE="`rdcsman 0x00010003 u32`"
+      C_LOCAL_HOSTNAME="`rdcsman 0x00010001 str`"
+   else
+      C_LOCAL_WANTYPE="`rdcsman 0x0001012$TMP u32`"
+      C_LOCAL_HOSTNAME="`rdcsman 0x00010001 str`" # Undefine for Multiwan (Use LOCAL Version)
+   fi
+      C_LOCAL_AP_CNT_TYPE="`rdcsman 0x00010035 u32`"
+   
+}
+
+get_lan_range() {
+   C_LOCAL_LANIP="`rdcsman 0x00010004 ipv4`"
+   C_LOCAL_LANNM="`rdcsman 0x00010005 ipv4`"
+
+   local lan_ip_tmp="$C_LOCAL_LANIP"
+   local lan_mask_tmp="$C_LOCAL_LANNM"
+
+   local ip1=$((`echo $lan_ip_tmp| cut -d "." -f1` & `echo $lan_mask_tmp| cut -d "." -f1`))
+   local ip2=$((`echo $lan_ip_tmp| cut -d "." -f2` & `echo $lan_mask_tmp| cut -d "." -f2`))
+   local ip3=$((`echo $lan_ip_tmp| cut -d "." -f3` & `echo $lan_mask_tmp| cut -d "." -f3`))
+   local ip4=$((`echo $lan_ip_tmp| cut -d "." -f4` & `echo $lan_mask_tmp| cut -d "." -f4`))
+
+   eval $1="$ip1.$ip2.$ip3.$ip4"
+   eval $2="$lan_mask_tmp"
+}
+
+get_3g_config() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      C_3G_MTU="`rdcsman 0x001e000b u32`"
+   else
+      C_3G_MTU="`rdcsman 0x001e20b$TMP u32`"
+   fi
+}
+
+get_failover_config() {
+   C_FAILOVER_LOADSHARING_ENABLE="`rdcsman 0x004301c0 u32`"
+   C_3G_FAILOVER_MODE="`rdcsman 0x001e0080 u32`"
+   C_FAILOVER_WANTYPE="`rdcsman 0x0043000b u32`"
+   C_3G_AUTOBAK_ENABLE="`rdcsman 0x001e000d u32`"
+}
+
+# Read PPTP Client Configs
+get_pptpc_config() {
+   C_PPTP_CLI_ENABLE="`rdcsman 0x00051000 u32`"
+   C_PPTP_CLI_QOS_ENABLE="`rdcsman 0x00051001 u32`"
+   # C_PPTP_CLI_DETECT_PNS="`rdcsman 0x00051002 u32`"
+}
+
+get_pptpc_tunnel_config() {
+   local IDX="$1"
+   local TUN_IDX="`printf %02X $((IDX))`"
+
+   C_PPTP_CLI_USER_ENABLE="`rdcsman 0x000511$TUN_IDX u32`"
+   C_PPTP_CLI_TUNLNAME="`rdcsman 0x000512$TUN_IDX str`"
+   C_PPTP_CLI_PEERIP="`rdcsman 0x000513$TUN_IDX ipv4`"
+   C_PPTP_CLI_USER="`rdcsman 0x000514$TUN_IDX str`"
+   C_PPTP_CLI_PASSWORD="`rdcsman 0x000515$TUN_IDX str`"
+   C_PPTP_CLI_ROUTE="`rdcsman 0x000516$TUN_IDX str`"
+   C_PPTP_CLI_CONNECT_TYPE="`rdcsman 0x000517$TUN_IDX u32`"
+   C_PPTP_CLI_MPPE="`rdcsman 0x000518$TUN_IDX u32`"
+   C_PPTP_CLI_NAT="`rdcsman 0x000519$TUN_IDX u32`"
+   C_PPTP_CLI_ACTIVE="`rdcsman 0x00051a$TUN_IDX u32`"
+   C_PPTP_CLI_PEERIP_STR="`rdcsman 0x00051b$TUN_IDX str`"
+   # C_PPTP_CLI_CCP_ENABLE=""
+   C_PPTP_CLI_DO_AUTH="`rdcsman 0x00051c$TUN_IDX u32`"
+   C_PPTP_CLI_AUTH_PAP="`rdcsman 0x00051d$TUN_IDX u32`"
+   C_PPTP_CLI_AUTH_CHAP="`rdcsman 0x00051e$TUN_IDX u32`"
+   C_PPTP_CLI_AUTH_MSCHAP="`rdcsman 0x00051f$TUN_IDX u32`"
+   C_PPTP_CLI_AUTH_MSCHAPV2="`rdcsman 0x000520$TUN_IDX u32`"
+   C_PPTP_CLI_LOCAL_IP="`rdcsman 0x000521$TUN_IDX ipv4`"
+   C_PPTP_CLI_REMOTE_IP="`rdcsman 0x000522$TUN_IDX ipv4`"
+   C_PPTP_CLI_LCP_TYPE="`rdcsman 0x000523$TUN_IDX u32`"
+   C_PPTP_CLI_LCP_INTERVAL="`rdcsman 0x000524$TUN_IDX u32`"
+   C_PPTP_CLI_LCP_FAILURE="`rdcsman 0x000525$TUN_IDX u32`"
+   C_PPTP_CLI_IDLETIME="`rdcsman 0x000526$TUN_IDX u32`"
+   C_PPTP_CLI_WAN="`rdcsman 0x000533$TUN_IDX u32`"
+}
+
+# Read Wantype Related Status
+get_sys_rom_info() {
+   # local MULTIWAN="$1"
+
+   S_SYS_INFO_ROM_ID="`rdcsman 0x80004210 str`"
+   S_SYS_INFO_ROM_ID_CUSTOMER_INFO="`expr substr $S_SYS_INFO_ROM_ID 1 3`"
+}
+
+get_phase1_dhcp_status() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      S_DHCP_CLI_IF_GW="`rdcsman 0x80035004 ipv4`"
+      S_DHCP_CLI_IF_PRIDNS="`rdcsman 0x80035005 ipv4`"
+      S_DHCP_CLI_IF_SECDNS="`rdcsman 0x80035006 ipv4`"
+      S_DHCP_CLI_CNT_STATUS="`rdcsman 0x80035007 u32`"
+   else
+      S_DHCP_CLI_IF_GW="`rdcsman 0x8003513$TMP ipv4`"
+      S_DHCP_CLI_IF_PRIDNS="`rdcsman 0x8003514$TMP ipv4`"
+      S_DHCP_CLI_IF_SECDNS="`rdcsman 0x8003515$TMP ipv4`"
+      S_DHCP_CLI_CNT_STATUS="`rdcsman 0x8003516$TMP u32`"
+   fi
+}
+
+get_phase1_static_status() {
+   local MULTIWAN="$1"
+
+   if [ -z "$MULTIWAN" ]; then
+      S_FIX_CNT_STATUS="`rdcsman 0x80110004 u32`"
+   else
+      S_FIX_CNT_STATUS="`rdcsman 0x80110004 u32`" # Undefine for Multiwan (Use LOCAL Version)
+   fi
+}
+
+get_wan_info() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP2="`printf %X $((MULTIWAN+2))`"
+   if [ -z "$MULTIWAN" ]; then   
+       #S_SYS_IF_WAN0="`rdcsman 0x8000F361 str`"
+	   S_SYS_IF_WAN="`rdcsman 0x8000F361 str`"
+   else
+       #S_SYS_IF_WAN1="`rdcsman 0x8000F36$TMP2 str`"
+	   S_SYS_MULTIWAN_IF_WAN="`rdcsman 0x8000F36$TMP2 str`"
+   fi
+}
+
+get_pptp_cnt_status() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ] ; then
+      S_PPTP_CNT_STATUS="`rdcsman 0x80050700 u32`"
+   else
+      S_PPTP_CNT_STATUS="`rdcsman 0x8005070$TMP1 u32`"
+   fi
+}
+
+get_pptp_cnt_info() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ] ; then
+      S_PPTP_CNT_TIME="`rdcsman 0x80050100 u32`"
+      S_PPTP_IF_IP="`rdcsman 0x80050200 ipv4`"
+      S_PPTP_IF_NM="`rdcsman 0x80050300 ipv4`"
+      S_PPTP_IF_GW="`rdcsman 0x80050400 ipv4`"
+      S_PPTP_IF_PRIDNS="`rdcsman 0x80050500 ipv4`"
+      S_PPTP_IF_SECDNS="`rdcsman 0x80050600 ipv4`"
+      S_PPTP_IF_NAME="`rdcsman 0x80050c00 str`"
+   else
+      S_PPTP_CNT_TIME="`rdcsman 0x8005010$TMP1 u32`"
+      S_PPTP_IF_IP="`rdcsman 0x8005020$TMP1 ipv4`"
+      S_PPTP_IF_NM="`rdcsman 0x8005030$TMP1 ipv4`"
+      S_PPTP_IF_GW="`rdcsman 0x8005040$TMP1 ipv4`"
+      S_PPTP_IF_PRIDNS="`rdcsman 0x8005050$TMP1 ipv4`"
+      S_PPTP_IF_SECDNS="`rdcsman 0x8005060$TMP1 ipv4`"
+      S_PPTP_IF_NAME="`rdcsman 0x80050c0$TMP1 str`"
+   fi
+}
+
+get_local_cnt_status() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ] ; then
+      S_LOCAL_WAN_STATUS="`rdcsman 0x80010007 u32`"
+   else
+      S_LOCAL_WAN_STATUS="`rdcsman 0x8001016$TMP u32`"
+   fi
+}
+
+get_local_cnt_force_status() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      S_LOCAL_WAN_CNT_FORCE="`rdcsman 0x8001000E u32`"
+   else
+      S_LOCAL_WAN_CNT_FORCE="`rdcsman 0x800101C$TMP u32`"
+   fi
+}
+
+get_local_cnt_info() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      S_LOCAL_CNT_TIME="`rdcsman 0x8001000c u32`"
+      S_LOCAL_WAN_IP="`rdcsman 0x80010002 ipv4`"
+      S_LOCAL_WAN_NM="`rdcsman 0x80010003 ipv4`"
+      S_LOCAL_WAN_GW="`rdcsman 0x80010004 ipv4`"
+      S_LOCAL_WAN_PRIDNS="`rdcsman 0x80010005 ipv4`"
+      S_LOCAL_WAN_SECDNS="`rdcsman 0x80010006 ipv4`"
+      S_LOCAL_WAN_IF_NAME="`rdcsman 0x8001000B str`"
+   else
+      S_LOCAL_CNT_TIME="`rdcsman 0x800101A$TMP u32`"
+      S_LOCAL_WAN_IP="`rdcsman 0x8001011$TMP ipv4`"
+      S_LOCAL_WAN_NM="`rdcsman 0x8001012$TMP ipv4`"
+      S_LOCAL_WAN_GW="`rdcsman 0x8001013$TMP ipv4`"
+      S_LOCAL_WAN_PRIDNS="`rdcsman 0x8001014$TMP ipv4`"
+      S_LOCAL_WAN_SECDNS="`rdcsman 0x8001015$TMP ipv4`"
+      S_LOCAL_WAN_IF_NAME="`rdcsman 0x8001019$TMP str`"
+   fi
+}
+
+get_3g_cnt_info() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      S_3G_IF_GW="`rdcsman 0x801e0400 ipv4`"
+   else
+      S_3G_IF_GW="`rdcsman 0x801e040$TMP1 ipv4`"
+   fi
+}
+
+get_failover_cnt_status() {
+   S_FAILOVER_STATUS="`rdcsman 0x80430600 u32`"
+   S_3G_AUTOBAK_MODE="`rdcsman 0x801e4000 u32`"
+   S_3G_AUTOBAK_STATUS="`rdcsman 0x801e1200 u32`"
+   S_FLASHOFDM_IF_GW="`rdcsman 0x80395004 u32`"
+}
+
+get_failover_cnt_info() {
+   S_FAILOVER_CNT_TIME="`rdcsman 0x8043000c u32`"
+   S_FAILOVER_WAN_IP="`rdcsman 0x80430002 ipv4`"
+   S_FAILOVER_WAN_NM="`rdcsman 0x80430003 ipv4`"
+   S_FAILOVER_WAN_GW="`rdcsman 0x80430004 ipv4`"
+   S_FAILOVER_WAN_PRIDNS="`rdcsman 0x80430005 ipv4`"
+   S_FAILOVER_WAN_SECDNS="`rdcsman 0x80430006 ipv4`"
+   S_FAILOVER_WAN_IF_NAME="`rdcsman 0x8043000b str`"
+}
+
+# Read PPTP Client Status
+get_pptpc_cnt_status() {
+   local IDX="$1"
+   local TUN_IDX="`printf %02X $((IDX))`"
+
+   S_PPTP_CLI_PEER_CONNT_STAT="`rdcsman 0x800529$TUN_IDX u32`"
+}
+
+get_pptpc_cnt_info() {
+   local IDX="$1"
+   local TUN_IDX="`printf %02X $((IDX))`"
+   local TUN_IDX_T2="`printf %02X $((IDX+2))`"
+
+   #S_PPTP_CLI_PEER_USER="`rdcsman 0x800521$TUN_IDX str`"
+   #S_PPTP_CLI_PEER_REAL_IP="`rdcsman 0x800522$TUN_IDX ipv4`"
+   S_PPTP_CLI_PEER_VIRTUAL_IP="`rdcsman 0x800523$TUN_IDX ipv4`"
+   S_PPTP_CLI_PEER_PID="`rdcsman 0x800524$TUN_IDX u32`"
+   S_PPTP_CLI_PEER_IFNAME="`rdcsman 0x800525$TUN_IDX str`"
+   S_PPTP_CLI_PEER_REMOTE_IP="`rdcsman 0x800526$TUN_IDX ipv4`"
+   S_PPTP_CLI_PEER_CONNT_ID="`rdcsman 0x800527$TUN_IDX u32`"
+   #S_PPTP_CLI_PEER_CONNT_TYPE="`rdcsman 0x800528$TUN_IDX u32`"
+}
+
+get_routing_restart_flag() {
+   S_ROUTING_RESTART_FLAG="`rdcsman 0x80130003 u32`"
+}
+
+# Write Wantype Related Status
+write_pptp_cnt_status() {
+   local CNTSTATUS="$1"
+   local MULTIWAN="$2"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_PPTP_CNT_STATUS
+      wrcsman "0x80050700 $CNTSTATUS"
+   else
+      # S_PPTP_MULTIWAN_CNT_STATUS
+      wrcsman "0x8005070$TMP1 $CNTSTATUS"
+   fi
+}
+
+write_pptp_cnt_info() {
+   local CNTTIME="$1"
+   local IF_IP="$2"
+   local IF_NM="$3"
+   local IF_GW="$4"
+   local IF_DNS1="$5"
+   local IF_DNS2="$6"
+   local PPP_IF="$7"
+   local MULTIWAN="$8"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_PPTP_CNT_TIME, S_PPTP_IF_IP, S_PPTP_IF_NM, S_PPTP_IF_GW,
+      # S_PPTP_IF_PRIDNS, S_PPTP_IF_SECDNS, S_PPTP_IF_NAME
+      wrcsman "0x80050100 $CNTTIME && \
+               0x80050200 {$IF_IP} && \
+               0x80050300 {$IF_NM} && \
+               0x80050400 {$IF_GW} && \
+               0x80050500 {$IF_DNS1} && \
+               0x80050600 {$IF_DNS2} && \
+               0x80050C00 \"$PPP_IF"
+   else
+      # S_PPTP_MULTIWAN_CNT_TIME, S_PPTP_MULTIWAN_IF_IP, S_PPTP_MULTIWAN_IF_NM, S_PPTP_MULTIWAN_IF_GW,
+      # S_PPTP_MULTIWAN_IF_PRIDNS, S_PPTP_MULTIWAN_IF_SECDNS, S_PPTP_MULTIWAN_IF_NAME
+      wrcsman "0x8005010$TMP1 $CNTTIME && \
+               0x8005020$TMP1 {$IF_IP} && \
+               0x8005030$TMP1 {$IF_NM} && \
+               0x8005040$TMP1 {$IF_GW} && \
+               0x8005050$TMP1 {$IF_DNS1} && \
+               0x8005060$TMP1 {$IF_DNS2} && \
+               0x80050C0$TMP1 \"$PPP_IF"
+   fi
+}
+
+write_local_cnt_status() {
+   local STATUS="$1"
+   local MULTIWAN="$2"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_LOCAL_WAN_STATUS
+      wrcsman "0x80010007 $STATUS"
+   else
+      # S_LOCAL_MULTIWAN_STATUS
+      wrcsman "0x8001016$TMP $STATUS"
+   fi
+}
+
+write_local_cnt_force_status() {
+   local CNT_FORCE_STATUS="$1"
+   local MULTIWAN="$2"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_LOCAL_WAN_CNT_FORCE
+      wrcsman "0x8001000e $CNT_FORCE_STATUS"
+   else
+      # S_LOCAL_MULTIWAN_CNT_FORCE
+      wrcsman "0x800101C$TMP $CNT_FORCE_STATUS"
+   fi
+}
+
+write_local_cnt_info() {
+   local CNTTIME="$1"
+   local IF_IP="$2"
+   local IF_NM="$3"
+   local IF_GW="$4"
+   local IF_DNS1="$5"
+   local IF_DNS2="$6"
+   local PPP_IF="$7"
+   local MULTIWAN="$8"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_LOCAL_CNT_TIME, S_LOCAL_WAN_IP, S_LOCAL_WAN_NM, S_LOCAL_WAN_GW,
+      # S_LOCAL_WAN_PRIDNS, S_LOCAL_WAN_SECDNS, S_LOCAL_WAN_IF_NAME
+      wrcsman "0x8001000c $CNTTIME && \
+               0x80010002 {$IF_IP} && \
+               0x80010003 {$IF_NM} && \
+               0x80010004 {$IF_GW} && \
+               0x80010005 {$IF_DNS1} && \
+               0x80010006 {$IF_DNS2} && \
+               0x8001000B \"$PPP_IF"
+   else
+      # S_LOCAL_MULTIWAN_CNT_TIME, S_LOCAL_MULTIWAN_IP, S_LOCAL_MULTIWAN_NM, S_LOCAL_MULTIWAN_GW,
+      # S_LOCAL_MULTIWAN_PRIDNS, S_LOCAL_MULTIWAN_SECDNS, S_LOCAL_MULTIWAN_IF_NAME
+      wrcsman "0x800101A$TMP $CNTTIME && \
+               0x8001011$TMP {$IF_IP} && \
+               0x8001012$TMP {$IF_NM} && \
+               0x8001013$TMP {$IF_GW} && \
+               0x8001014$TMP {$IF_DNS1} && \
+               0x8001015$TMP {$IF_DNS2} && \
+               0x8001019$TMP \"$PPP_IF"
+   fi
+}
+
+write_failover_cnt_status() {
+   local STATUS="$1"
+
+   # S_FAILOVER_STATUS
+   wrcsman "0x80430600 $STATUS"
+}
+
+write_failover_cnt_info() {
+   local CNTTIME="$1"
+   local IF_IP="$2"
+   local IF_NM="$3"
+   local IF_GW="$4"
+   local IF_DNS1="$5"
+   local IF_DNS2="$6"
+   local PPP_IF="$7"
+
+   # S_FAILOVER_CNT_TIME, S_FAILOVER_WAN_IP, S_FAILOVER_WAN_NM, S_FAILOVER_WAN_GW,
+   # S_FAILOVER_WAN_PRIDNS, S_FAILOVER_WAN_SECDNS, S_FAILOVER_WAN_IF_NAME
+   wrcsman "0x8043000c $CNTTIME && \
+            0x80430002 {$IF_IP} && \
+            0x80430003 {$IF_NM} && \
+            0x80430004 {$IF_GW} && \
+            0x80430005 {$IF_DNS1} && \
+            0x80430006 {$IF_DNS2} && \
+            0x8043000b \"$PPP_IF"
+}
+
+# Write PPTP Client Status
+write_pptpc_cnt_status() {
+   local STATUS="$1"
+   local IDX="$2"
+   local TUN_IDX="`printf %02X $((IDX))`"
+
+   # S_PPTP_CLI_PEER_CONNT_STAT
+   wrcsman "0x800529$TUN_IDX $STATUS"
+}
+
+write_pptpc_pid_info() {
+   local PID="$1"
+   local IDX="$2"
+   local TUN_IDX="`printf %02X $((IDX))`"
+
+   # S_PPTP_CLI_PEER_PID
+   wrcsman "0x800524$TUN_IDX $PID"
+}
+
+write_routing_restart_flag() {
+   local ROUTING_RESTART_FLAG="$1"
+
+   # S_ROUTING_RESTART_FLAG
+   wrcsman "0x80130003 $ROUTING_RESTART_FLAG"
+}
+
+write_pptpc_cnt_info() {
+   local PID="$1"
+   local IFNAME="$2"
+   local VIRTUAL_IP="$3"
+   local REMOTE_IP="$4"
+   local IDX="$5"
+   local TUN_IDX="`printf %02X $((IDX))`"
+
+   # S_PPTP_CLI_PEER_PID, S_PPTP_CLI_PEER_IFNAME,
+   # S_PPTP_CLI_PEER_VIRTUAL_IP, S_PPTP_CLI_PEER_REMOTE_IP
+   if [ "$IFNAME" != "" ]; then
+      wrcsman "0x800524$TUN_IDX $PID && \
+               0x800525$TUN_IDX \"$IFNAME && \
+               0x800523$TUN_IDX {$VIRTUAL_IP} && \
+               0x800526$TUN_IDX {$REMOTE_IP}"
+   fi
+}
+
+# Write PPTP Client Config
+write_pptpc_peerip_info() {
+   local PEERIP="$1"
+   local IDX="$2"
+   local TUN_IDX="`printf %02X $((IDX))`"
+
+   # C_PPTP_CLI_PEERIP
+   wrcsman "0x000513$TUN_IDX {$PEERIP}"
+}
+
+# Clear Status
+clear_pptp_cnt_status() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_PPTP_CNT_STATUS
+      wrcsman "0x80050700 0x00"
+   else
+      # S_PPTP_MULTIWAN_CNT_STATUS
+      wrcsman "0x8005070$TMP1 0x00"
+   fi
+}
+
+clear_pptp_cnt_info() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_PPTP_CNT_TIME, S_PPTP_IF_IP, S_PPTP_IF_NM, S_PPTP_IF_GW,
+      # S_PPTP_IF_PRIDNS, S_PPTP_IF_SECDNS, S_PPTP_IF_NAME
+      wrcsman "0x80050200 0x00 && \
+               0x80050100 {0.0.0.0} && \
+               0x80050300 {0.0.0.0} && \
+               0x80050400 {0.0.0.0} && \
+               0x80050500 {0.0.0.0} && \
+               0x80050600 {0.0.0.0} && \
+               0x80050c00 \""
+   else
+      # S_PPTP_MULTIWAN_CNT_TIME, S_PPTP_MULTIWAN_IF_IP, S_PPTP_MULTIWAN_IF_NM, S_PPTP_MULTIWAN_IF_GW,
+      # S_PPTP_MULTIWAN_IF_PRIDNS, S_PPTP_MULTIWAN_IF_SECDNS, S_PPTP_MULTIWAN_IF_NAME
+      wrcsman "0x8005020$TMP1 0x00 && \
+               0x8005010$TMP1 {0.0.0.0} && \
+               0x8005030$TMP1 {0.0.0.0} && \
+               0x8005040$TMP1 {0.0.0.0} && \
+               0x8005050$TMP1 {0.0.0.0} && \
+               0x8005060$TMP1 {0.0.0.0} && \
+               0x80050c0$TMP1 \""
+   fi
+}
+
+clear_local_cnt_status() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_LOCAL_WAN_STATUS
+      wrcsman "0x80010007 0x00"
+   else
+      # S_LOCAL_MULTIWAN_STATUS
+      wrcsman "0x8001016$TMP 0x00"
+   fi
+}
+
+clear_local_cnt_force_status() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_LOCAL_WAN_CNT_FORCE
+      wrcsman "0x8001000e 0x00"
+   else
+      # S_LOCAL_MULTIWAN_CNT_FORCE
+      wrcsman "0x800101C$TMP 0x00"
+   fi
+}
+
+clear_local_cnt_info() {
+   local MULTIWAN="$1"
+   local TMP="`printf %X $((MULTIWAN))`"
+   local TMP1="`printf %X $((MULTIWAN+1))`"
+
+   if [ -z "$MULTIWAN" ]; then
+      # S_LOCAL_WAN_IP, S_LOCAL_WAN_NM, S_LOCAL_WAN_GW,
+      # S_LOCAL_WAN_PRIDNS, S_LOCAL_WAN_SECDNS, S_LOCAL_WAN_IF_NAME
+      wrcsman "0x8001000c 0x00 && \
+               0x80010002 {0.0.0.0} && \
+               0x80010003 {0.0.0.0} && \
+               0x80010004 {0.0.0.0} && \
+               0x80010005 {0.0.0.0} && \
+               0x80010006 {0.0.0.0} && \
+               0x8001000B \""
+   else
+      # S_LOCAL_MULTIWAN_CNT_TIME, S_LOCAL_MULTIWAN_IP, S_LOCAL_MULTIWAN_NM, S_LOCAL_MULTIWAN_GW,
+      # S_LOCAL_MULTIWAN_PRIDNS, S_LOCAL_MULTIWAN_SECDNS, S_LOCAL_MULTIWAN_IF_NAME
+      wrcsman "0x800101A$TMP 0x00 && \
+               0x8001011$TMP {0.0.0.0} && \
+               0x8001012$TMP {0.0.0.0} && \
+               0x8001013$TMP {0.0.0.0} && \
+               0x8001014$TMP {0.0.0.0} && \
+               0x8001015$TMP {0.0.0.0} && \
+               0x8001019$TMP \""
+   fi
+}
+
+clear_failover_cnt_status() {
+   # S_FAILOVER_STATUS
+   wrcsman "0x80430600 0"
+}
+
+clear_failover_cnt_info() {
+   # S_FAILOVER_CNT_TIME, S_FAILOVER_WAN_IP, S_FAILOVER_WAN_NM, S_FAILOVER_WAN_GW,
+   # S_FAILOVER_WAN_PRIDNS, S_FAILOVER_WAN_SECDNS, S_FAILOVER_WAN_IF_NAME
+   wrcsman "0x8043000c 0x00 && \
+            0x80430002 {0.0.0.0} && \
+            0x80430003 {0.0.0.0} && \
+            0x80430004 {0.0.0.0} && \
+            0x80430005 {0.0.0.0} && \
+            0x80430006 {0.0.0.0} && \
+            0x8043000b \""
+}
+
+# Clear PPTP Client Status
+clear_pptpc_cnt_info() {
+   local IDX="$1"
+   local TUN_IDX="`printf %02X $((IDX))`"
+
+   # S_PPTP_CLI_PEER_PID, S_PPTP_CLI_PEER_IFNAME,
+   # S_PPTP_CLI_PEER_VIRTUAL_IP, S_PPTP_CLI_PEER_REMOTE_IP
+   wrcsman "0x800524$TUN_IDX 0x00 && \
+            0x800525$TUN_IDX \" && \
+            0x800523$TUN_IDX {0.0.0.0} && \
+            0x800526$TUN_IDX {0.0.0.0}
+            0x800529$TUN_IDX  0"
+}

@@ -1,0 +1,28 @@
+globalerror load_fail "Load fail"
+globalerror save_fail "Save fail"
+globalerror memory_fail "Insufficient memory"
+
+# Device info that shows up in Device Cloud device summary
+# Device Cloud queries this system setting to display the information in root folder
+group setting system "System"
+    element description "Description" type string max 63
+    element contact "Contact" type string max 63
+    element location "Location" type string max 63
+    error invalid_length "Invalid Length"
+ 
+# Device location
+# State configuration for GPS
+# Must setup the following group for Latitude and Longitude to be shown in Device Cloud.
+group state gps_stats "GPS"
+    element latitude "Latitude" type string access read_only
+    element longitude "Longitude" type string access read_only
+    
+# Health Data Metrics configuration
+group setting simple_enhanced_services "Simple Health data reporting configuration"
+    element report_rate "Global reporting interval (minutes)" type uint32
+    element eth_metrics "Ethernet Metrics" type on_off
+    element eth_sample_rate "Ethernet Sampling interval (minutes)" type uint32
+    element mobile_metrics "Mobile Metrics" type on_off
+    element mobile_sample_rate "Mobile Sampling interval (minutes)" type uint32
+    element sys_metrics "System Metrics" type on_off
+    element sys_sample_rate "System Sampling interval (minutes)" type uint32

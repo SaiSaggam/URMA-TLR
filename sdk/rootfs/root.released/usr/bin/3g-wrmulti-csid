@@ -1,0 +1,202 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+. /usr/bin/scriptlib
+
+# Get index[usb][3G]
+get_index "$2" "$3"
+get_config ${Index} ${Index_3G}
+get_usb_status ${Index}
+
+MODEMCHK_RESTART_PATH="/tmp/modem_restart_count_${Index_3G}"
+
+extra_link()
+{
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+
+    if [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "5340" ] ||
+       [ "${VENDORID}" == "4817" -a "${PRODUCTID}" == "5493" ] ; then
+        wrcsman "0x801e7c3${Index_3G} 0x01"
+        wrcsman "0x801e7c4${Index_3G} \"$CSID_S_USB_IF_GW"
+    fi
+}
+
+write_csid_multi3g()
+{
+    get_usb_status ${idx}
+ 
+    # write to csid_s_3g
+    #write_csid_s_3g
+
+    # Write csid for IPv6
+    if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "1" ] ; then
+    #   	wrcsman "0x801e010$idx_3g $CSID_S_USB_CNT_TIME && \
+	#			0x805500f$idx_3g {$CSID_S_USB_IF_IPV6} && \
+	#			0x801e505$idx_3g {$CSID_S_USB_IF_GW_IPV6} && \
+	#			0x801e506$idx_3g {$CSID_S_USB_IF_PRIDNS_IPV6} && \
+	#			0x801e507$idx_3g {$CSID_S_USB_IF_SECDNS_IPV6} && \
+ 	#			0x801e070$idx_3g $CSID_S_USB_CNT_STATUS && \
+   	#			0x801e110$idx_3g $CSID_S_USB_CNT_ERR_CODE && \
+   	#			0x801e220$idx_3g \"$CSID_S_USB_CNT_IF_NAME"
+    	wrcsman "0x801e220$idx_3g \"$CSID_S_USB_CNT_IF_NAME && \
+   				0x801e2bf$idx_3g \"$CSID_S_USB_MAC_ADDR"
+    fi
+
+    # Write csid for IPv4
+    if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "0" -o "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ] ; then
+    	wrcsman "0x801e010$idx_3g $CSID_S_USB_CNT_TIME && \
+				0x801e020$idx_3g {$CSID_S_USB_IF_IP} && \
+				0x801e030$idx_3g {$CSID_S_USB_IF_NM} && \
+				0x801e040$idx_3g {$CSID_S_USB_IF_GW} && \
+				0x801e050$idx_3g {$CSID_S_USB_IF_PRIDNS} && \
+				0x801e060$idx_3g {$CSID_S_USB_IF_SECDNS} && \
+ 				0x801e070$idx_3g $CSID_S_USB_CNT_STATUS && \
+   				0x801e110$idx_3g $CSID_S_USB_CNT_ERR_CODE && \
+   				0x801e220$idx_3g \"$CSID_S_USB_CNT_IF_NAME && \
+   				0x801e2bf$idx_3g \"$CSID_S_USB_MAC_ADDR"
+    fi
+
+    if [ $CSID_S_USB_CNT_IF_NAME ]; then
+        if [ $CSID_S_USB_IF_IP == "0.0.0.0" ] ; then
+    		wrcsman "0x801e010$idx_3g 0x00 && \
+            		0x801e020$idx_3g 0x00 && \
+            		0x801e030$idx_3g 0x00 && \
+            		0x801e040$idx_3g 0x00 && \
+            		0x801e050$idx_3g 0x00 && \
+            		0x801e060$idx_3g 0x00 && \
+            		0x801e070$idx_3g 0x00 && \
+            		0x801e110$idx_3g 0x00 "
+            if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" == "0" -o "$CSID_C_3G_MULTIWAN_IP_TYPE" == "2" ] ; then
+                # In pure IPv6 LTE do not clean WAN_IF_NAME
+                wrcsman "0x801e220$idx_3g 0x00 "
+            fi
+        fi
+    fi
+ 
+    local CNT_PATH="/tmp/3G${Index_3G}_connect"
+
+    # remove first, to prevent the previos one is left, for case only do 3g-action start but no stop
+    [ -f "$CNT_PATH" ] && rm -f "$CNT_PATH"
+
+    # connect add index_usb
+    echo "Index_usb:${idx}"                >> "$CNT_PATH"
+    echo "IF_name:$CSID_S_USB_NDIS1_NAME"  >> "$CNT_PATH"
+
+    if [ ${CSID_S_USB_QMI_NODE1} ] ; then
+        echo "QMI_node:$CSID_S_USB_QMI_NODE1" >> "$CNT_PATH"
+    fi 
+    # write connect driver type for CSID_S_USB_CNT_DRIVER
+    wrcsman "0x805501e$idx $CSID_S_USB_DRIVER_TYPE"
+
+    # Do some thing on UI for special modem
+    extra_link
+
+    if [ "$CSID_S_USB_CNT_STATUS" == "2" -a $CSID_C_3G_MODEM_RESTART_ENABLE -eq 1 ];then
+        # clean connect fail times when connect success
+        wrcsman "0x801e712${Index_3G} 0x00" 
+        echo "0" > $MODEMCHK_RESTART_PATH
+    fi
+}
+
+write_csid_s_3g()
+{
+    wrcsman "0x801e0100 $CSID_S_USB_CNT_TIME && \
+			0x801e0200 {$CSID_S_USB_IF_IP} && \
+			0x801e0300 {$CSID_S_USB_IF_NM} && \
+			0x801e0400 {$CSID_S_USB_IF_GW} && \
+			0x801e0500 {$CSID_S_USB_IF_PRIDNS} && \
+			0x801e0600 {$CSID_S_USB_IF_SECDNS} && \
+ 			0x801e0700 $CSID_S_USB_CNT_STATUS && \
+   			0x801e1100 $CSID_S_USB_CNT_ERR_CODE && \
+   			0x801e2200 \"$CSID_S_USB_CNT_IF_NAME"
+
+    if [ $CSID_S_USB_CNT_IF_NAME != "" ]; then
+        if [ $CSID_S_USB_IF_IP == "0.0.0.0" ] ; then
+    		wrcsman "0x801e0100 0x00 && \
+            		0x801e0200 0x00 && \
+            		0x801e0300 0x00 && \
+            		0x801e0400 0x00 && \
+            		0x801e0500 0x00 && \
+            		0x801e0600 0x00 && \
+            		0x801e0700 0x00 && \
+            		0x801e1100 0x00 && \
+            		0x801e2200 0x00 "
+        fi
+    fi
+}
+
+clean_csid_multi3g()
+{
+    wrcsman "0x801e010$idx_3g 0x00 && \
+			0x801e020$idx_3g 0x00 && \
+			0x801e030$idx_3g 0x00 && \
+			0x801e040$idx_3g 0x00 && \
+			0x801e050$idx_3g 0x00 && \
+			0x801e060$idx_3g 0x00 && \
+  			0x801e070$idx_3g 0x00 && \
+   			0x801e110$idx_3g 0x00 && \
+   			0x801e220$idx_3g 0x00 "
+
+    if [ "$CSID_C_3G_MULTIWAN_IP_TYPE" != "0" ] ; then
+       	wrcsman "0x801e010$idx_3g 0x00 && \
+				0x801e504$idx_3g 0x00 && \
+				0x801e505$idx_3g 0x00 && \
+				0x801e506$idx_3g 0x00 && \
+				0x801e507$idx_3g 0x00 && \
+ 				0x801e070$idx_3g 0x00 && \
+   				0x801e110$idx_3g 0x00 && \
+   				0x801e220$idx_3g 0x00 "
+    fi
+
+    # disconnect del index_usb
+    local CNT_PATH="/tmp/3G${Index_3G}_connect"
+    [ -f "$CNT_PATH" ] && rm -f "$CNT_PATH"
+
+    # clean connect driver type for CSID_S_USB_CNT_DRIVER
+    wrcsman "0x805501e$idx 0x00" 
+
+    # Clean dongle link csid for special modem
+    wrcsman "0x801e7c3${Index_3G} 0x00 && \
+             0x801e7c4${Index_3G} 0x00"
+
+}
+
+clean_csid_s_3g()
+{
+
+    wrcsman "0x801e0100 0x00 && \
+			0x801e0200 0x00 && \
+			0x801e0300 0x00 && \
+			0x801e0400 0x00 && \
+			0x801e0500 0x00 && \
+			0x801e0600 0x00 && \
+   			0x801e0700 0x00 && \
+   			0x801e1100 0x00 && \
+   			0x801e2200 0x00 "
+ 
+} 
+
+usage() {
+	 echo "$0 [write|clean] [index_usb] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+get_cnt_status ${Index}
+
+#Index_3G=$3
+idx_3g=`expr $Index_3G + 1`
+
+case "$1" in
+    write)       write_csid_multi3g;;
+    clean)       clean_csid_multi3g;;
+    *)           usage;;
+esac
+
+exit 0  
+

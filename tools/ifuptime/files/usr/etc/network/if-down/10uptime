@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#remove the uptime file /var/network/uptimes when an interface goes down
+if [ "$IFACE" != "" ]; then
+    [ -e /var/network/uptimes/$IFACE ] && rm -f /var/network/uptimes/$IFACE
+fi
+

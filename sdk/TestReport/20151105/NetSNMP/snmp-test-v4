@@ -1,0 +1,302 @@
+#!/bin/bash
+#
+# Script for testing SNMP UCI configuration and native format
+#
+
+export UCI_CONFIG_DIR="/home/digi"
+
+CONFIGFILE="/etc/snmpd.conf"
+REPORT="/home/digi/unitest_report"
+
+. /lib/functions.sh
+. /lib/config/uci.sh
+
+
+# Default Values
+default_v2c="off"
+default_v3="off"
+default_port="161"
+default_auth_traps="off"
+default_access="ro"
+default_authentication="none"
+default_privacy="none"
+
+#
+# SNMPv1/v2c Community configuration
+#
+snmp_com2sec_checking() {
+
+	local cfg="$1"
+	
+	config_get community $cfg community
+	[ -n "$community" ] || return 0
+
+	if [ "`grep -wc \"com2sec $community default $community\" $CONFIGFILE`" -eq 1 ]; then
+        echo "com2sec configuration checking  $section... passed" >> $REPORT
+    else
+        echo "com2sec configuration checking  $section... failed" >> $REPORT
+    fi
+}
+
+snmp_v2c_group_checking() {
+
+	local cfg="$1"
+	local group="Group"
+
+	config_get community $cfg community
+	[ -n "$community" ] || return 0
+	
+	if [ "`grep -wc \"group $community$group v2c $community\" $CONFIGFILE`" -eq 1 ]; then
+        echo "Group configuration checking  $section... passed" >> $REPORT
+    else
+        echo "Group configuration checking  $section... failed" >> $REPORT
+    fi
+}
+
+snmp_v2c_access_checking() {
+	
+	local cfg="$1"
+	local group="Group"
+
+	config_get community $cfg community
+	[ -n "$community" ] || return 0
+	config_get access $cfg access $default_access
+
+	if [ "$access" = "rw" ]; then
+		write="all"
+	else
+		write="none"
+	fi
+
+	temp_2="\"\""
+	
+	if [ "`grep -wc \"access $community$group $temp_2 v2c noauth exact all $write none\" $CONFIGFILE`" -eq 1 ]; then
+        echo "Access configuration checking  $section... passed" >> $REPORT
+    else
+        echo "Access configuration checking  $section... failed" >> $REPORT
+    fi	
+		
+}
+
+
+#
+# SNMPv3 User configuration
+#
+snmp_createuser_checking() {
+
+	local cfg="$1"
+
+	config_get user $cfg user
+	[ -n "$user" ] || return 0
+	config_get authentication $cfg authentication $default_authentication
+	config_get privacy $cfg privacy $default_privacy
+	config_get authentication_password $cfg authentication_password 
+	config_get privacy_password $cfg privacy_password
+			
+	if [ "$authentication" = "none" ]; then
+		level="noauth"
+				
+		if [ "`grep -wc \"createUser $user\" $CONFIGFILE`" -eq 1 ]; then
+            echo "SNMPv3 createuser configuration checking  $section... passed" >> $REPORT
+        else
+            echo "SNMPv3 createuser configuration checking  $section... failed" >> $REPORT
+        fi	
+
+	elif [ "$authentication" = "sha1" -a "$privacy" = "none" ]; then
+		level="auth  "
+		
+		if [ "`grep -wc \"createUser $user SHA $authentication_password\" $CONFIGFILE`" -eq 1 ]; then
+            echo "SNMPv3 createuser configuration checking  $section... passed" >> $REPORT
+        else
+            echo "SNMPv3 createuser configuration checking  $section... failed" >> $REPORT
+        fi	
+
+	elif [ "$authentication" = "md5" -a "$privacy" = "none" ]; then
+		level="auth  "
+
+		if [ "`grep -wc \"createUser $user MD5 $authentication_password\" $CONFIGFILE`" -eq 1 ]; then
+            echo "SNMPv3 createuser configuration checking  $section... passed" >> $REPORT
+        else
+            echo "SNMPv3 createuser configuration checking  $section... failed" >> $REPORT
+        fi	
+		
+	elif [ "$authentication" = "sha1" -a "$privacy" = "des" ]; then		
+		level="priv  "
+
+		if [ "`grep -wc \"createUser $user SHA $authentication_password DES $privacy_password\" $CONFIGFILE`" -eq 1 ]; then
+            echo "SNMPv3 createuser configuration checking  $section... passed" >> $REPORT
+        else
+            echo "SNMPv3 createuser configuration checking  $section... failed" >> $REPORT
+        fi	
+		
+	elif [ "$authentication" = "sha1" -a "$privacy" = "aes" ]; then		
+		level="priv  "
+
+		if [ "`grep -wc \"createUser $user SHA $authentication_password AES $privacy_password\" $CONFIGFILE`" -eq 1 ]; then
+            echo "SNMPv3 createuser configuration checking  $section... passed" >> $REPORT
+        else
+            echo "SNMPv3 createuser configuration checking  $section... failed" >> $REPORT
+        fi	
+		
+	elif [ "$authentication" = "md5" -a "$privacy" = "des" ]; then		
+		level="priv  "
+		
+		if [ "`grep -wc \"createUser $user MD5 $authentication_password DES $privacy_password\" $CONFIGFILE`" -eq 1 ]; then
+            echo "SNMPv3 createuser configuration checking  $section... passed" >> $REPORT
+        else
+            echo "SNMPv3 createuser configuration checking  $section... failed" >> $REPORT
+        fi	
+		
+	elif [ "$authentication" = "md5" -a "$privacy" = "aes" ]; then		
+		level="priv  "
+
+		if [ "`grep -wc \"createUser $user MD5 $authentication_password AES $privacy_password\" $CONFIGFILE`" -eq 1 ]; then
+            echo "SNMPv3 createuser configuration checking  $section... passed" >> $REPORT
+        else
+            echo "SNMPv3 createuser configuration checking  $section... failed" >> $REPORT
+        fi	
+		
+	fi
+}
+
+snmp_authuser_checking() {
+
+	local cfg="$1"
+
+	config_get user $cfg user
+	[ -n "$user" ] || return 0
+	config_get access $cfg access $default_access
+	config_get authentication $cfg authentication $default_authentication
+	config_get privacy $cfg privacy $default_privacy
+		
+	if [ "$access" = "rw" ]; then
+		user_access="read,write"
+	else
+		user_access="read      "
+	fi
+	
+	if [ "$authentication" = "none" ]; then
+		level="noauth"
+	elif [ "$privacy" = "none" ]; then
+		level="auth  "
+	else
+		level="priv  "
+	fi
+
+	if [ "`grep -wc \"authuser $user_access -s usm $user $level\" $CONFIGFILE`" -eq 1 ]; then
+        echo "SNMPv3 authuser configuration checking  $section... passed" >> $REPORT
+    else
+        echo "SNMPv3 authuser configuration checking  $section... failed" >> $REPORT
+    fi
+}
+
+
+#
+# Starts here
+#
+[ -f "$REPORT" ] && rm -f "$REPORT"
+
+config_load snmp
+
+config_get_bool snmp_v2c snmp v2c $default_v2c
+config_get_bool snmp_v3 snmp v3 $default_v3
+config_get snmp_port snmp port $default_port
+config_get_bool snmp_auth_traps snmp authentication_traps $default_auth_traps
+
+# Global SNMP configuration
+if [ "`grep -wc \"agentaddress udp:$snmp_port\" $CONFIGFILE`" -eq 1 ]; then
+        echo "Global SNMP configuration snmp port checking... passed" >> $REPORT
+    else
+        echo "Global SNMP configuration snmp port checking... failed" >> $REPORT
+    fi
+
+# com2sec configuration checking
+if [ "$snmp_v2c" -eq "1" ]; then
+    config_foreach snmp_com2sec_checking snmp_community
+else
+   [ -z "`grep -w \"com2sec\" $CONFIGFILE`" ] && echo "com2sec configuration checking... passed" >> $REPORT || echo "com2sec configuration checking... failed" >> $REPORT
+fi
+
+# Group configuration checking
+if [ "$snmp_v2c" -eq "1" ]; then
+	config_foreach snmp_v2c_group_checking snmp_community
+else
+   [ -z "`grep -w \"group\" $CONFIGFILE`" ] && echo "Group configuration checking... passed" >> $REPORT || echo "Group configuration checking... failed" >> $REPORT
+fi
+
+# Access configuration checking
+if [ "$snmp_v2c" -eq "1" ]; then
+	config_foreach snmp_v2c_access_checking snmp_community
+else
+   [ -z "`grep -w \"access\" $CONFIGFILE`" ] && echo "Access configuration checking... passed" >> $REPORT || echo "Access configuration checking... failed" >> $REPORT
+fi
+
+# SNMPv3 configuration checking
+if [ "$snmp_v3" -eq "1" ]; then
+	config_foreach snmp_createuser_checking snmp_user 
+	config_foreach snmp_authuser_checking snmp_user
+else
+	[ -z "`grep -w \"createUser\" $CONFIGFILE`" ] && echo "SNMPv3 createUser configuration checking... passed" >> $REPORT || echo "SNMPv3 createUser configuration checking... failed" >> $REPORT
+	[ -z "`grep -w \"authuser\" $CONFIGFILE`" ] && echo "SNMPv3 authuser configuration checking... passed" >> $REPORT || echo "SNMPv3 authuser configuration checking... failed" >> $REPORT	
+fi
+
+# view configuration checking
+if [ "`grep -wc \"view all included  .1  \" $CONFIGFILE`" -eq 1 ]; then
+        echo "view configuration checking... passed" >> $REPORT
+    else
+        echo "view configuration checking... failed" >> $REPORT
+    fi
+
+# Active monitoring configuration checking
+if [ "$snmp_auth_traps" -eq "1" ]; then
+	if [ "`grep -wc \"authtrapenable 1\" $CONFIGFILE`" -eq 1 ]; then 
+		echo "Active monitoring configuration snmp authtrapenable checking... passed" >> $REPORT
+	else
+		echo "Active monitoring configuration snmp authtrapenable checking... failed" >> $REPORT
+	fi
+else
+	if [ "`grep -wc \"authtrapenable 2\" $CONFIGFILE`" -eq 1 ]; then 
+		echo "Active monitoring configuration snmp authtrapenable checking... passed" >> $REPORT
+	else
+		echo "Active monitoring configuration snmp authtrapenable checking... failed" >> $REPORT
+	fi
+fi
+
+
+#
+# System Configuration checking
+#
+config_load system
+
+config_get system_name system name
+config_get system_contact system contact
+config_get system_location system location
+
+if [ "`grep -wc \"sysName $system_name\" $CONFIGFILE`" -eq 1 ]; then 
+		echo "sysName configuration checking... passed" >> $REPORT
+	else
+		echo "sysName configuration checking... failed" >> $REPORT
+	fi
+	
+if [ "`grep -wc \"sysContact $system_contact\" $CONFIGFILE`" -eq 1 ]; then 
+		echo "sysContact configuration checking... passed" >> $REPORT 
+	else
+		echo "sysContact configuration checking... failed" >> $REPORT
+	fi	
+	
+if [ "`grep -wc \"sysLocation $system_location\" $CONFIGFILE`" -eq 1 ]; then 
+		echo "sysLocation configuration checking... passed" >> $REPORT 
+	else
+		echo "sysLocation configuration checking... failed" >> $REPORT
+	fi	
+
+echo "------------------------------------------------------------------------" >> $REPORT
+# Config unitest result
+if [ "`grep \"failed\" $REPORT`" ]; then
+			echo "Final config unitest result... failed"
+			echo "Final config unitest result... failed" >> $REPORT
+		else
+			echo "Final config unitest result... passed"
+			echo "Final config unitest result... passed" >> $REPORT
+		fi
+echo "The detail testing report is in the unitest_report"

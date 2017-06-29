@@ -1,0 +1,12 @@
+{
+  "digi:urma-core": {
+    "git": "ssh://git@stash.digi.com/idigi/urma-framework.git",
+    "version": "HEAD",
+    "path": "packages/urma-core"
+  },
+  "digi:urma-styles": {
+    "git": "ssh://git@stash.digi.com/idigi/urma-framework.git",
+    "version": "HEAD",
+    "path": "packages/urma-styles"
+  }
+}

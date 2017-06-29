@@ -1,0 +1,13 @@
+*.o
+*.d
+!*.d/
+*.oo
+*.lo
+*.la
+*.a
+*.cmd
+*.dd
+*.Plo
+*.c.gcov
+*.gcda
+*.gcno

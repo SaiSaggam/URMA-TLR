@@ -1,0 +1,31 @@
+
+TRANSPORT-LR-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                enterprises, MODULE-IDENTITY, OBJECT-TYPE,
+                Counter64, IpAddress, Integer32, Unsigned32     FROM SNMPv2-SMI
+                MODULE-COMPLIANCE, OBJECT-GROUP                 FROM SNMPv2-CONF
+                DisplayString                                   FROM SNMPv2-TC;
+
+
+        %s MODULE-IDENTITY
+        LAST-UPDATED    "%sZ"
+        ORGANIZATION
+                "Digi International, Inc."
+
+        CONTACT-INFO
+                "Digi International Tech Support
+
+                Phone:  877 912 3444                    (US and Canada)
+                        +1 952 912 3456                 (Worldwide)
+                EMail:  <Tech.Support@digi.com>"
+
+                DESCRIPTION
+                        "Auto-generated MIB for the TransPort LR <release>"
+
+                REVISION        "%sZ"
+                DESCRIPTION
+                        "Err"
+                ::= { digi 1 }
+
+digi                    OBJECT IDENTIFIER ::= { enterprises 332 }

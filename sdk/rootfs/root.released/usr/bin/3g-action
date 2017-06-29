@@ -1,0 +1,432 @@
+#!/bin/sh
+#
+# 3g-action                     This script do a job for 3g link
+#
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+get_index "$2" "$3"
+
+start() {
+
+#rename interface
+     M_INDEX=`rdcsman 0x801e5010 u16`
+ 	 SIM_STA="`rdcsman 0x801e7560 u16`"    #CSID_S_3G_DUALSIM_CARDSTATUS
+	 if [ "${SIM_STA}" == "1" ]; then
+		 ip link set usbnet0 name cellular1
+wrcsman "0x805500b${M_INDEX} \"cellular1"  #CSID_S_USB_NDIS1_NAME
+wrcsman "0x805500c${M_INDEX} \"cellular1"  #CSID_S_USB_NDIS2_NAME
+         wrcsman "0x8055016${M_INDEX} \"cellular1"  #CSID_S_USB_CNT_IF_NAME
+     fi
+     if [ "${SIM_STA}" == "2" ]; then
+		 ip link set usbnet0 name cellular2
+wrcsman "0x805500b${M_INDEX} \"cellular2"  #CSID_S_USB_NDIS1_NAME
+wrcsman "0x805500c${M_INDEX} \"cellular2"  #CSID_S_USB_NDIS2_NAME
+         wrcsman "0x8055016${M_INDEX} \"cellular2"  #CSID_S_USB_CNT_IF_NAME
+     fi
+
+    get_sim_mode ${Index} ${Index_3G}
+    CSID_S_3G_MULTIWAN_SCAN_APPLY_TOSWITCH="`rdcsman 0x801e7f7$Index_3G u32`"
+		
+    # Is dual SIM
+	if [ "$CSID_S_3G_MULTIWAN_SCAN_APPLY_TOSWITCH" == "0" ]; then
+	    if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE != "0" ] ; then
+	        logger -t "O3G/SCRIPT" "DUALSIM ENABLE"
+	        echo "O3G/SCRIPT: DUALSIM ENABLE"
+	        3g-dualsim-action ${Index} ${Index_3G}
+	        dualsim_ret=$?
+	        if [ "$dualsim_ret" == "1" ];then
+	            return 0
+	        fi
+	    fi
+	fi
+	wrcsman "0x801e7f7$Index_3G 0"
+
+    get_general_config ${Index} ${Index_3G}
+    get_general_status ${Index} ${Index_3G}
+
+    # check sim status only for module
+    if [ $CSID_C_3G_MAPPING_DEVICE -eq 1 ] && [ $CSID_S_3G_MULTIWAN_SIM_STATUS -eq 2 ] ; then
+        logger -t "O3G/SCRIPT" "SIM not insert, don't start connect"
+        echo "SIM card not insert, don't start connect,SIM_STATUS=$CSID_S_3G_MULTIWAN_SIM_STATUS"
+        return 0;
+    fi
+
+    if [ "$CSID_C_3G_MULTIWAN_AUTO_APN" == "0" ];then		# run auto APN
+        echo "O3G/SCRIPT: Start auto APN"
+        auto_apn -g ${Index_3G}
+    elif [ "$CSID_C_3G_MULTIWAN_AUTO_APN" == "2" ]; then	# APN profile list
+        [ -f /usr/bin/3g-apn-profile ] && . /usr/bin/3g-apn-profile
+
+        check_apn_profile ${Index} ${Index_3G}
+        local chk_apn_profile_ret=$?
+        if [ "${chk_apn_profile_ret}" == "1" ]; then
+            return 0
+        fi
+    fi
+
+   get_config ${Index} ${Index_3G} 
+   get_usb_status ${Index}
+
+   # check connect fail restart modem
+   if [ $CSID_C_3G_MODEM_RESTART_ENABLE -eq 1 ];then
+      logger -t "O3G/SCRIPT" "Modem restart enable"
+      3g-modemchk-restart cntstart ${Index} ${Index_3G}
+
+      if [ $? -eq 1 ]; then        # check result: restart
+         logger -t "O3G/SCRIPT" "Modem is restarting, return 3g-action!"
+         return 0
+      fi
+   fi
+
+   # Check register status for module
+   if [ $CSID_C_3G_MAPPING_DEVICE -eq 1 ];then
+        logger -t "O3G/SCRIPT" "Module to check register status..."
+        echo "Module to check register status..."
+        chk_network chkreg ${Index} ${Index_3G}
+
+        # check registered network is home network or roaming
+        local idx_3g REG_STATUS
+        idx_3g=`expr $Index_3G + 1` 
+        REG_STATUS="`rdcsman 0x801e190$idx_3g u8`"		# real time
+
+        if [ "${REG_STATUS}" == "5" -a "${ALLOW_ROAMING}" != 1 ] ; then		# registration status is roaming and is not allowed
+            logger -t "O3G/SCRIPT" "Registered network is roaming, but the setting is not allowed to connect"
+            echo "Registered network is roaming, but the setting is not allowed to connect"
+            return 0;
+        elif [ "${REG_STATUS}" == "0" -o "${REG_STATUS}" == "2" -o "${REG_STATUS}" == "3" ] ; then	# not registered 
+            logger -t "O3G/SCRIPT" "Not registered, don't start connection"
+            echo "Not registered, don't start connection"
+            return 0;
+        fi
+    fi
+
+   local PPPOnlyFlag="0"
+   if [ "${CSID_C_3G_PPP_ONLY}" != "" ] && [ "${CSID_C_3G_PPP_ONLY}" == "1" ]; then
+      PPPOnlyFlag="1"
+   fi
+   local EnableSecAPNFlag="0"
+
+   # Start 3G/LTE connection
+   # -----------------------------Start connection--------------------------
+   if [ "${CSID_S_USB_DRIVER_TYPE}" == "" ] || [ "${CSID_S_USB_DRIVER_TYPE}" == "0" ]; then # Unknown
+      logger -t "O3G/SCRIPT" "Unknown link... (Do nothing)"
+      echo "O3G/SCRIPT: Unknown link... (Do nothing)"
+   elif [ "${PPPOnlyFlag}" == "1" ] ; then # Force PPP connecting
+	   logger -t "O3G/SCRIPT" "Force PPP connecting..."
+	   echo "O3G/SCRIPT: Force PPP connecting......"
+	   3g-ppp-action start ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "6" ]; then # For Sierra Net
+      logger -t "O3G/SCRIPT" "Bringing up Sierra Net DHCP link..."
+      echo "O3G/SCRIPT: Bringing up Sierra Net DHCP link..."
+			sierra-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "8" ] ||    # For CDC_ETHER
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "19" ]; then  # For LC_CDCECM
+      logger -t "O3G/SCRIPT" "Bringing up CDC_ETHER DHCP link..."
+      echo "O3G/SCRIPT: Bringing up CDC_ETHER DHCP link..."
+      cdc-ether-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "9" ]; then # For CDCNCM
+      logger -t "O3G/SCRIPT" "Bringing up CDCNCM DHCP link..."
+      echo "O3G/SCRIPT: Bringing up CDCNCM DHCP link..."
+      cdc-ncm-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "10" ] || [ "${CSID_S_USB_DRIVER_TYPE}" == "15" ]; then # For GobiNet and Qmiwan_cdcwdm
+      logger -t "O3G/SCRIPT" "Bringing up QMI link..."
+      echo "O3G/SCRIPT: Bringing up QMI link..."
+      qmi-action start "${CSID_S_USB_QMI_NODE1}" "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+      if [ "${EnableSecAPNFlag}" == "1" ] && [ "${CSID_S_USB_QMI_NODE2}" != "" ] && [ "${CSID_S_USB_NDIS2_NAME}" != "" ]; then
+         qmi-action start "${CSID_S_USB_QMI_NODE2}" "${CSID_S_USB_NDIS2_NAME}" ${Index} ${Index_3G}
+      fi
+
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "12" ]; then # For Huawei CDC
+      logger -t "O3G/SCRIPT" "Bringing up Huawei CDC link..."
+      echo "O3G/SCRIPT: Bringing up Huawei CDC link..."
+          #wrcsman "0x805500b0 \"usbnet0"
+ 		  hw-cdc-action start usbnet0 ${Index} ${Index_3G}
+		  #hw-cdc-action start "${CSID_S_USB_NDIS1_NAME}" ${Index}
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "21" ]; then # For altair solution
+      logger -t "O3G/SCRIPT" "Bringing up Altair DHCP link..."
+      echo "O3G/SCRIPT: Bringing up Altair DHCP link..."
+ 		   lteue-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "13" ]; then # For ipheth
+      logger -t "O3G/SCRIPT" "Bringing up iPhone DHCP link..."
+      echo "O3G/SCRIPT: Bringing up iPhone DHCP link..." > /tmp/ipheth_dhcp
+		  ipheth-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "14" ]; then # For rndishost
+      logger -t "O3G/SCRIPT" "Bringing up Rndishost DHCP link..."
+      echo "O3G/SCRIPT: Bringing up Rndishost DHCP link..." > /tmp/amandadhcp
+		  rndis-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "20" ]; then # For rndishost GCT
+      logger -t "O3G/SCRIPT" "Bringing up GCT link..."
+      echo "O3G/SCRIPT: Bringing up GCT link..." > /tmp/amandadhcp
+		  gct-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "22" ]; then # For cdc-mbim
+      logger -t "O3G/SCRIPT" "Bringing up CDC MBIM link..."
+      echo "O3G/SCRIPT: Bringing up CDC MBIM link..."
+      cdc-mbim-action start "${CSID_S_USB_QMI_NODE1}" "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+
+   elif [ "${CSID_S_USB_DRIVER_TYPE}" == "?" ]; then # For altair solution
+      logger -t "O3G/SCRIPT" "Bringing up Altair DHCP link..."
+      echo "O3G/SCRIPT: Bringing up Altair DHCP link..."
+		  # wrcsman "0x801e4001 0x01"
+		  # lteue-action start
+
+   else # For PPP connection
+      if [ "${CSID_S_USB_DRIVER_TYPE}" == "1" ] || [ "${CSID_S_USB_DRIVER_TYPE}" == "2" ] || [ "${CSID_S_USB_DRIVER_TYPE}" == "3" ] || [ "${CSID_S_USB_DRIVER_TYPE}" == "5" ]; then # For Option, CDCACM, Sierra
+			   logger -t "O3G/SCRIPT" "Bringing up PPP link..."
+			   echo "O3G/SCRIPT: Bringing up PPP link..."
+			   3g-ppp-action start ${Index} ${Index_3G}
+      elif [ "${CSID_S_USB_DRIVER_TYPE}" == "4" ]; then # For Hso
+			   logger -t "O3G/SCRIPT" "Bringing up HSO link..."
+			   echo "O3G/SCRIPT: Bringing up HSO link..."
+			   3g-hso-action start "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+      else
+			   logger -t "O3G/SCRIPT" "Bringing up PPP link..."
+			   echo "O3G/SCRIPT: Bringing up PPP link..."
+			   3g-ppp-action start ${Index} ${Index_3G}
+			fi
+   fi
+   # -----------------------------End of starting connection----------------
+
+    # ----------------------------- Start function --------------------
+    CNT_STATUS="`rdcsman 0x8055015${Index} u16`"
+    DNS_SER="`rdcsman 0x8055013${Index} ipv4`"
+    INTERFACE="${CSID_S_USB_NDIS1_NAME}"
+
+    if [ "${CSID_S_USB_DRIVER_TYPE}" == "1" ] || [ "${CSID_S_USB_DRIVER_TYPE}" == "2" ] ||[ "${CSID_S_USB_DRIVER_TYPE}" == "3" ] || [ "${CSID_S_USB_DRIVER_TYPE}" == "5" ]; then
+        INTERFACE=ppp0
+    fi
+
+    # for IP mode, if choosing static IP
+    if [ "${CNT_STATUS}" == "2" -a "${CSID_C_3G_MULTIWAN_IP_MODE}" == "1" ]; then
+        3g-ip-mode-action ${Index} ${Index_3G} ${INTERFACE}
+    fi
+
+    # for keep alive function
+    if [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" == "1" -a "${CNT_STATUS}" == "2" ]; then    # for ping
+        keepalive ${Index_3G} ${CSID_C_3G_MULTIWAN_KA_PING_IP} ${CSID_C_3G_MULTIWAN_KA_PING_INTERVAL} &
+    elif [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" == "5" -a "${CNT_STATUS}" == "2" ]; then   # for DNS query
+        dns_check 0 -i ${INTERFACE} -t ${CSID_C_3G_MULTIWAN_KA_PING_INTERVAL} -d ${CSID_C_3G_MULTIWAN_KA_PING_HOST} &  #%s &
+        #dns-query -I ${CSID_S_USB_NDIS1_NAME} -s ${DNS_SER} www.google.com
+    elif [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" == "6" -a "${CNT_STATUS}" == "2" ]; then   # for New keepalive
+        #logger -t "O3G/SCRIPT" "Start new keepalive!!!"
+        #logger -t "O3G/SCRIPT" "new_keepalive ${Index_3G} -i ${INTERFACE} -t ${CSID_C_3G_MULTIWAN_KA_PING_INTERVAL} -d ${CSID_C_3G_MULTIWAN_KA_PING_HOST} -c -p"
+        new_keepalive ${Index_3G} -i ${INTERFACE} -t ${CSID_C_3G_MULTIWAN_KA_PING_INTERVAL} -d ${CSID_C_3G_MULTIWAN_KA_PING_HOST} -c -p &
+    fi 
+    # ----------------------------- End of starting function --------------------
+
+    return 0
+}
+
+stop() {
+
+   # get_general_config
+   # get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+   get_cnt_status ${Index}
+
+    local CNT_PATH="/tmp/3G${Index_3G}_connect"
+    if [ "${CSID_S_USB_NDIS1_NAME}" == "" ]; then
+        IF_NAME="`grep 'IF_name' $CNT_PATH | cut -d: -f2`"
+        CSID_S_USB_NDIS1_NAME="$IF_NAME"
+    fi
+
+    if [ "${CSID_S_USB_CNT_DRIVER}" == "10" ] || [ "${CSID_S_USB_CNT_DRIVER}" == "15" ]; then
+        if [ "${CSID_S_USB_QMI_NODE1}" == "" ]; then
+            QMI_NODE="`grep 'QMI_node' $CNT_PATH | cut -d: -f2`"
+            CSID_S_USB_QMI_NODE1="$QMI_NODE"
+        fi
+    fi 
+
+   local PPPOnlyFlag="0"
+   if [ "${CSID_C_3G_PPP_ONLY}" != "" ] && [ "${CSID_C_3G_PPP_ONLY}" == "1" ]; then
+      PPPOnlyFlag="1"
+   fi
+   local EnableSecAPNFlag="0"
+   # Stop 3G/LTE connection
+   # -----------------------------Stop connection---------------------------
+ 
+   if [ "${CSID_S_USB_DRIVER_TYPE}" == "0" ] && [ "${CSID_S_USB_CNT_DRIVER}" == "0" ]; then # Unknown
+      logger -t "O3G/SCRIPT" "Unknown link... (Do nothing)"
+      echo "O3G/SCRIPT: Unknown link... (Do nothing)"
+   elif [ "${PPPOnlyFlag}" == "1" ] ; then # Force PPP only
+        echo "O3G/SCRIPT: Shutting down PPP link..."
+        3g-ppp-action stop ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] &&
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "6" -o "${CSID_S_USB_CNT_DRIVER}" == "6" ]; then # For Sier
+      logger -t "O3G/SCRIPT" "Shutting down Sierra Net DHCP link..."
+      echo "O3G/SCRIPT: Shutting down Sierra Net DHCP link..."
+	  sierra-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] &&
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "8" -o "${CSID_S_USB_CNT_DRIVER}" == "8" ] || # For CDC_ETHER
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "19" -o "${CSID_S_USB_CNT_DRIVER}" == "19" ]; then # For LC_CEC_ECM 
+      logger -t "O3G/SCRIPT" "Shutting down CDC_ETHER DHCP link..."
+      echo "O3G/SCRIPT: Shutting down CDC_ETHER DHCP link..."
+      cdc-ether-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] &&
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "9" -o "${CSID_S_USB_CNT_DRIVER}" == "9" ]; then # For CDCNCM
+      logger -t "O3G/SCRIPT" "Shutting down CDCNCM DHCP link..."
+      echo "O3G/SCRIPT: Shutting down CDCNCM DHCP link..."
+      cdc-ncm-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] &&
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "10" -o "${CSID_S_USB_CNT_DRIVER}" == "10" ] ||
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "15" -o "${CSID_S_USB_CNT_DRIVER}" == "15" ]; then # For GobiNet and Qmiwan_cdcwdm
+      logger -t "O3G/SCRIPT" "Shutting down QMI link..."
+      echo "O3G/SCRIPT: Shutting down QMI link..."
+      qmi-action stop "${CSID_S_USB_QMI_NODE1}" "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+      if [ "${EnableSecAPNFlag}" == "1" ] && [ "${CSID_S_USB_QMI_NODE2}" != "" ] && [ "${CSID_S_USB_NDIS2_NAME}" != "" ]; then
+         qmi-action stop "${CSID_S_USB_QMI_NODE2}" "${CSID_S_USB_NDIS2_NAME}" ${Index} ${Index_3G}
+      fi
+   elif [ "${PPPOnlyFlag}" == "0" ] &&
+        [ "${CSID_S_USB_DRIVER_TYPE}" == "12" -o "${CSID_S_USB_CNT_DRIVER}" == "12" ]; then # For Huawei CDC
+      logger -t "O3G/SCRIPT" "Shutting down Huawei CDC link..."
+      echo "O3G/SCRIPT: Shutting down Huawei CDC link..."
+		  hw-cdc-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${CSID_S_USB_DRIVER_TYPE}" == "13" -o "${CSID_S_USB_CNT_DRIVER}" == "13" ]; then # For ipheth
+      logger -t "O3G/SCRIPT" "Shutting down iPhone DHCP link..."
+      echo "O3G/SCRIPT: Shutting down iPhone DHCP link..." # > /tmp/ipheth_shut
+		  ipheth-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${CSID_S_USB_DRIVER_TYPE}" == "14" -o "${CSID_S_USB_CNT_DRIVER}" == "14" ]; then # For rndishost
+      logger -t "O3G/SCRIPT" "Shutting down Rndishost DHCP link..."
+      echo "O3G/SCRIPT: Shutting down Rndishost DHCP link..." > /tmp/amandadhcp
+      rndis-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${CSID_S_USB_DRIVER_TYPE}" == "20" -o "${CSID_S_USB_CNT_DRIVER}" == "20" ]; then # For rndishost
+      logger -t "O3G/SCRIPT" "Shutting down GCT link..."
+      echo "O3G/SCRIPT: Shutting down GCT link..." > /tmp/amandadhcp
+      gct-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${CSID_S_USB_DRIVER_TYPE}" == "21" -o "${CSID_S_USB_CNT_DRIVER}" == "21" ]; then # For altair solution
+      logger -t "O3G/SCRIPT" "Shutting down Altair DHCP link..."
+      echo "O3G/SCRIPT: Shutting down Altair DHCP link..."
+      lteue-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   elif [ "${PPPOnlyFlag}" == "0" ] && [ "${CSID_S_USB_DRIVER_TYPE}" == "22" ]; then # For cdc-mbim
+      logger -t "O3G/SCRIPT" "Shutting down CDC MBIM link..."
+      echo "O3G/SCRIPT: Shutting down CDC MBIM link..."
+      cdc-mbim-action stop "${CSID_S_USB_QMI_NODE1}" "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+   else # For PPP connection
+      if [ "${CSID_S_USB_DRIVER_TYPE}" == "1" -o "${CSID_S_USB_CNT_DRIVER}" == "1" ] ||
+         [ "${CSID_S_USB_DRIVER_TYPE}" == "2" -o "${CSID_S_USB_CNT_DRIVER}" == "2" ] ||
+         [ "${CSID_S_USB_DRIVER_TYPE}" == "3" -o "${CSID_S_USB_CNT_DRIVER}" == "3" ] ||
+         [ "${CSID_S_USB_DRIVER_TYPE}" == "5" -o "${CSID_S_USB_CNT_DRIVER}" == "5" ]; then # For Option, CDCACM, or Sierra
+			   logger -t "O3G/SCRIPT" "Shutting down PPP link..."
+			   3g-ppp-action stop ${Index} ${Index_3G}
+      elif [ "${CSID_S_USB_DRIVER_TYPE}" == "4" -o "${CSID_S_USB_CNT_DRIVER}" == "4" ]; then # For Hso
+			   logger -t "O3G/SCRIPT" "Shutting down HSO link..."
+			   echo "O3G/SCRIPT: Shutting down HSO link..."
+			   3g-hso-action stop "${CSID_S_USB_NDIS1_NAME}" ${Index} ${Index_3G}
+      else
+			   echo "O3G/SCRIPT: Shutting down PPP link..."
+			   3g-ppp-action stop ${Index} ${Index_3G}
+			fi
+   fi
+   # -----------------------------End of stopping connection----------------
+
+   # ----------------------------- Stop function --------------------
+    # rm checking files under directory /tmp for APN profile list
+    remove_apn_profile_chk_file
+
+    KEEPALIVT_PATH="/var/run/keepalive${Index_3G}.pid"
+    KEEPPID=0
+    DNSCHECK_PATH="/var/run/dns_check${Index_3G}.pid"
+    DNSCHECKPID=0
+    NEWKEEPALIVT_PATH="/var/run/new_keepalive${Index_3G}.pid"
+    NEWKEEPPID=0
+
+    if [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" == "1" ]; then
+        if [ -r "$KEEPALIVT_PATH" ]; then
+            KEEPPID="`cat $KEEPALIVT_PATH`"
+            if [  $KEEPPID != "0" ]; then
+                logger -p 8.7 -t "O3G/script" "kill keepalive daemon : $KEEPPID"
+                kill $KEEPPID
+            fi
+        fi
+
+    elif [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" == "5" ]; then
+        if [ -r "$DNSCHECK_PATH" ]; then
+            DNSCHECKPID="`cat $DNSCHECK_PATH`"
+            if [  $DNSCHECKPID != "0" ]; then
+                logger -p 8.7 -t "O3G/script" "kill DNS check : $DNSCHECKPID"
+                kill $DNSCHECKPID
+            fi
+        fi
+    elif [ "${CSID_C_3G_MULTIWAN_KEEP_ALIVE}" == "6" ]; then
+        if [ -r "$NEWKEEPALIVT_PATH" ]; then
+            NEWKEEPPID="`cat $NEWKEEPALIVT_PATH`"
+            if [  $NEWKEEPPID != "0" ]; then
+                logger -p 8.7 -t "O3G/script" "kill new_keepalive : $NEWKEEPPID"
+                kill $NEWKEEPPID
+            fi
+        fi
+    fi
+
+    # ----------------------------- Switch dual sim --------------------
+    get_sim_mode ${Index} ${Index_3G}
+    SIMCARD_STATUS="`rdcsman 0x801e756${Index_3G} u16`"
+    CSID_S_3G_DUALSIM_SIMCARD_FLAG="`rdcsman 0x801e7c6$Index_3G u8`"
+		CSID_S_3G_MULTIWAN_SCAN_APPLY_TOSWITCH="`rdcsman 0x801e7f7$Index_3G u32`"
+#    if [ "$CSID_C_3G_MULTIWAN_SIMCARD_MODE" == "1" -o $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "2" ] &&
+#       [ "$CSID_S_3G_DUALSIM_SIMCARD_FLAG" == "0" ]; then
+
+    if [ "$CSID_C_3G_MULTIWAN_SIMCARD_MODE" == "1" -o $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "2" ] ; then
+        logger -t "O3G/SCRIPT" "STOP connecting!!SIMCARD_STATUS=$SIMCARD_STATUS,SIMCARD_FLAG=$CSID_S_3G_DUALSIM_SIMCARD_FLAG"
+        echo "STOP connecting!!SIMCARD_STATUS=$SIMCARD_STATUS,SIMCARD_FLAG=$CSID_S_3G_DUALSIM_SIMCARD_FLAG"
+        if [ "$CSID_S_3G_MULTIWAN_SCAN_APPLY_TOSWITCH" == "0" ]; then 
+            if [ "$CSID_S_3G_DUALSIM_SIMCARD_FLAG" == "0" ]; then 
+
+                if [ "${CSID_C_3G_MULTIWAN_AUTO_APN}" == "2" ] ; then
+                    local SIMSWITCH_FOR_APN_PROFILE=`cat "${SIMSWITCH_CHECK_FILE}"`
+                    if [ "${SIMSWITCH_FOR_APN_PROFILE}" == "0" ] ; then
+                        echo "Not finish all APN profiles, do not do SIM switch"
+                        return 0
+                    fi
+                fi
+                
+                echo "O3G/SCRIPT: Connecting stop to switch sim"
+                if [ $SIMCARD_STATUS == "1" ] ; then   #now is SIMA to switch SIMB
+                    logger -t "O3G/SCRIPT" "SIMA is disconnecting to switch SIMB"
+                    sim_switch=2
+                elif [ $SIMCARD_STATUS == "2" ] ; then   #now is SIMB to switch SIMA
+                    logger -t "O3G/SCRIPT" "SIMB is disconnecting to switch SIMA"
+                    sim_switch=1
+                fi
+
+                # write flag
+                wrcsman "0x801e7c6$Index_3G 1"
+                dualsim_switch $Index_3G -s $sim_switch
+            fi
+        fi
+    fi
+
+   return 0
+}
+
+usage() {
+#	 echo "$0 [start|stop|restart|config|usb|status] [index_usb] [index_3g]"
+     echo "$0 [OPTION] [index_usb] [index_3g]"
+     echo "[OPTION:start|stop|restart|config|gecfg|usb|status|3gstatus]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+   start)        start ;;
+   stop)         stop ;;
+   restart)      stop; start; ;;
+   config)       show_config ;;
+   geconfig)     show_general_config;;
+   gecfg)        show_general_config;;
+   usb)          show_usb_status ;;
+   status)       show_cnt_status ;;
+   3gstatus)     show_3g_cnt_status ;; 
+   3gstatus0)    show_3g_cnt_status0 ;; 
+   *)            usage;;
+esac
+
+exit 0

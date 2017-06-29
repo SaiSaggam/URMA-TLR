@@ -1,0 +1,57 @@
+#
+# Makefile to export important environment variables
+#
+# (Corner DE core file)
+
+export TOPDIR ?= $(shell cd ../../..; pwd)
+export TARGET ?= mipsel-linux-uclibc
+
+ifdef TARGET
+   export TARGET_PREFIX = $(TARGET)-
+endif
+
+ifndef CROSS_COMPILE
+   export CROSS_COMPILE = $(TARGET_PREFIX)
+   export AS      = $(CROSS_COMPILE)as
+   export LD      = $(CROSS_COMPILE)ld
+   export CC      = $(CROSS_COMPILE)gcc
+   export CPP     = $(CC) -E
+   export AR      = $(CROSS_COMPILE)ar
+   export NM      = $(CROSS_COMPILE)nm
+   export STRIP   = $(CROSS_COMPILE)strip
+   export OBJCOPY = $(CROSS_COMPILE)objcopy
+   export OBJDUMP = $(CROSS_COMPILE)objdump
+endif
+
+ifndef TOOLPATH
+	export TOOLPATH := $(shell cat $(TOPDIR)/TOOLPATH)
+	export PATH     := $(TOOLPATH):$(PATH)
+endif
+
+#
+
+-include $(TOPDIR)/project_config/project.config
+
+export GLUE         := $(TOPDIR)/rootfs/glue
+export COMPO_BASE   := $(TOPDIR)/rootfs/src
+export INSTALL_ROOT := $(TOPDIR)/rootfs/root
+
+#
+
+export LOG_COLLECTOR ?= 3
+export RD_LEVEL ?= 0
+#
+
+export KERNEL_DIR ?= $(TOPDIR)/linux/src
+
+ifneq ($(wildcard $(TOPDIR)/rootfs/makefile.corner),)
+export FULL_COPY := 1
+endif
+ 
+#for MIPS BIG endian
+ifneq ($(wildcard $(TOPDIR)/project_config/$(PROJECT_NAME)/TOOLPATH.MIPSBIG),)
+export TARGET := mips-linux-uclibc
+endif
+
+
+ENABLE_3G_FAILOVER_3G = 1

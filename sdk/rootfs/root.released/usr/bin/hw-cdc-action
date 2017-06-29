@@ -1,0 +1,223 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+# Paths to programs
+UDHCPC="udhcpc"
+
+# Set Interface
+if [ "$2" != "" ]; then
+   ETH="$2"
+else
+   #KERNEL_VERSION="`uname -a | grep \"2.6.36\"`"
+   #if [ "${KERNEL_VERSION}" != "" ]; then
+   #   ETH="eth0"
+   #else
+      ETH="usbnet0"
+   #fi
+fi
+
+get_index "$3" "$4"
+FileNameCode="${ETH}"
+UDHCPC_PID_FILE="/var/run/udhcpc.${FileNameCode}.pid"
+PIDFILE_CONNECT="/var/run/udhcpc.${FileNameCode}.pid.connect"
+DEMAND_FILE="/var/run/udhcpc.${FileNameCode}.demand"
+UDHCPC_DEFAULT_SCRIPT="/usr/bin/dhcp.script"
+[ -f "/tmp/dhcp.script" ] && UDHCPC_DEFAULT_SCRIPT="/tmp/dhcp.script"
+HOSTNAME="`cat /etc/hostname`"
+if [ "${HOSTNAME}" == "" ]; then
+   HOSTNAME="Router"
+fi
+TMPFIL="/tmp/hw-cdc-connect-${FileNameCode}"
+
+hw_cdc_status()
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   TIME=0
+   TIMEOUT=10
+   while [ true ] ; do	
+      sl_get_IP_NM_GW_in_ifconfig ${ETH} IF_IP IF_NM IF_GW
+      #echo "$0 : IF_IP=${IF_IP} IF_NM=${IF_NM} IF_GW=${IF_GW}"	
+      if [ "${IF_IP}x" != "x" ] && [ "${IF_NM}x" != "x" ] && [ "${IF_GW}x" != "x" ]; then	
+         return 0		
+      else			
+         sleep 1
+         TIME=$((TIME+1))
+         if [ ${TIME} -gt ${TIMEOUT} ] ; then
+            return 1	
+         fi			
+      fi
+   done
+}
+
+hw_cdc_start()
+{
+   get_general_config ${Index} ${Index_3G}
+   #get_general_status
+   get_config ${Index} ${Index_3G}
+   get_usb_status ${Index}
+
+   # wrcsman "0x801e4001 0x05"
+
+   kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+
+   if [ ${CSID_C_3G_MTU} == "" ] || [ $((${CSID_C_3G_MTU})) -le 0 ] ; then
+      ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu 1500 up
+   else
+      ${IFCFG_PROG} ${ETH} 0.0.0.0 mtu ${CSID_C_3G_MTU} up
+   fi
+   sleep 4
+
+   local DevModem1="${CSID_S_USB_MODEM1}"
+   local DevModem2="${CSID_S_USB_MODEM2}"
+
+   ${ATCMD_PROG} ${DevModem1} 'AT^NDISDUP=1,0'
+   sleep 1
+   #${ATCMD_PROG} ${DevModem1} AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\",\"${CSID_C_3G_USERNAME}\",\"${CSID_C_3G_PASSWORD}\" > ${TMPFIL}
+   #sleep 1
+   logger -t "O3G/SCRIPT" -p 8.7 "tmpfil:${TMPFIL}"
+
+   PIP="`cat ${TMPFIL} | grep 'OK' | cut -d, -f2 | cut -d\" -f2`"
+   logger -t "O3G/SCRIPT" -p 8.7 "pip:${PIP}"
+   if [ -z "$PIP" ]; then
+      logger -t "O3G/SCRIPT" -p 8.7 "again"
+      ${ATCMD_PROG} ${DevModem1} 'AT^NDISDUP=1,0'
+      sleep 1
+      if  [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" != "" -o "${CSID_C_3G_PASSWORD}" != "" ] ; then
+         ${ATCMD_PROG} ${DevModem1} AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\",\"${CSID_C_3G_USERNAME}\",\"${CSID_C_3G_PASSWORD}\" > $TMPFIL
+      elif [ "${CSID_C_3G_APN}" != "" ] && [ "${CSID_C_3G_USERNAME}" == "" -a "${CSID_C_3G_PASSWORD}" == "" ]; then
+         ${ATCMD_PROG} ${DevModem1} AT^NDISDUP=1,1,\"${CSID_C_3G_APN}\" > $TMPFIL
+      elif [ "${CSID_C_3G_APN}" == "" ]; then
+         local PDP_APN
+         ${ATCMD_PROG} ${DevModem1} 'AT+CGDCONT?' -t 1 > "/tmp/pdp_apn_chk"
+         PDP_APN=`cat /tmp/pdp_apn_chk | grep "+CGDCONT: 1," | cut -d \" -f 4`
+         rm -f "/tmp/pdp_apn_chk"
+         echo "APN is null and got from PDP context [${PDP_APN}]"
+
+         ${ATCMD_PROG} ${DevModem1} AT^NDISDUP=1,1,\"${PDP_APN}\" > $TMPFIL
+      fi
+      sleep 1
+   fi
+   write_error_code 0 ${Index} # clean error code
+   logger -t "O3G/SCRIPT" -p 8.7 "befre"
+   sleep 5
+
+   if [ "${CSID_S_LOCAL_WAN_CNT_FORCE}" == "1" ]; then
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      # wrcsman "0x8001000e 0x00"
+   elif [ "${CSID_C_3G_CNT_TYPE}" == "0" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G on demand
+      # udhcpc-connect-cdc_ncm &
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   elif [ "${CSID_C_3G_CNT_TYPE}" == "2" ] && [ "${CSID_C_WANTYPE}" == "16" ] ; then # 3G manually
+      # udhcpc-connect-cdc_ncm &
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   else
+      ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+   fi
+
+   return $?
+}
+
+hw_cdc_stop()
+{
+   get_general_config ${Index} ${Index_3G}
+   get_config ${Index} ${Index_3G}
+
+   local DevModem1="${CSID_S_USB_MODEM1}"
+   local DevModem2="${CSID_S_USB_MODEM2}"
+
+   kill `ps | grep ${UDHCPC} | grep ${ETH} | cut -dr -f1` > /dev/null 2>&1
+   ${ATCMD_PROG} ${DevModem1} 'AT^NDISDUP=1,0'
+   sleep 1
+   killall ${ATCMD_PROG}
+   [ -f "${DEMAND_FILE}" ] && rm -f ${DEMAND_FILE}
+
+   if [ -f "${PIDFILE_CONNECT}" ] ; then
+      CONNECT_PID="`cat ${PIDFILE_CONNECT}`"
+      kill -9 ${CONNECT_PID} > /dev/null 2>&1
+      rm -f ${PIDFILE_CONNECT} > /dev/null 2>&1	
+   fi
+
+   if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+      UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+      rm -f ${UDHCPC_PID_FILE}
+      kill -9 ${UDHCPC_PID} > /dev/null 2>&1 || exit 1
+   fi
+
+   if [ -f "${TMPFIL}" ] ; then 
+      rm -f ${TMPFIL}
+   fi
+ 
+   ${IFCFG_PROG} ${ETH} down
+
+   clear_all_cnt_status ${Index}
+   write_cnt_status 0 ${Index}
+   #wrcsman "0x801E0800 0x00 && \
+   #         0x801E0900 0x00 && \
+   #         0x801E1200"
+
+   return 0
+}
+
+usage() {
+	 echo "$0 [start|stop|release|renew] [IFName] [index] [index_3g]"
+	 exit 1
+}
+
+# ----------------- main --------------------
+[ -z "$1" ] && usage;
+
+case "$1" in
+   start)
+      pre_init     
+      hw_cdc_start
+      if [ "$?" == "1" ] ; then
+			   logger -t "O3G/SCRIPT" -p 8.7 "connect fail!!\n"
+			   ${IFCFG_PROG} ${ETH} 0.0.0.0
+			   write_cnt_status 3 ${Index}
+         exit 1
+      fi
+      exit 0
+      ;;
+
+   stop)
+      hw_cdc_stop
+      ;;
+
+   release)
+      if [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ] ; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -USR2 ${UDHCPC_PID}
+      fi
+      write_dns_info "0.0.0.0" "" ${Index}
+      exit 0
+      ;;
+
+   renew)
+      if [ "${CSID_C_3G_CNT_TYPE}" == "" ] || [ "${CSID_C_3G_CNT_TYPE}" == "0" ] ; then
+         hw_cdc_stop
+         hw_cdc_start
+      elif [ -f "${UDHCPC_PID_FILE}" ] && [ -r "${UDHCPC_PID_FILE}" ]; then 
+         UDHCPC_PID="`cat ${UDHCPC_PID_FILE}`"
+         kill -USR1 ${UDHCPC_PID}
+         hw_cdc_status	
+      else
+         ${UDHCPC} -n -i ${ETH} -p ${UDHCPC_PID_FILE} -s ${UDHCPC_DEFAULT_SCRIPT} -I ${Index}
+      fi
+
+      exit 0
+      ;;
+
+	*)
+      usage
+      exit 1
+      ;;
+esac
+
+exit 0		
+			

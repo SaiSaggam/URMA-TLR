@@ -1,0 +1,9 @@
+*.so
+
+.depend
+getHostIP
+get_csid_addr
+handlers/l2tp-control
+l2tp-ondemand
+l2tpd
+port-scan

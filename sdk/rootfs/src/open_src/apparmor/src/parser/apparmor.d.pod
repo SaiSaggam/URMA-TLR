@@ -1,0 +1,934 @@
+# ----------------------------------------------------------------------
+#    Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+#                  2008, 2009
+#    NOVELL (All rights reserved)
+#
+#    Copyright (c) 2010 - 2012
+#    Canonical Ltd. (All rights reserved)
+#
+#    This program is free software; you can redistribute it and/or
+#    modify it under the terms of version 2 of the GNU General Public
+#    License published by the Free Software Foundation.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, contact Novell, Inc or Canonical
+#    Ltd.
+# ----------------------------------------------------------------------
+
+=pod
+
+=head1 NAME
+
+apparmor.d - syntax of security profiles for AppArmor.
+
+=head1 DESCRIPTION
+
+AppArmor profiles describe mandatory access rights granted to given
+programs and are fed to the AppArmor policy enforcement module using
+apparmor_parser(8). This man page describes the format of the AppArmor
+configuration files; see apparmor(7) for an overview of AppArmor.
+
+=head1 FORMAT
+
+The following is a BNF-style description of AppArmor policy
+configuration files; see below for an example AppArmor policy file.
+AppArmor configuration files are line-oriented; B<#> introduces a
+comment, similar to shell scripting languages. The exception to this
+rule is that B<#include> will I<include> the contents of a file inline
+to the policy; this behaviour is modelled after cpp(1).
+
+=over 4
+
+B<INCLUDE> = '#include' ( I<ABS PATH> | I<MAGIC PATH> )
+
+B<ABS PATH> = '"' path '"' (the path is passed to open(2))
+
+B<MAGIC PATH> = '<' relative path '>' (the path is relative to F</etc/apparmor.d/>)
+
+B<COMMENT> = '#' I<TEXT>
+
+B<TEXT> = any characters
+
+B<PROFILE> = [ I<COMMENT> ... ] [ I<VARIABLE ASSIGNMENT> ... ] ( '"' I<PROGRAM> '"' | I<PROGRAM> ) [ 'flags=(complain)' ]'{' [ ( I<RESOURCE RULE> | I<COMMENT> | I<INCLUDE> | I<SUBPROFILE> | 'capability ' I<CAPABILITY> | I<NETWORK RULE> | I<MOUNT RULE> | I<FILE RULE> | 'change_profile -> ' I<PROGRAMCHILD> ) ... ] '}'
+
+B<SUBPROFILE> = [ I<COMMENT> ... ] ( I<PROGRAMHAT> | 'profile ' I<PROGRAMCHILD> ) '{' [ ( I<FILE RULE> | I<COMMENT> | I<INCLUDE> ) ... ] '}'
+
+B<CAPABILITY> = (lowercase capability name without 'CAP_' prefix; see
+capabilities(7))
+
+B<NETWORK RULE> = 'network' [ [ I<DOMAIN> ] [ I<TYPE> ] [ I <PROTOCOL> ] ] ','
+
+B<DOMAIN> = ( 'inet' | 'ax25' | 'ipx' | 'appletalk' | 'netrom' | 'bridge' | 'atmpvc' | 'x25' | 'inet6' | 'rose' | 'netbeui' | 'security' | 'key' | 'packet' | 'ash' | 'econet' | 'atmsvc' | 'sna' | 'irda' | 'pppox' | 'wanpipe' | 'bluetooth' ) ','
+
+B<TYPE> = ( 'stream' | 'dgram' | 'seqpacket' |  'rdm' | 'raw' | 'packet' )
+
+B<PROTOCOL> = ( 'tcp' | 'udp' | 'icmp' )
+
+B<PROGRAM> = (non-whitespace characters except for '^', must start with '/'. Embedded spaces or tabs must be quoted.)
+
+B<PROGRAMHAT> = '^'  (non-whitespace characters; see aa_change_hat(2) for a description of how this "hat" is used.)
+
+B<PROGRAMCHILD> = I<SUBPROFILE> name
+
+B<MOUNT RULE> = ( I<MOUNT> | I<REMOUNT> | I<UMOUNT> | I<PIVOT ROOT> )
+
+B<MOUNT> = [ 'audit' ] [ 'deny' ] 'mount' [ I<MOUNT CONDITIONS> ] [ I<SOURCE FILEGLOB> ] [ -> [ I<MOUNTPOINT FILEGLOB> ]
+
+B<REMOUNT> = [ 'audit' ] [ 'deny' ] 'remount' [ I<MOUNT CONDITIONS> ] I<MOUNTPOINT FILEGLOB>
+
+B<UMOUNT> = [ 'audit' ] [ 'deny' ] 'umount' [ I<MOUNT CONDITIONS> ] I<MOUNTPOINT FILEGLOB>
+
+B<PIVOT ROOT> = [ 'audit' ] [ 'deny' ] pivot_root [ I<OLD ABS PATH> ] [ I<MOUNTPOINT ABS PATH> ] [ -> I<PROGRAMCHILD> ]
+
+B<MOUNT CONDITIONS> = [ ( 'fstype' | 'vfstype' ) ( '=' | 'in' ) I<MOUNT FSTYPE EXPRESSION> ] [ 'options' ( '=' | 'in' ) I<MOUNT FLAGS EXPRESSION> ]
+
+B<MOUNT FSTYPE EXPRESSION> = ( I<MOUNT FSTYPE LIST> | I<MOUNT EXPRESSION> )
+
+B<MOUNT FSTYPE LIST> = Comma separated list of valid filesystem and virtual filesystem types (eg ext4, debugfs, devfs, etc)
+
+B<MOUNT FLAGS EXPRESSION> = ( I<MOUNT FLAGS LIST> | I<MOUNT EXPRESSION> )
+
+B<MOUNT FLAGS LIST> = Comma separated list of I<MOUNT FLAGS>.
+
+B<MOUNT FLAGS> = ( 'ro' | 'rw' | 'nosuid' | 'suid' | 'nodev' | 'dev' | 'noexec' | 'exec' | 'sync' | 'async' | 'remount' | 'mand' | 'nomand' | 'dirsync' | 'nodirsync' | 'noatime' | 'atime' | 'nodiratime' | 'diratime' | 'bind' | 'move' | 'rec' | 'verbose' | 'silent' | 'load' | 'acl' | 'noacl' | 'unbindable' | 'private' | 'slave' | 'shared' | 'relative' | 'norelative' | 'iversion' | 'noiversion' | 'strictatime' | 'nouser' | 'user' )
+
+B<MOUNT EXPRESSION> = ( I<ALPHANUMERIC> | I<AARE> ) ...
+
+B<AARE> = B<?*[]{}^> (see below for meanings)
+
+B<FILE RULE> = I<RULE QUALIFIER> ( '"' I<FILEGLOB> '"' | I<FILEGLOB> ) I<ACCESS> ','
+
+B<RULE QUALIFIER> = [ 'audit' ] [ 'deny' ] [ 'owner' ]
+
+B<FILEGLOB> = (must start with '/' (after variable expansion), B<AARE> have special meanings; see below. May include I<VARIABLE>. Rules with embedded spaces or tabs must be quoted. Rules must end with '/' to apply to directories.)
+
+B<ACCESS> = ( 'r' | 'w' | 'l' | 'ix' | 'ux' | 'Ux' | 'px' | 'Px' | 'cx -> ' I<PROGRAMCHILD> | 'Cx -> ' I<PROGRAMCHILD> | 'm' ) [ I<ACCESS> ... ]  (not all combinations are allowed; see below.)
+
+B<VARIABLE> = '@{' I<ALPHA> [ ( I<ALPHANUMERIC> | '_' ) ... ] '}'
+
+B<VARIABLE ASSIGNMENT> = I<VARIABLE> ('=' | '+=') (space separated values)
+
+B<ALIAS RULE> = I<ABS PATH> '->' I<REWRITTEN ABS PATH> ','
+
+B<ALPHA> = ('a', 'b', 'c', ... 'z', 'A', 'B', ... 'Z')
+
+B<ALPHANUMERIC> = ('0', '1', '2', ... '9', 'a', 'b', 'c', ... 'z', 'A', 'B', ... 'Z')
+
+=back
+
+All resources and programs need a full path. There may be any number of
+subprofiles (aka child profiles) in a profile, limited only by kernel
+memory. Subprofile names are limited to 974 characters.  Child profiles can
+be used to confine an application in a special way, or when you want the
+child to be unconfined on the system, but confined when called from the
+parent.  Hats are a special child profile that can be used with the
+aa_change_hat(2) API call.  Applications written or modified to use
+aa_change_hat(2) can take advantage of subprofiles to run under different
+confinements, dependent on program logic. Several aa_change_hat(2)-aware
+applications exist, including an Apache module, mod_apparmor(5); a PAM
+module, pam_apparmor; and a Tomcat valve, tomcat_apparmor. Applications
+written or modified to use change_profile(2) transition permanently to the
+specified profile. libvirt is one such application.
+
+=head2 Access Modes
+
+File permission access modes consists of combinations of the following
+modes:
+
+=over 8
+
+=item B<r> 	- read
+
+=item B<w> 	- write -- conflicts with append
+
+=item B<a>	- append -- conflicts with write
+
+=item B<ux> 	- unconfined execute
+
+=item B<Ux> 	- unconfined execute -- scrub the environment
+
+=item B<px> 	- discrete profile execute
+
+=item B<Px> 	- discrete profile execute -- scrub the environment
+
+=item B<cx> 	- transition to subprofile on execute
+
+=item B<Cx> 	- transition to subprofile on execute -- scrub the environment
+
+=item B<ix>	- inherit execute
+
+=item B<m>	- allow PROT_EXEC with mmap(2) calls
+
+=item B<l> 	- link
+
+=item B<k>	- lock
+
+=back
+
+=head2 Access Modes Details
+
+=over 4
+
+=item B<r - Read mode>
+
+Allows the program to have read access to the file or directory listing. Read access is
+required for shell scripts and other interpreted content.
+
+=item B<w - Write mode>
+
+Allows the program to have write access to the file. Files and directories
+must have this permission if they are to be unlinked (removed.)  Write mode
+is not required on a directory to rename or create files within the directory.
+
+This mode conflicts with append mode.
+
+=item B<a - Append mode>
+
+Allows the program to have a limited appending only write access to the file.
+Append mode will prevent an application from opening the file for write unless
+it passes the O_APPEND parameter flag on open.
+
+The mode conflicts with Write mode.
+
+=item B<ux - Unconfined execute mode>
+
+Allows the program to execute the program without any AppArmor profile
+being applied to the program.
+
+This mode is useful when a confined program needs to be able to perform
+a privileged operation, such as rebooting the machine. By placing the
+privileged section in another executable and granting unconfined
+execution rights, it is possible to bypass the mandatory constraints
+imposed on all confined processes. For more information on what is
+constrained, see the apparmor(7) man page.
+
+B<WARNING> 'ux' should only be used in very special cases. It enables the
+designated child processes to be run without any AppArmor protection.
+'ux' does not scrub the environment of variables such as LD_PRELOAD;
+as a result, the calling domain may have an undue amount of influence
+over the callee.  Use this mode only if the child absolutely must be
+run unconfined and LD_PRELOAD must be used. Any profile using this mode
+provides negligible security. Use at your own risk.
+
+Incompatible with 'Ux', 'px', 'Px', 'cx', 'Cx', 'ix'.
+
+=item B<Ux - unconfined execute -- scrub the environment>
+
+'Ux' allows the named program to run in 'ux' mode, but AppArmor
+will invoke the Linux Kernel's B<unsafe_exec> routines to scrub
+the environment, similar to setuid programs. (See ld.so(8) for some
+information on setuid/setgid environment scrubbing.)
+
+B<WARNING> 'Ux' should only be used in very special cases. It enables the
+designated child processes to be run without any AppArmor protection.
+Use this mode only if the child absolutely must be run unconfined. Use
+at your own risk.
+
+Incompatible with 'ux', 'px', 'Px', 'cx', 'Cx', 'ix'.
+
+=item B<px - Discrete Profile execute mode>
+
+This mode requires that a discrete security profile is defined for a
+program executed and forces an AppArmor domain transition. If there is
+no profile defined then the access will be denied.
+
+B<WARNING> 'px' does not scrub the environment of variables such as
+LD_PRELOAD; as a result, the calling domain may have an undue amount of
+influence over the callee.
+
+Incompatible with 'Ux', 'ux', 'Px', 'cx', 'Cx', 'ix'.
+
+=item B<Px - Discrete Profile execute mode -- scrub the environment>
+
+'Px' allows the named program to run in 'px' mode, but AppArmor
+will invoke the Linux Kernel's B<unsafe_exec> routines to scrub
+the environment, similar to setuid programs. (See ld.so(8) for some
+information on setuid/setgid environment scrubbing.)
+
+Incompatible with 'Ux', 'ux', 'px', 'cx', 'Cx', 'ix'.
+
+=item B<cx - Transition to Subprofile execute mode>
+
+This mode requires that a local security profile is defined and forces an
+AppArmor domain transition to the named profile. If there is no profile
+defined then the access will be denied.
+
+B<WARNING> 'cx' does not scrub the environment of variables such as
+LD_PRELOAD; as a result, the calling domain may have an undue amount of
+influence over the callee.
+
+Incompatible with 'Ux', 'ux', 'px', 'Px', 'Cx', 'ix'.
+
+=item B<Cx - Transition to Subprofile execute mode -- scrub the environment>
+
+'Cx' allows the named program to run in 'cx' mode, but AppArmor
+will invoke the Linux Kernel's B<unsafe_exec> routines to scrub
+the environment, similar to setuid programs. (See ld.so(8) for some
+information on setuid/setgid environment scrubbing.)
+
+Incompatible with 'Ux', 'ux', 'px', 'Px', 'cx', 'ix'.
+
+=item B<ix - Inherit execute mode>
+
+Prevent the normal AppArmor domain transition on execve(2) when the
+profiled program executes the named program. Instead, the executed resource
+will inherit the current profile.
+
+This mode is useful when a confined program needs to call another
+confined program without gaining the permissions of the target's
+profile, or losing the permissions of the current profile. There is no
+version to scrub the environment because 'ix' executions don't change
+privileges.
+
+Incompatible with 'Ux', 'ux', 'Px', 'px', 'cx', 'Cx'. Implies 'm'.
+
+=item B<m - Allow executable mapping>
+
+This mode allows a file to be mapped into memory using mmap(2)'s
+PROT_EXEC flag. This flag marks the pages executable; it is used on some
+architectures to provide non-executable data pages, which can complicate
+exploit attempts. AppArmor uses this mode to limit which files a
+well-behaved program (or all programs on architectures that enforce
+non-executable memory access controls) may use as libraries, to limit
+the effect of invalid B<-L> flags given to ld(1) and B<LD_PRELOAD>,
+B<LD_LIBRARY_PATH>, given to ld.so(8).
+
+=item B<l - Link mode>
+
+Allows the program to be able to create a link with this name.  When a
+link is created, the new link B<MUST> have a subset of permissions as
+the original file (with the exception that
+the destination does not have to have link access.) If there is an 'x' rule
+on the new link, it must match the original file exactly.
+
+=item B<k - lock mode>
+
+Allows the program to be able lock a file with this name.  This permission
+covers both advisory and mandatory locking.
+
+=back
+
+=head2 Comments
+
+Comments start with # and may begin at any place within a line. The
+comment ends when the line ends. This is the same comment style as
+shell scripts.
+
+=head2 Capabilities
+
+The only capabilities a confined process may use may be enumerated; for
+the complete list, please refer to capabilities(7). Note that granting
+some capabilities renders AppArmor confinement for that domain advisory;
+while open(2), read(2), write(2), etc., will still return error when
+access is not granted, some capabilities allow loading kernel modules,
+arbitrary access to IPC, ability to bypass discretionary access controls,
+and other operations that are typically reserved for the root user.
+
+=head2 Network Rules
+
+AppArmor supports simple coarse grained network mediation.  The network
+rule restrict all socket(2) based operations.  The mediation done is
+a course grained check on whether a socket of a given type and family
+can be created, read, or written.  There is no mediation based of port
+number or protocol beyond tcp, udp, and raw.
+
+AppArmor network rules are accumulated so that the granted network
+permissions are the union of all the listed network rule permissions.
+
+AppArmor network rules are broad and general and become more restrictive
+as further information is specified.
+
+eg.
+
+ network,		#allow access to all networking
+ network tcp,		#allow access to tcp
+ network inet tcp,	#allow access to tcp only for inet4 addresses
+ network inet6 tcp,	#allow access to tcp only for inet6 addresses
+
+=head2 Mount Rules
+
+AppArmor supports mount mediation and allows specifying filesystem types and
+mount flags. The syntax of mount rules in AppArmor is based on the mount(8)
+command syntax. Mount rules must contain one of the mount, remount, umount or
+pivot_root keywords, but all mount conditions are optional. Unspecified
+optional conditionals are assumed to match all entries (eg, not specifying
+fstype means all fstypes are matched). Due to the complexity of the mount
+command and how options may be specified, AppArmor allows specifying
+conditionals three different ways:
+
+=over 4
+
+=item 1.
+
+If a conditional is specified using '=', then the rule only grants permission
+for mounts matching the exactly specified options. For example, an AppArmor
+policy with the following rule:
+
+=over 4
+
+mount options=ro /dev/foo -> /mnt/,
+
+=back
+
+Would match:
+
+=over 4
+
+$ mount -o ro /dev/foo /mnt
+
+=back
+
+but not either of these:
+
+=over 4
+
+$ mount -o ro,atime /dev/foo /mnt
+
+$ mount -o rw /dev/foo /mnt
+
+=back
+
+=item 2.
+
+If a conditional is specified using 'in', then the rule grants permission for
+mounts matching any combination of the specified options. For example, if an
+AppArmor policy has the following rule:
+
+=over 4
+
+mount options in (ro,atime) /dev/foo -> /mnt/,
+
+=back
+
+all of these mount commands will match:
+
+=over 4
+
+$ mount -o ro /dev/foo /mnt
+
+$ mount -o ro,atime /dev/foo /mnt
+
+$ mount -o atime /dev/foo /mnt
+
+=back
+
+but none of these will:
+
+=over 4
+
+$ mount -o ro,sync /dev/foo /mnt
+
+$ mount -o ro,atime,sync /dev/foo /mnt
+
+$ mount -o rw /dev/foo /mnt
+
+$ mount -o rw,noatime /dev/foo /mnt
+
+$ mount /dev/foo /mnt
+
+=back
+
+=item 3.
+
+If multiple conditionals are specified in a single mount rule, then the rule
+grants permission for each set of options. This provides a shorthand when
+writing mount rules which might help to logically break up a conditional. For
+example, if an AppArmor policy has the following rule:
+
+=over 4
+
+mount options=ro options=atime
+
+=back
+
+both of these mount commands will match:
+
+=over 4
+
+$ mount -o ro /dev/foo /mnt
+
+$ mount -o atime /dev/foo /mnt
+
+=back
+
+but this one will not:
+
+=over 4
+
+$ mount -o ro,atime /dev/foo /mnt
+
+=back
+
+=back
+
+Note that separate mount rules are distinct and the options do not accumulate.
+For example, these AppArmor mount rules:
+
+=over 4
+
+mount options=ro,
+mount options=atime,
+
+=back
+
+are not equivalent to either of these mount rules:
+
+=over 4
+
+mount options=(ro,atime),
+
+mount options in (ro,atime),
+
+=back
+
+To help clarify the flexibility and complexity of mount rules, here are some
+example rules with accompanying matching commands:
+
+=over 4
+
+=item B<mount,>
+
+the 'mount' rule without any conditionals is the most generic and allows any
+mount. Equivalent to 'mount fstype=** options=** ** -> /**'.
+
+=item B<mount /dev/foo,>
+
+allow mounting of /dev/foo anywhere with any options. Some matching mount
+commands:
+
+=over 4
+
+$ mount /dev/foo /mnt
+
+$ mount -t ext3 /dev/foo /mnt
+
+$ mount -t vfat /dev/foo /mnt
+
+$ mount -o ro,atime,noexec,nodiratime /dev/foo /srv/some/mountpoint
+
+=back
+
+=item B<mount options=ro /dev/foo,>
+
+allow mounting of /dev/foo anywhere, as read only. Some matching mount
+commands:
+
+=over 4
+
+$ mount -o ro /dev/foo /mnt
+
+$ mount -o ro /dev/foo /some/where/else
+
+=back
+
+=item B<mount options=(ro,atime) /dev/foo,>
+
+allow mount of /dev/foo anywhere, as read only and using inode access times.
+Some matching mount commands:
+
+=over 4
+
+$ mount -o ro,atime /dev/foo /mnt
+
+$ mount -o ro,atime /dev/foo /some/where/else
+
+=back
+
+=item B<mount options in (ro,atime) /dev/foo,>
+
+allow mount of /dev/foo anywhere using some combination of 'ro' and 'atime'
+(see above). Some matching mount commands:
+
+=over 4
+
+$ mount -o ro /dev/foo /mnt
+
+$ mount -o atime /dev/foo /some/where/else
+
+$ mount -o ro,atime /dev/foo /some/other/place
+
+=back
+
+=item B<mount options=ro /dev/foo, mount options=atime /dev/foo,>
+
+allow mount of /dev/foo anywhere as read only, and allow mount of /dev/foo
+anywhere using inode access times. Note this is expressed as two different
+rules. Matches:
+
+=over 4
+
+$ mount -o ro /dev/foo /mnt/1
+
+$ mount -o atime /dev/foo /mnt/2
+
+=back
+
+=item B<< mount -> /mnt/**, >>
+
+allow mounting anything under a directory in /mnt/**. Some matching mount
+commands:
+
+=over 4
+
+$ mount /dev/foo1 /mnt/1
+
+$ mount -o ro,atime,noexec,nodiratime /dev/foo2 /mnt/deep/path/foo2
+
+=back
+
+=item B<< mount options=ro -> /mnt/**, >>
+
+allow mounting anything under /mnt/**, as read only. Some matching mount
+commands:
+
+=over 4
+
+$ mount -o ro /dev/foo1 /mnt/1
+
+$ mount -o ro /dev/foo2 /mnt/deep/path/foo2
+
+=back
+
+=item B<< mount fstype=ext3 options=(rw,atime) /dev/sdb1 -> /mnt/stick/, >>
+
+allow mounting an ext3 filesystem in /dev/sdb1 on /mnt/stick as read/write and
+using inode access times. Matches only:
+
+=over 4
+
+$ mount -o rw,atime /dev/sdb1 /mnt/stick
+
+=back
+
+=item B<< mount options=(ro, atime) options in (nodev, user) /dev/foo -> /mnt/, >>
+
+allow mounting /dev/foo on /mmt/ read only and using inode access times or
+allow mounting /dev/foo on /mnt/ with some combination of 'nodev' and 'user'.
+Matches only:
+
+=over 4
+
+$ mount -o ro,atime /dev/foo /mnt
+
+$ mount -o nodev /dev/foo /mnt
+
+$ mount -o user /dev/foo /mnt
+
+$ mount -o nodev,user /dev/foo /mnt
+
+=back
+
+=back
+
+=head2 Variables
+
+AppArmor's policy language allows embedding variables into file rules
+to enable easier configuration for some common (and pervasive) setups.
+Variables may have multiple values assigned, but any variable assignments
+must be made before the start of the profile.
+
+The parser will automatically expand variables to include all values
+that they have been assigned; it is an error to reference a variable
+without setting at least one value.
+
+At the time of this writing, only B<@{HOME}> and B<@{HOMEDIRS}> are defined
+in the AppArmor policy provided, in the F</etc/apparmor.d/tunables/home>
+file; these variables are used in many of the abstractions described later.
+You may also add files in F</etc/apparmor.d/tunables/home.d> for
+site-specific customization of B<@{HOMEDIRS}>.
+
+=head2 Alias rules
+
+AppArmor also provides alias rules for remapping paths for site-specific
+layouts. They are an alternative form of path rewriting to using variables,
+and are done after variable resolution. Alias rules must occur within the
+preamble of the profile. System-wide aliases are found in
+F</etc/apparmor.d/tunables/alias>, which is included by
+F</etc/apparmor.d/tunables/global>. F</etc/apparmor.d/tunables/global> is
+typically included at the beginning of an AppArmor profile.
+
+=head2 Globbing
+
+File resources may be specified with a globbing syntax similar to that
+used by popular shells, such as csh(1), bash(1), zsh(1).
+
+=over 4
+
+=item B<*>
+
+can substitute for any number of characters, excepting '/'
+
+=item B<**>
+
+can substitute for any number of characters, including '/'
+
+=item B<?>
+
+can substitute for any single character excepting '/'
+
+=item B<[abc]>
+
+will substitute for the single character a, b, or c
+
+=item B<[a-c]>
+
+will substitute for the single character a, b, or c
+
+=item B<[^a-c]>
+
+will substitute for any single character not matching a, b or c
+
+=item B<{ab,cd}>
+
+will expand to one rule to match ab, one rule to match cd
+
+=back
+
+When AppArmor looks up a directory the pathname being looked up will
+end with a slash (e.g., F</var/tmp/>); otherwise it will not end with a
+slash. Only rules that match a trailing slash will match directories. Some
+examples, none matching the F</tmp/> directory itself, are:
+
+=over 4
+
+=item B</tmp/*>
+
+Files directly in F</tmp>.
+
+=item B</tmp/*/>
+
+Directories directly in F</tmp>.
+
+=item B</tmp/**>
+
+Files and directories anywhere underneath F</tmp>.
+
+=item B</tmp/**/>
+
+Directories anywhere underneath F</tmp>.
+
+=back
+
+=head2 Rule Qualifiers
+
+There are several rule qualifiers that can be applied to permission rules.
+Rule qualifiers can modify the rule and/or permissions within the rule.
+
+=over 4
+
+=item B<audit>
+
+Specifies that permissions requests that match the rule should be recorded
+to the audit log.
+
+=item B<deny>
+
+Specifies that permissions requests that match the rule should be denied
+without logging. Can be combined with 'audit' to enable logging.
+
+=item B<owner>
+
+Specifies that the task must have the same euid/fsuid as the object being
+referenced by the permission check.
+
+=back
+
+=head2 #include mechanism
+
+AppArmor provides an easy abstraction mechanism to group common file
+access requirements; this abstraction is an extremely flexible way to
+grant site-specific rights and makes writing new AppArmor profiles very
+simple by assembling the needed building blocks for any given program.
+
+The use of '#include' is modelled directly after cpp(1); its use will
+replace the '#include' statement with the specified file's contents.
+B<#include "/absolute/path"> specifies that F</absolute/path> should be
+used.  B<#include "relative/path"> specifies that F<relative/path> should
+be used, where the path is relative to the current working directory.
+B<#include E<lt>magic/pathE<gt>> is the most common usage; it will load
+F<magic/path> relative to a directory specified to apparmor_parser(8).
+F</etc/apparmor.d/> is the AppArmor default.
+
+The supplied AppArmor profiles follow several conventions; the
+abstractions stored in F</etc/apparmor.d/abstractions/> are some
+large clusters that are used in most profiles. What follows are short
+descriptions of how some of the abstractions are used.
+
+=over 4
+
+
+=item F<abstractions/audio>
+
+Includes accesses to device files used for audio applications.
+
+=item F<abstractions/authentication>
+
+Includes access to files and services typically necessary for services
+that perform user authentication.
+
+=item F<abstractions/base>
+
+Includes files that should be readable and writable in all profiles.
+
+=item F<abstractions/bash>
+
+Includes many files used by bash; useful for interactive shells and
+programs that call system(3).
+
+=item F<abstractions/consoles>
+
+Includes read and write access to the device files controlling the
+virtual console, sshd(8), xterm(1), etc. This abstraction is needed for
+many programs that interact with users.
+
+=item F<abstractions/fonts>
+
+Includes access to fonts and the font libraries.
+
+=item F<abstractions/gnome>
+
+Includes read and write access to GNOME configuration files, as well as
+read access to GNOME libraries.
+
+=item F<abstractions/kde>
+
+Includes read and write access to KDE configuration files, as well as
+read access to KDE libraries.
+
+=item F<abstractions/kerberosclient>
+
+Includes file access rules needed for common kerberos clients.
+
+=item F<abstractions/nameservice>
+
+Includes file rules to allow DNS, LDAP, NIS, SMB, user and group password
+databases, services, and protocols lookups.
+
+=item F<abstractions/perl>
+
+Includes read access to perl modules.
+
+=item F<abstractions/user-download>
+
+=item F<abstractions/user-mail>
+
+=item F<abstractions/user-manpages>
+
+=item F<abstractions/user-tmp>
+
+=item F<abstractions/user-write>
+
+Some profiles for typical "user" programs will use these include files
+to describe rights that users have in the system.
+
+=item F<abstractions/wutmp>
+
+Includes write access to files used to maintain wtmp(5) and utmp(5)
+databases, used with the w(1) and associated commands.
+
+=item F<abstractions/X>
+
+Includes read access to libraries, configuration files, X authentication
+files, and the X socket.
+
+=back
+
+The abstractions stored in F</etc/apparmor.d/program-chunks/> are
+intended for use by specific program suites, and are not generally
+useful.
+
+Some of the abstractions rely on variables that are set in files in the
+F</etc/apparmor.d/tunables/> directory. These variables are currently
+B<@{HOME}> and B<@{HOMEDIRS}>. Variables cannot be set in profile scope;
+they can only be set before the profile. Therefore, any profiles that
+use abstractions should either B<#include E<lt>tunables/globalE<gt>> or
+otherwise ensure that B<@{HOME}> and B<@{HOMEDIRS}> are set before
+starting the profile definition. The aa-autodep(8) and aa-genprof(8) utilities
+will automatically emit B<#include E<lt>tunables/globalE<gt>> in
+generated profiles.
+
+=head1 EXAMPLE
+
+An example AppArmor profile:
+
+	# a variable definition in the preamble
+	@{HOME} = /home/*/ /root/
+
+	# a comment about foo.
+	/usr/bin/foo {
+	  /bin/mount          ux,
+  	  /dev/{,u}random     r,
+  	  /etc/ld.so.cache    r,
+  	  /etc/foo.conf       r,
+  	  /etc/foo/*          r,
+  	  /lib/ld-*.so*       rmix,
+  	  /lib/lib*.so*       r,
+  	  /proc/[0-9]**       r,
+  	  /usr/lib/**         r,
+  	  /tmp/foo.pid        wr,
+  	  /tmp/foo.*          lrw,
+	  /@{HOME}/.foo_file  rw,
+	  /usr/bin/baz        Cx -> baz,
+
+	  # a comment about foo's hat (subprofile), bar.
+  	  ^bar {
+  	    /lib/ld-*.so*       rmix,
+  	    /usr/bin/bar        rmix,
+  	    /var/spool/*        rwl,
+  	  }
+
+	  # a comment about foo's subprofile, baz.
+	  profile baz {
+	    #include <abstractions/bash>
+	    owner /proc/[0-9]*/stat r,
+	    /bin/bash ixr,
+	    /var/lib/baz/ r,
+	    owner /var/lib/baz/* rw,
+	  }
+  	}
+
+=head1 FILES
+
+=over 4
+
+=item F</etc/init.d/boot.apparmor>
+
+=item F</etc/apparmor.d/>
+
+=back
+
+=head1 KNOWN BUGS
+
+=over 4
+
+Mount options support the use of pattern matching but mount flags are not
+correctly intersected against specified patterns. Eg, 'mount options=**,'
+should be equivalent to 'mount,', but it is not. (LP: #965690)
+
+The fstype may not be matched against when certain mount command flags are
+used. Specifically fstype matching currently only works when creating a new
+mount and not remount, bind, etc.
+
+Mount rules with multiple 'options' conditionals are not applied as documented
+but instead merged such that 'options in (ro,nodev) options in (atime)' is
+equivalent to 'options in (ro,nodev,atime)'.
+
+When specifying mount options with the 'in' conditional, both the positive and
+negative values match when specifying one or the other. Eg, 'rw' matches when
+'ro' is specified and 'dev' matches when 'nodev' is specified such that
+'options in (ro,nodev)' is equivalent to 'options in (rw,dev)'.
+
+=back
+
+=head1 SEE ALSO
+
+apparmor(7), apparmor_parser(8), aa-complain(1),
+aa-enforce(1), aa_change_hat(2), mod_apparmor(5), and
+L<http://wiki.apparmor.net>.
+
+=cut

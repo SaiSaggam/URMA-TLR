@@ -1,0 +1,9 @@
+all:
+
+check:
+
+menuconfig:
+
+clean:
+
+

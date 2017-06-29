@@ -1,0 +1,12 @@
+/_pam_compat.h
+/_pam_macros.h
+/_pam_types.h
+/gmp.h
+/openssl/
+/pam/
+/pam_appl.h
+/pam_ext.h
+/pam_modules.h
+/pam_modutil.h
+/security/
+/pcap*

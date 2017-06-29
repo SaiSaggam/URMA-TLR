@@ -1,0 +1,5 @@
+Makefile
+.dirstamp
+config.h
+stamp-h1
+tools/rsyslogd

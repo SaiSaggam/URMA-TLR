@@ -1,0 +1,13 @@
+config 'snmp' 'snmp'
+	option v2c 'off'
+	option v3 'on'
+	option port '161'
+	option authentication_traps 'off'
+	
+config 'snmp_user' 'snmp_user5'
+	option user 'test_user_4'
+	option access 'rw'
+	option authentication 'sha1'
+	option authentication_password 'sha1-password'
+	option privacy 'aes'
+	option privacy_password 'aes-password'

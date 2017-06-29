@@ -1,0 +1,5 @@
+{
+  "srcDistPath_mdist": "../urma-seed/.build/mdist/bundle/programs/web.browser",
+  "srcDistPath": "../urma-seed/.build/dist",
+  "pyDistPath": ".build/dist"
+}

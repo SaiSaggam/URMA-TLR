@@ -1,0 +1,633 @@
+/*
+ * Group ID: 0x009F0000/0x809F0000
+ */
+
+#ifndef _CSID_GROUPING_H_
+#define _CSID_GROUPING_H_
+
+#include "csid_gid.h"
+
+#define _CFG_GROUPING(x)       (CSID_GIDC_GROUPING|(x))
+#define _STA_GROUPING(x)       (CSID_GIDS_GROUPING|(x))
+
+#define CSID_S_GROUPING_ALTERED          _STA_GROUPING(0x0100) //T=u32, D=0, altered
+
+#define CSID_S_GROUPING_ADD_HOST         _STA_GROUPING(0x0101) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_HOST         _STA_GROUPING(0x0102) //T=u32, D=0
+#define CSID_S_GROUPING_MOD_HOST         _STA_GROUPING(0x0103) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_HOST_MEM     _STA_GROUPING(0x0104) //T=u32, D=0
+
+
+#define CSID_S_GROUPING_ADD_FEXT         _STA_GROUPING(0x0105) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_FEXT         _STA_GROUPING(0x0106) //T=u32, D=0
+#define CSID_S_GROUPING_MOD_FEXT         _STA_GROUPING(0x0107) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_FEXT_MEM     _STA_GROUPING(0x0108) //T=u32, D=0
+
+
+#define CSID_S_GROUPING_ADD_APP_GRP      _STA_GROUPING(0x0109) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_APP_GRP      _STA_GROUPING(0x010A) //T=u32, D=0
+#define CSID_S_GROUPING_MOD_APP_GRP      _STA_GROUPING(0x010B) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_APP_GRP_MEM  _STA_GROUPING(0x010C) //T=u32, D=0
+
+
+//global configure
+#define CSID_S_GROUPING_EANBLE           _STA_GROUPING(0x010D) //T=u32, D=0
+#define CSID_S_GROUPING_IPV6             _STA_GROUPING(0x010E) //T=u32, D=0
+
+#define CSID_S_GROUPING_FIW_PF_ALTERED   _STA_GROUPING(0x010F) //T=u32, D=0, Firewall Profile ui altered
+
+#define CSID_S_GROUPING_ADD_AP_GRP      	   _STA_GROUPING(0x0110) //T=u32, D=0
+#define CSID_S_GROUPING_MOD_AP_GRP      	   _STA_GROUPING(0x0111) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_AP_GRP_MEM  	   _STA_GROUPING(0x0112) //T=u32, D=0
+#define CSID_S_GROUPING_DEL_AP_GRP      	   _STA_GROUPING(0x0113) //T=u32, D=0
+
+#define CSID_C_GROUPING_ENABLE                 _CFG_GROUPING(0x0001) //T=u8, D=0, grouping enable
+//host group list
+
+#define CSID_C_GROUPING_HOST_NAME0                 _CFG_GROUPING(0x1000) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE0             _CFG_GROUPING(0x1010) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID0               _CFG_GROUPING(0x1050) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL0       _CFG_GROUPING(0x1090) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS0            _CFG_GROUPING(0x1091) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE0               _CFG_GROUPING(0x1092) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME1                 _CFG_GROUPING(0x1001) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE1             _CFG_GROUPING(0x1110) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID1               _CFG_GROUPING(0x1150) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL1       _CFG_GROUPING(0x1190) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS1            _CFG_GROUPING(0x1191) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE1               _CFG_GROUPING(0x1192) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME2                 _CFG_GROUPING(0x1002) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE2             _CFG_GROUPING(0x1210) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID2               _CFG_GROUPING(0x1250) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL2       _CFG_GROUPING(0x1290) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS2            _CFG_GROUPING(0x1291) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE2               _CFG_GROUPING(0x1292) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME3                 _CFG_GROUPING(0x1003) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE3             _CFG_GROUPING(0x1310) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID3               _CFG_GROUPING(0x1350) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL3       _CFG_GROUPING(0x1390) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS3            _CFG_GROUPING(0x1391) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE3               _CFG_GROUPING(0x1392) //T=u32, D=0
+                                    
+#define CSID_C_GROUPING_HOST_NAME4                 _CFG_GROUPING(0x1004) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE4             _CFG_GROUPING(0x1410) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID4               _CFG_GROUPING(0x1450) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL4       _CFG_GROUPING(0x1490) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS4            _CFG_GROUPING(0x1491) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE4               _CFG_GROUPING(0x1492) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME5                 _CFG_GROUPING(0x1005) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE5             _CFG_GROUPING(0x1510) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID5               _CFG_GROUPING(0x1550) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL5       _CFG_GROUPING(0x1590) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS5            _CFG_GROUPING(0x1591) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE5               _CFG_GROUPING(0x1592) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME6                 _CFG_GROUPING(0x1006) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE6             _CFG_GROUPING(0x1610) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID6               _CFG_GROUPING(0x1650) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL6       _CFG_GROUPING(0x1690) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS6            _CFG_GROUPING(0x1691) //T=u32, D=0                  
+#define CSID_C_GROUPING_HOST_ENABLE6               _CFG_GROUPING(0x1692) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME7                 _CFG_GROUPING(0x1007) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE7             _CFG_GROUPING(0x1710) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID7               _CFG_GROUPING(0x1750) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL7       _CFG_GROUPING(0x1790) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS7            _CFG_GROUPING(0x1791) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE7               _CFG_GROUPING(0x1792) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME8                 _CFG_GROUPING(0x1008) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE8             _CFG_GROUPING(0x1810) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID8               _CFG_GROUPING(0x1850) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL8       _CFG_GROUPING(0x1890) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS8            _CFG_GROUPING(0x1891) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE8               _CFG_GROUPING(0x1892) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAME9                 _CFG_GROUPING(0x1009) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPE9             _CFG_GROUPING(0x1910) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_ID9               _CFG_GROUPING(0x1950) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALL9       _CFG_GROUPING(0x1990) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOS9            _CFG_GROUPING(0x1991) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLE9               _CFG_GROUPING(0x1992) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAMEA                 _CFG_GROUPING(0x100A) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPEA             _CFG_GROUPING(0x1A10) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_IDA               _CFG_GROUPING(0x1A50) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALLA       _CFG_GROUPING(0x1A90) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOSA            _CFG_GROUPING(0x1A91) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLEA               _CFG_GROUPING(0x1A92) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAMEB                 _CFG_GROUPING(0x100B) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPEB             _CFG_GROUPING(0x1B10) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_IDB               _CFG_GROUPING(0x1B50) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALLB       _CFG_GROUPING(0x1B90) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOSB            _CFG_GROUPING(0x1B91) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLEB               _CFG_GROUPING(0x1B92) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAMEC                 _CFG_GROUPING(0x100C) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPEC             _CFG_GROUPING(0x1C10) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_IDC               _CFG_GROUPING(0x1C50) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALLC       _CFG_GROUPING(0x1C90) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOSC            _CFG_GROUPING(0x1C91) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLEC               _CFG_GROUPING(0x1C92) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAMED                 _CFG_GROUPING(0x100D) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPED             _CFG_GROUPING(0x1D10) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_IDD               _CFG_GROUPING(0x1D50) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALLD       _CFG_GROUPING(0x1D90) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOSD            _CFG_GROUPING(0x1D91) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLED               _CFG_GROUPING(0x1D92) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAMEE                 _CFG_GROUPING(0x100E) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPEE             _CFG_GROUPING(0x1E10) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_IDE               _CFG_GROUPING(0x1E50) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALLE       _CFG_GROUPING(0x1E90) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOSE            _CFG_GROUPING(0x1E91) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLEE               _CFG_GROUPING(0x1E92) //T=u32, D=0
+
+#define CSID_C_GROUPING_HOST_NAMEF                 _CFG_GROUPING(0x100F) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_TYPEF             _CFG_GROUPING(0x1F10) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MEM_IDF               _CFG_GROUPING(0x1F50) //T=str, D=""
+#define CSID_C_GROUPING_HOST_BOUND_FIREWALLF       _CFG_GROUPING(0x1F90) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_BOUND_QOSF            _CFG_GROUPING(0x1F91) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ENABLEF               _CFG_GROUPING(0x1F92) //T=u32, D=0                                                                                               
+//add host group
+//reserve 0x2001~0x200F
+#define CSID_C_GROUPING_HOST_ADD_NAME                  _CFG_GROUPING(0x2000) //T=str, D=""
+#define CSID_C_GROUPING_HOST_ADD_MEM_TYPE              _CFG_GROUPING(0x2010) //T=str, D=""
+#define CSID_C_GROUPING_HOST_ADD_MEM_ID                _CFG_GROUPING(0x2050) //T=str, D=""
+#define CSID_C_GROUPING_HOST_ADD_BOUND_FIREWALL        _CFG_GROUPING(0x2090) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ADD_BOUND_QOS             _CFG_GROUPING(0x2091) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_ADD_EANBLE                _CFG_GROUPING(0x2092) //T=u32, D=1
+
+//delete host group
+#define CSID_C_GROUPING_HOST_DEL_NAME                  _CFG_GROUPING(0x2100) //T=str, D=""
+
+//delete member
+#define CSID_C_GROUPING_DEL_HOST_GRP_NAME              _CFG_GROUPING(0x2200) //T=str, D=""
+#define CSID_C_GROUPING_DEL_HOST_MEM_TYPE              _CFG_GROUPING(0x2201) //T=str, D=""
+#define CSID_C_GROUPING_DEL_HOST_MEM_ID                _CFG_GROUPING(0x2202) //T=str, D=""
+
+//edit host group
+#define CSID_C_GROUPING_HOST_MOD_ORG_NAME              _CFG_GROUPING(0x3000) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MOD_NAME                  _CFG_GROUPING(0x3001) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MOD_MEM_TYPE              _CFG_GROUPING(0x3010) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MOD_MEM_ID                _CFG_GROUPING(0x3050) //T=str, D=""
+#define CSID_C_GROUPING_HOST_MOD_BOUND_FIREWALL        _CFG_GROUPING(0x3090) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_MOD_BOUND_QOS             _CFG_GROUPING(0x3091) //T=u32, D=0
+#define CSID_C_GROUPING_HOST_MOD_EANBLE                _CFG_GROUPING(0x3092) //T=u32, D=0
+
+//reserve 0x3100~0x31FF
+#define CSID_C_GROUPING_HOST_NAME_INUSE        	       _CFG_GROUPING(0x3100) //T=str, D="", host group name in-use by other applications
+//---------------------------------------------------------------------
+//file extension list
+#define CSID_C_GROUPING_FEXT_NAME0                  _CFG_GROUPING(0x4000) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE0             _CFG_GROUPING(0x4010) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT0                _CFG_GROUPING(0x4050) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL0        _CFG_GROUPING(0x4090) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS0             _CFG_GROUPING(0x4091) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE0                _CFG_GROUPING(0x4092) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME1                  _CFG_GROUPING(0x4001) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE1             _CFG_GROUPING(0x4110) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT1                _CFG_GROUPING(0x4150) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL1        _CFG_GROUPING(0x4190) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS1             _CFG_GROUPING(0x4191) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE1                _CFG_GROUPING(0x4192) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME2                  _CFG_GROUPING(0x4002) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE2             _CFG_GROUPING(0x4210) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT2                _CFG_GROUPING(0x4250) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL2        _CFG_GROUPING(0x4290) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS2             _CFG_GROUPING(0x4291) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE2                _CFG_GROUPING(0x4292) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME3                  _CFG_GROUPING(0x4003) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE3             _CFG_GROUPING(0x4310) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT3                _CFG_GROUPING(0x4350) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL3        _CFG_GROUPING(0x4390) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS3             _CFG_GROUPING(0x4391) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE3                _CFG_GROUPING(0x4392) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME4                  _CFG_GROUPING(0x4004) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE4             _CFG_GROUPING(0x4410) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT4                _CFG_GROUPING(0x4450) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL4        _CFG_GROUPING(0x4490) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS4             _CFG_GROUPING(0x4491) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE4                _CFG_GROUPING(0x4492) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME5                  _CFG_GROUPING(0x4005) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE5             _CFG_GROUPING(0x4510) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT5                _CFG_GROUPING(0x4550) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL5        _CFG_GROUPING(0x4590) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS5             _CFG_GROUPING(0x4591) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE5                _CFG_GROUPING(0x4592) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME6                  _CFG_GROUPING(0x4006) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE6             _CFG_GROUPING(0x4610) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT6                _CFG_GROUPING(0x4650) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL6        _CFG_GROUPING(0x4690) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS6             _CFG_GROUPING(0x4691) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE6                _CFG_GROUPING(0x4692) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME7                  _CFG_GROUPING(0x4007) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE7             _CFG_GROUPING(0x4710) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT7                _CFG_GROUPING(0x4750) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL7        _CFG_GROUPING(0x4790) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS7             _CFG_GROUPING(0x4791) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE7                _CFG_GROUPING(0x4792) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME8                  _CFG_GROUPING(0x4008) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE8             _CFG_GROUPING(0x4810) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT8                _CFG_GROUPING(0x4850) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL8        _CFG_GROUPING(0x4890) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS8             _CFG_GROUPING(0x4891) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE8                _CFG_GROUPING(0x4892) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAME9                  _CFG_GROUPING(0x4009) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPE9             _CFG_GROUPING(0x4910) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMAT9                _CFG_GROUPING(0x4950) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALL9        _CFG_GROUPING(0x4990) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOS9             _CFG_GROUPING(0x4991) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLE9                _CFG_GROUPING(0x4992) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAMEA                  _CFG_GROUPING(0x400A) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPEA             _CFG_GROUPING(0x4A10) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMATA                _CFG_GROUPING(0x4A50) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALLA        _CFG_GROUPING(0x4A90) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOSA             _CFG_GROUPING(0x4A91) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLEA                _CFG_GROUPING(0x4A92) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAMEB                  _CFG_GROUPING(0x400B) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPEB             _CFG_GROUPING(0x4B10) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMATB                _CFG_GROUPING(0x4B50) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALLB        _CFG_GROUPING(0x4B90) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOSB             _CFG_GROUPING(0x4B91) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLEB                _CFG_GROUPING(0x4B92) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAMEC                  _CFG_GROUPING(0x400C) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPEC             _CFG_GROUPING(0x4C10) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMATC                _CFG_GROUPING(0x4C50) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALLC        _CFG_GROUPING(0x4C90) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOSC             _CFG_GROUPING(0x4C91) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLEC                _CFG_GROUPING(0x4C92) //T=u32, D=0
+
+
+#define CSID_C_GROUPING_FEXT_NAMED                  _CFG_GROUPING(0x400D) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPED             _CFG_GROUPING(0x4D10) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMATD                _CFG_GROUPING(0x4D50) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALLD        _CFG_GROUPING(0x4D90) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOSD             _CFG_GROUPING(0x4D91) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLED                _CFG_GROUPING(0x4D92) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAMEE                  _CFG_GROUPING(0x400E) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPEE             _CFG_GROUPING(0x4E10) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMATE                _CFG_GROUPING(0x4E50) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALLE        _CFG_GROUPING(0x4E90) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOSE             _CFG_GROUPING(0x4E91) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLEE                _CFG_GROUPING(0x4E92) //T=u32, D=0
+
+#define CSID_C_GROUPING_FEXT_NAMEF                  _CFG_GROUPING(0x400F) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FILE_TYPEF             _CFG_GROUPING(0x4F10) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_FORMATF                _CFG_GROUPING(0x4F50) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_BOUND_FIREWALLF        _CFG_GROUPING(0x4F90) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_BOUND_QOSF             _CFG_GROUPING(0x4F91) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ENABLEF                _CFG_GROUPING(0x4F92) //T=u32, D=0                                    
+//add file ext group
+#define CSID_C_GROUPING_FEXT_ADD_NAME                  _CFG_GROUPING(0x5000) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_ADD_FILE_TYPE             _CFG_GROUPING(0x5010) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_ADD_FORMAT                _CFG_GROUPING(0x5050) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_ADD_BOUND_FIREWALL        _CFG_GROUPING(0x5090) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ADD_BOUND_QOS             _CFG_GROUPING(0x5091) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_ADD_EANBLE                _CFG_GROUPING(0x5092) //T=u32, D=1
+
+//delete file ext group
+#define CSID_C_GROUPING_FEXT_DEL_NAME                  _CFG_GROUPING(0x5100) //T=str, D=""
+
+//delete member
+#define CSID_C_GROUPING_DEL_FEXT_GRP_NAME              _CFG_GROUPING(0x5200) //T=str, D=""
+#define CSID_C_GROUPING_DEL_FEXT_MEM_TYPE              _CFG_GROUPING(0x5201) //T=str, D=""
+#define CSID_C_GROUPING_DEL_FEXT_MEM_ID                _CFG_GROUPING(0x5202) //T=str, D=""
+                                                                           
+//edit file ext group
+#define CSID_C_GROUPING_FEXT_MOD_ORG_NAME              _CFG_GROUPING(0x6000) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_MOD_NAME                  _CFG_GROUPING(0x6001) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_MOD_FILE_TYPE             _CFG_GROUPING(0x6010) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_MOD_FORMAT                _CFG_GROUPING(0x6050) //T=str, D=""
+#define CSID_C_GROUPING_FEXT_MOD_BOUND_FIREWALL        _CFG_GROUPING(0x6090) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_MOD_BOUND_QOS             _CFG_GROUPING(0x6091) //T=u32, D=0
+#define CSID_C_GROUPING_FEXT_MOD_EANBLE                _CFG_GROUPING(0x6092) //T=u32, D=0
+//-----------------------------------------------------------------------
+//application list
+#define CSID_C_GROUPING_APP_GRP_NAME0              _CFG_GROUPING(0x7000) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE0              _CFG_GROUPING(0x7010) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME0          _CFG_GROUPING(0x7050) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL0    _CFG_GROUPING(0x7090) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS0         _CFG_GROUPING(0x7091) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE0            _CFG_GROUPING(0x7092) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME1              _CFG_GROUPING(0x7001) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE1              _CFG_GROUPING(0x7110) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME1          _CFG_GROUPING(0x7150) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL1    _CFG_GROUPING(0x7190) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS1         _CFG_GROUPING(0x7191) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE1            _CFG_GROUPING(0x7192) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME2              _CFG_GROUPING(0x7002) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE2              _CFG_GROUPING(0x7210) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME2          _CFG_GROUPING(0x7250) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL2    _CFG_GROUPING(0x7290) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS2         _CFG_GROUPING(0x7291) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE2            _CFG_GROUPING(0x7292) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME3              _CFG_GROUPING(0x7003) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE3              _CFG_GROUPING(0x7310) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME3          _CFG_GROUPING(0x7350) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL3    _CFG_GROUPING(0x7390) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS3         _CFG_GROUPING(0x7391) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE3            _CFG_GROUPING(0x7392) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME4              _CFG_GROUPING(0x7004) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE4              _CFG_GROUPING(0x7410) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME4          _CFG_GROUPING(0x7450) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL4    _CFG_GROUPING(0x7490) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS4         _CFG_GROUPING(0x7491) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE4            _CFG_GROUPING(0x7492) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME5              _CFG_GROUPING(0x7005) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE5              _CFG_GROUPING(0x7510) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME5          _CFG_GROUPING(0x7550) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL5    _CFG_GROUPING(0x7590) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS5         _CFG_GROUPING(0x7591) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE5            _CFG_GROUPING(0x7592) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME6              _CFG_GROUPING(0x7006) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE6              _CFG_GROUPING(0x7610) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME6          _CFG_GROUPING(0x7650) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL6    _CFG_GROUPING(0x7690) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS6         _CFG_GROUPING(0x7691) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE6            _CFG_GROUPING(0x7692) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME7              _CFG_GROUPING(0x7007) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE7              _CFG_GROUPING(0x7710) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME7          _CFG_GROUPING(0x7750) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL7    _CFG_GROUPING(0x7790) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS7         _CFG_GROUPING(0x7791) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE7            _CFG_GROUPING(0x7792) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME8              _CFG_GROUPING(0x7008) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE8              _CFG_GROUPING(0x7810) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME8          _CFG_GROUPING(0x7850) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL8    _CFG_GROUPING(0x7890) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS8         _CFG_GROUPING(0x7891) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE8            _CFG_GROUPING(0x7892) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAME9              _CFG_GROUPING(0x7009) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPE9              _CFG_GROUPING(0x7910) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAME9          _CFG_GROUPING(0x7950) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALL9    _CFG_GROUPING(0x7990) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOS9         _CFG_GROUPING(0x7991) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLE9            _CFG_GROUPING(0x7992) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAMEA              _CFG_GROUPING(0x700A) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPEA              _CFG_GROUPING(0x7A10) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAMEA          _CFG_GROUPING(0x7A50) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALLA    _CFG_GROUPING(0x7A90) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOSA         _CFG_GROUPING(0x7A91) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLEA            _CFG_GROUPING(0x7A92) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAMEB              _CFG_GROUPING(0x700B) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPEB              _CFG_GROUPING(0x7B10) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAMEB          _CFG_GROUPING(0x7B50) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALLB    _CFG_GROUPING(0x7B90) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOSB         _CFG_GROUPING(0x7B91) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLEB            _CFG_GROUPING(0x7B92) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAMEC              _CFG_GROUPING(0x700C) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPEC              _CFG_GROUPING(0x7C10) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAMEC          _CFG_GROUPING(0x7C50) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALLC    _CFG_GROUPING(0x7C90) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOSC         _CFG_GROUPING(0x7C91) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLEC            _CFG_GROUPING(0x7C92) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAMED              _CFG_GROUPING(0x700D) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPED              _CFG_GROUPING(0x7D10) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAMED          _CFG_GROUPING(0x7D50) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALLD    _CFG_GROUPING(0x7D90) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOSD         _CFG_GROUPING(0x7D91) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLED            _CFG_GROUPING(0x7D92) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAMEE              _CFG_GROUPING(0x700E) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPEE              _CFG_GROUPING(0x7E10) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAMEE          _CFG_GROUPING(0x7E50) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALLE    _CFG_GROUPING(0x7E90) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOSE         _CFG_GROUPING(0x7E91) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLEE            _CFG_GROUPING(0x7E92) //T=u32, D=0
+
+#define CSID_C_GROUPING_APP_GRP_NAMEF              _CFG_GROUPING(0x700F) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_TYPEF              _CFG_GROUPING(0x7F10) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_APP_NAMEF          _CFG_GROUPING(0x7F50) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_BOUND_FIREWALLF    _CFG_GROUPING(0x7F90) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_BOUND_QOSF         _CFG_GROUPING(0x7F91) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ENABLEF            _CFG_GROUPING(0x7F92) //T=u32, D=0
+//add application group
+#define CSID_C_GROUPING_APP_GRP_ADD_NAME               _CFG_GROUPING(0x8000) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_ADD_TYPE               _CFG_GROUPING(0x8010) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_ADD_APP_NAME           _CFG_GROUPING(0x8050) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_ADD_BOUND_FIREWALL     _CFG_GROUPING(0x8090) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ADD_BOUND_QOS          _CFG_GROUPING(0x8091) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_ADD_EANBLE             _CFG_GROUPING(0x8092) //T=u32, D=1
+
+//delete application group
+#define CSID_C_GROUPING_APP_GRP_DEL_NAME               _CFG_GROUPING(0x8100) //T=str, D=""
+
+//delete application group member
+#define CSID_C_GROUPING_DEL_APP_GRP_NAME               _CFG_GROUPING(0x8200) //T=str, D=""
+#define CSID_C_GROUPING_DEL_APP_MEM_TYPE               _CFG_GROUPING(0x8201) //T=str, D=""
+#define CSID_C_GROUPING_DEL_APP_MEM_ID                 _CFG_GROUPING(0x8202) //T=str, D=""
+
+//edit application group
+#define CSID_C_GROUPING_APP_GRP_MOD_ORG_NAME           _CFG_GROUPING(0x9000) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_MOD_NAME               _CFG_GROUPING(0x9001) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_MOD_TYPE               _CFG_GROUPING(0x9010) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_MOD_APP_NAME           _CFG_GROUPING(0x9050) //T=str, D=""
+#define CSID_C_GROUPING_APP_GRP_MOD_BOUND_FIREWALL     _CFG_GROUPING(0x9090) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_MOD_BOUND_QOS          _CFG_GROUPING(0x9091) //T=u32, D=0
+#define CSID_C_GROUPING_APP_GRP_MOD_EANBLE             _CFG_GROUPING(0x9092) //T=u32, D=0
+
+// Firewall Rule-List Bits-mapping on Firewall Profile List (Reserved for Firewall Rule-List on 0xA000 ~ 0xAFFF)
+#define CSID_C_GROUPING_FIW_PKFILTER_PF_LIST1          _CFG_GROUPING(0xA000) //T=u32, D=0, Packet Filters Rule bits-mapping on PF 1~32
+#define CSID_C_GROUPING_FIW_PKFILTER_PF_LIST2          _CFG_GROUPING(0xA080) //T=u32, D=0, Packet Filters Rule bits-mapping on PF 33~64
+#define CSID_C_GROUPING_FIW_PKFILTER_PF_LIST3          _CFG_GROUPING(0xA100) //T=u32, D=0, Packet Filters Rule bits-mapping on PF 65~96
+#define CSID_C_GROUPING_FIW_PKFILTER_PF_LIST4          _CFG_GROUPING(0xA180) //T=u32, D=0, Packet Filters Rule bits-mapping on PF 97~128
+
+#define CSID_C_GROUPING_FIW_URLBLOCK_PF_LIST1          _CFG_GROUPING(0xA200) //T=u32, D=0, URL Blocking Rule bits-mapping on PF 1~32
+#define CSID_C_GROUPING_FIW_URLBLOCK_PF_LIST2          _CFG_GROUPING(0xA280) //T=u32, D=0, URL Blocking Rule bits-mapping on PF 33~64
+#define CSID_C_GROUPING_FIW_URLBLOCK_PF_LIST3          _CFG_GROUPING(0xA300) //T=u32, D=0, URL Blocking Rule bits-mapping on PF 65~96
+#define CSID_C_GROUPING_FIW_URLBLOCK_PF_LIST4          _CFG_GROUPING(0xA380) //T=u32, D=0, URL Blocking Rule bits-mapping on PF 97~128
+
+#define CSID_C_GROUPING_FIW_FILE_EXTENSION_PF_LIST1    _CFG_GROUPING(0xA400) //T=u32, D=0, File Extension Rule bits-mapping on PF 1~32
+#define CSID_C_GROUPING_FIW_FILE_EXTENSION_PF_LIST2    _CFG_GROUPING(0xA480) //T=u32, D=0, File Extension Rule bits-mapping on PF 33~64
+#define CSID_C_GROUPING_FIW_FILE_EXTENSION_PF_LIST3    _CFG_GROUPING(0xA500) //T=u32, D=0, File Extension Rule bits-mapping on PF 65~96
+#define CSID_C_GROUPING_FIW_FILE_EXTENSION_PF_LIST4    _CFG_GROUPING(0xA580) //T=u32, D=0, File Extensiong Rule bits-mapping on PF 97~128
+
+#define CSID_C_GROUPING_FIW_MACCTL_PF_LIST1            _CFG_GROUPING(0xA600) //T=u32, D=0, MAC Control Rule bits-mapping on PF 1~32
+#define CSID_C_GROUPING_FIW_MACCTL_PF_LIST2            _CFG_GROUPING(0xA680) //T=u32, D=0, MAC Control Rule bits-mapping on PF 33~64
+#define CSID_C_GROUPING_FIW_MACCTL_PF_LIST3            _CFG_GROUPING(0xA700) //T=u32, D=0, MAC Control Rule bits-mapping on PF 65~96
+#define CSID_C_GROUPING_FIW_MACCTL_PF_LIST4            _CFG_GROUPING(0xA780) //T=u32, D=0, MAC Control Rule bits-mapping on PF 97~128
+
+#define CSID_C_GROUPING_FIW_APPLICATION_PF_LIST1       _CFG_GROUPING(0xA800) //T=u32, D=0, Application Filters Rule bits-mapping on PF 1~32
+#define CSID_C_GROUPING_FIW_APPLICATION_PF_LIST2       _CFG_GROUPING(0xA880) //T=u32, D=0, Application Filters Rule bits-mapping on PF 33~64
+#define CSID_C_GROUPING_FIW_APPLICATION_PF_LIST3       _CFG_GROUPING(0xA900) //T=u32, D=0, Application Filters Rule bits-mapping on PF 65~96
+#define CSID_C_GROUPING_FIW_APPLICATION_PF_LIST4       _CFG_GROUPING(0xA980) //T=u32, D=0, Application Filters Rule bits-mapping on PF 97~128
+
+/* Firewall Profile List (Reserved for Firewall Profile on 0xB000 ~ 0xBFFF) */
+#define CSID_C_GROUPING_FIW_PF_NAME                    _CFG_GROUPING(0xB000) //T=str, Firewall Profile Name
+#define CSID_C_GROUPING_FIW_PF_ENABLE                  _CFG_GROUPING(0xB080) //T=u16, Firewall Profile Enable
+#define CSID_C_GROUPING_FIW_PF_GROUP_NAME              _CFG_GROUPING(0xB100) //T=str, Record Group Name on Firewall Profile
+#define CSID_C_GROUPING_FIW_PF_GROUP_TYPE              _CFG_GROUPING(0xB180) //T=u32, Record Group Type, 1 = IP Address-based, 2 = MAC Address-based, 3 = User-based
+
+//ap group list
+
+#define CSID_S_GROUPING_AP_GRP_NAME0                 _STA_GROUPING(0x1000) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC0              _STA_GROUPING(0x1010) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME0           _STA_GROUPING(0x1050) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB0           _STA_GROUPING(0x1090) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS0            _STA_GROUPING(0x1091) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE0               _STA_GROUPING(0x1092) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME1                 _STA_GROUPING(0x1001) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC1              _STA_GROUPING(0x1110) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME1           _STA_GROUPING(0x1150) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB1           _STA_GROUPING(0x1190) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS1            _STA_GROUPING(0x1191) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE1               _STA_GROUPING(0x1192) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME2                 _STA_GROUPING(0x1002) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC2              _STA_GROUPING(0x1210) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME2           _STA_GROUPING(0x1250) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB2           _STA_GROUPING(0x1290) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS2            _STA_GROUPING(0x1291) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE2               _STA_GROUPING(0x1292) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME3                 _STA_GROUPING(0x1003) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC3              _STA_GROUPING(0x1310) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME3           _STA_GROUPING(0x1350) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB3           _STA_GROUPING(0x1390) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS3            _STA_GROUPING(0x1391) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE3               _STA_GROUPING(0x1392) //T=u32, D=0
+                                    
+#define CSID_S_GROUPING_AP_GRP_NAME4                 _STA_GROUPING(0x1004) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC4              _STA_GROUPING(0x1410) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME4           _STA_GROUPING(0x1450) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB4           _STA_GROUPING(0x1490) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS4            _STA_GROUPING(0x1491) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE4               _STA_GROUPING(0x1492) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME5                 _STA_GROUPING(0x1005) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC5              _STA_GROUPING(0x1510) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME5           _STA_GROUPING(0x1550) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB5           _STA_GROUPING(0x1590) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS5            _STA_GROUPING(0x1591) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE5               _STA_GROUPING(0x1592) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME6                 _STA_GROUPING(0x1006) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC6              _STA_GROUPING(0x1610) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME6           _STA_GROUPING(0x1650) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB6           _STA_GROUPING(0x1690) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS6            _STA_GROUPING(0x1691) //T=u32, D=0                  
+#define CSID_S_GROUPING_AP_GRP_ENABLE6               _STA_GROUPING(0x1692) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME7                 _STA_GROUPING(0x1007) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC7              _STA_GROUPING(0x1710) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME7           _STA_GROUPING(0x1750) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB7           _STA_GROUPING(0x1790) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS7            _STA_GROUPING(0x1791) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE7               _STA_GROUPING(0x1792) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME8                 _STA_GROUPING(0x1008) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC8              _STA_GROUPING(0x1810) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME8           _STA_GROUPING(0x1850) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB8           _STA_GROUPING(0x1890) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS8            _STA_GROUPING(0x1891) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE8               _STA_GROUPING(0x1892) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAME9                 _STA_GROUPING(0x1009) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MAC9              _STA_GROUPING(0x1910) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAME9           _STA_GROUPING(0x1950) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLB9           _STA_GROUPING(0x1990) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOS9            _STA_GROUPING(0x1991) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLE9               _STA_GROUPING(0x1992) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAMEA                 _STA_GROUPING(0x100A) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MACA              _STA_GROUPING(0x1A10) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAMEA           _STA_GROUPING(0x1A50) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLBA           _STA_GROUPING(0x1A90) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOSA            _STA_GROUPING(0x1A91) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLEA               _STA_GROUPING(0x1A92) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAMEB                 _STA_GROUPING(0x100B) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MACB              _STA_GROUPING(0x1B10) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAMEB           _STA_GROUPING(0x1B50) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLBB           _STA_GROUPING(0x1B90) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOSB            _STA_GROUPING(0x1B91) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLEB               _STA_GROUPING(0x1B92) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAMEC                 _STA_GROUPING(0x100C) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MACC              _STA_GROUPING(0x1C10) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAMEC           _STA_GROUPING(0x1C50) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLBC           _STA_GROUPING(0x1C90) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOSC            _STA_GROUPING(0x1C91) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLEC               _STA_GROUPING(0x1C92) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAMED                 _STA_GROUPING(0x100D) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MACD              _STA_GROUPING(0x1D10) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAMED           _STA_GROUPING(0x1D50) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLBD           _STA_GROUPING(0x1D90) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOSD            _STA_GROUPING(0x1D91) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLED               _STA_GROUPING(0x1D92) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAMEE                 _STA_GROUPING(0x100E) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MACE              _STA_GROUPING(0x1E10) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAMEE           _STA_GROUPING(0x1E50) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLBE           _STA_GROUPING(0x1E90) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOSE            _STA_GROUPING(0x1E91) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLEE               _STA_GROUPING(0x1E92) //T=u32, D=0
+
+#define CSID_S_GROUPING_AP_GRP_NAMEF                 _STA_GROUPING(0x100F) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_MACF              _STA_GROUPING(0x1F10) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MEM_APNAMEF           _STA_GROUPING(0x1F50) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_BOUND_APLBF           _STA_GROUPING(0x1F90) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_BOUND_QOSF            _STA_GROUPING(0x1F91) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ENABLEF               _STA_GROUPING(0x1F92) //T=u32, D=0                                                                                               
+//add host group
+//reserve 0x2001~0x200F
+#define CSID_S_GROUPING_AP_GRP_ADD_NAME                  _STA_GROUPING(0x2000) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_ADD_MEM_MAC               _STA_GROUPING(0x2010) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_ADD_MEM_APNAME            _STA_GROUPING(0x2050) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_ADD_BOUND_APLB            _STA_GROUPING(0x2090) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_ADD_BOUND_QOS             _STA_GROUPING(0x2091) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_ADD_EANBLE                _STA_GROUPING(0x2092) //T=u32, D=1
+
+//delete host group
+#define CSID_S_GROUPING_AP_GRP_DEL_NAME                  _STA_GROUPING(0x2100) //T=str, D=""
+
+//delete member
+#define CSID_S_GROUPING_DEL_AP_GRP_GRP_NAME              _STA_GROUPING(0x2200) //T=str, D=""
+#define CSID_S_GROUPING_DEL_AP_GRP_MEM_MAC               _STA_GROUPING(0x2201) //T=str, D=""
+#define CSID_S_GROUPING_DEL_AP_GRP_MEM_APNAME            _STA_GROUPING(0x2202) //T=str, D=""
+
+//edit host group
+#define CSID_S_GROUPING_AP_GRP_MOD_ORG_NAME              _STA_GROUPING(0x3000) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MOD_NAME                  _STA_GROUPING(0x3001) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MOD_MEM_MAC               _STA_GROUPING(0x3010) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MOD_MEM_APNAME            _STA_GROUPING(0x3050) //T=str, D=""
+#define CSID_S_GROUPING_AP_GRP_MOD_BOUND_APLB            _STA_GROUPING(0x3090) //T=u32, D=0
+//#define CSID_S_GROUPING_AP_GRP_MOD_BOUND_QOS             _STA_GROUPING(0x3091) //T=u32, D=0
+#define CSID_S_GROUPING_AP_GRP_MOD_ENABLE                _STA_GROUPING(0x3092) //T=u32, D=0
+
+#endif

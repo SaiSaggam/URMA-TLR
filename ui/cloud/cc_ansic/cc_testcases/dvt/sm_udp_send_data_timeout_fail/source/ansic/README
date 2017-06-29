@@ -1,0 +1,93 @@
+This example code is strongly based on sm_udp_send_data.
+The main differences are:
+connector_config.h: CONNECTOR_SM_TIMEOUT is 1 second only.
+application.c: Wait some seconds before starting (for console feedback) and only send one put request.
+put_request.c: More verbose output for connector_request_id_data_service_send_data and added some delay to force the timeout (connector_callback_busy).
+
+The differences file:
+diff source/cc_testcases/dvt/sm_udp_send_data_timeout_fail/source/ansic/application.c source/cc_testcases/dvt/sm_udp_send_data/source/ansic/application.c
+14a15
+> #include <time.h>
+88a90
+>     const unsigned int send_cnt_max = 2;
+90a93
+> 
+92,96c95,99
+<     connector_status_t status;
+<     
+<     sleep(15);
+<     do {
+<         status = app_send_put_request(handle, response_needed);
+---
+>     unsigned int send_cnt = 0;
+> 
+>     for (send_cnt = 0; send_cnt < send_cnt_max; )
+>     {
+>         connector_status_t status = app_send_put_request(handle, response_needed);
+107a111,120
+>                 if (app_put_request_complete())
+>                 {
+>                     response_needed = !response_needed;
+>                     send_cnt++;
+>                 }
+>                 else
+>                 {
+>                     app_cancel_put_request(handle);
+>                     sleep(sleep_sec_busy);
+>                 }
+109c122
+<             }
+---
+>              }
+121,122c134
+<     } while (status != connector_success);
+< 
+---
+>     }
+diff source/cc_testcases/dvt/sm_udp_send_data_timeout_fail/source/ansic/connector_config.h source/cc_testcases/dvt/sm_udp_send_data/source/ansic/connector_config.h
+31c31
+< #define CONNECTOR_SM_TIMEOUT        1  /* Very low timeout to force an error */
+---
+> #define CONNECTOR_SM_TIMEOUT        0  /* In seconds, 0: Wait forever for the complete request/response */
+diff source/cc_testcases/dvt/sm_udp_send_data_timeout_fail/source/ansic/put_request.c source/cc_testcases/dvt/sm_udp_send_data/source/ansic/put_request.c
+13d12
+< #include <unistd.h>
+133,143d131
+<             static int skip = 3;
+<             
+<             if (skip)
+<             {
+<                 unsigned int const wait_secs = 1;
+<                 
+<                 skip--;
+<                 APP_DEBUG("Waiting %d second to force a session timeout (%d)\n", wait_secs, CONNECTOR_SM_TIMEOUT);
+<                 sleep(wait_secs);
+<                 return connector_callback_busy;
+<             }
+151a140
+> 
+171,190c160,162
+<             APP_DEBUG("Data Service status: ");
+<             switch(error_ptr->status)
+<             {
+<                 case connector_data_service_status_complete:
+<                     APP_DEBUG("connector_data_service_status_complete");
+<                     break;
+<                 case connector_data_service_status_cancel:
+<                     APP_DEBUG("connector_data_service_status_cancel");
+<                     break;
+<                 case connector_data_service_status_timeout:
+<                     APP_DEBUG("connector_data_service_status_timeout");
+<                     break;
+<                 case connector_data_service_status_session_error:
+<                     APP_DEBUG("connector_data_service_status_session_error");
+<                     break;
+<                 default:
+<                     APP_DEBUG("unkown");
+<                     break;
+<             }
+<             APP_DEBUG("\n");
+---
+> 
+>             APP_DEBUG("Data service error: %d\n", error_ptr->status);
+> 

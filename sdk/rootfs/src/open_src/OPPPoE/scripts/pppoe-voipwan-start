@@ -1,0 +1,243 @@
+#!/bin/sh
+
+# Check if exist multiwan index
+VOIPWAN=$1
+CONFIG=/etc/ppp/pppoe-voipwan.conf
+
+export CONFIG
+. $CONFIG
+
+. /usr/bin/scriptlib
+
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+VOIPWAN_RESOLV_CONF="/etc/ppp/voipwan_resolv.conf"
+MAX_COUNT=40
+
+if [ -n "$VOIPWAN" ] ; then
+	PIDFILE_PPPD="/var/run/ppp-pppoeVOIPWAN$VOIPWAN.pid"
+	TMP=$((VOIPWAN+1))
+	CNT_TYPE=`rdcsman 0x0004091$TMP u32`
+fi
+
+sl_get_VoIPWAN_DNS_in_resolv_conf()
+{
+	local _DNS1 _DNS2 CFG got cnt s 
+	
+	CFG=`cat $VOIPWAN_RESOLV_CONF`
+	
+	got=0
+	cnt=0
+	for s in $CFG
+	do
+   		if [ $got -eq 1 ] ; then        
+    		[ $cnt = 0 ] && _DNS1=$s
+    		[ $cnt = 1 ] && _DNS2=$s
+       		cnt=$(($cnt+1)) 	
+    		got=0
+    		continue       	
+   		fi
+
+   		if [ $s = "nameserver" ] ; then
+       		got=1
+   		fi
+	done
+	
+	eval $1=$_DNS1
+	eval $2=$_DNS2
+	return 0	
+}
+
+writeCSIDvalues () {
+	#Sleep < MAX_COUNT second to get PIDFILE_PPPD and PPP_IF
+	COUNT=1
+	while [ true ] ; do
+		if [ -r $PIDFILE_PPPD ] ; then
+			cp $PIDFILE_PPPD $PIDFILE_PPPD_BAK
+			sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+			if [ $? != 0 ] ; then
+				exit 1 	
+			elif [ -z $PPP_IF ] ; then
+				COUNT=$(($COUNT+1))
+			else
+				break;
+			fi
+		else
+			COUNT=$(($COUNT+1))
+		fi	
+		
+		if [ $COUNT -gt $MAX_COUNT ] ; then
+			exit 1
+		fi
+		sleep 1
+	done
+
+	#Sleep < MAX_COUNT second to get IF_IP
+	COUNT=1
+	while [ true ] ; do
+		sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+		if [ "$IF_IP" = "" ] ; then
+			COUNT=$(($COUNT+1))
+		else
+			break;
+		fi	
+
+		if [ "$IF_IP" = "" ] && [ $COUNT -gt $MAX_COUNT ] ; then
+			exit 1
+		fi
+		sleep 1
+	done
+	sl_get_VoIPWAN_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+	sl_get_uptime CNTTIME
+
+	if [ -n "$VOIPWAN" ] ; then
+		if [ "$IF_IP" = "10.64.64.64" ] ; then
+		#Got a fake IP, interface is disconnect
+			wrcsman "0x8004021$TMP 00 && \
+					 0x8004031$TMP 00 && \
+					 0x8004041$TMP 00 && \
+					 0x8004051$TMP 00 && \
+					 0x8004061$TMP 00 && \
+					 0x8001022$VOIPWAN 00 && \
+					 0x8001023$VOIPWAN 00 && \
+					 0x8001024$VOIPWAN 00 && \
+					 0x8001025$VOIPWAN 00 && \
+					 0x8001026$VOIPWAN 00 "
+			#manual or autoreconnect, but wan is unconnected.
+			wrcsman "0x8004071$TMP 0x00 && \
+				 	 0x8001027$VOIPWAN 0x00"
+
+		elif [ "$IF_IP" = "" ] ; then
+			#Got no IP, interface is disconnect
+            wrcsman "0x8004021$TMP 00 && \
+                     0x8004031$TMP 00 && \
+                     0x8004041$TMP 00 && \
+                     0x8004051$TMP 00 && \
+                     0x8004061$TMP 00 && \
+                     0x8001022$VOIPWAN 00 && \
+                     0x8001023$VOIPWAN 00 && \
+                     0x8001024$VOIPWAN 00 && \
+                     0x8001025$VOIPWAN 00 && \
+                     0x8001026$VOIPWAN 00 "
+			#disconnecting   
+			wrcsman "0x8004071$TMP 0x03 && \
+					 0x8001027$VOIPWAN 0x03"
+
+		else
+		#Got a real IP address
+			wrcsman "0x8004011$TMP $CNTTIME && \
+					 0x8004021$TMP {$IF_IP} && \
+					 0x8004031$TMP {$IF_NM} && \
+					 0x8004041$TMP {$IF_GW} && \
+					 0x8004051$TMP {$IF_DNS1} && \
+					 0x8004061$TMP {$IF_DNS2} && \
+					 0x8004071$TMP 0x02 && \
+					 0x8001022$VOIPWAN {$IF_IP} && \
+					 0x8001023$VOIPWAN {$IF_NM} && \
+					 0x8001024$VOIPWAN {$IF_GW} && \
+		             0x8001025$VOIPWAN {$IF_DNS1} && \
+				     0x8001026$VOIPWAN {$IF_DNS2} && \
+		             0x800102a$VOIPWAN \"$PPP_IF && \
+					 0x8001027$VOIPWAN 0x02"
+		fi
+	fi
+
+	rm -rf $VOIPWAN_RESOLV_CONF
+}
+
+#clear last ppp auth fail tmp file
+rm -rf /var/run/ppp_auth_fail
+
+# Check for $PIDFILE.connect
+if [ -r "$PIDFILE_CONNECT" ] ; then
+    PID=`cat "$PIDFILE_CONNECT"`
+    # Check if still running
+    kill -0 $PID > /dev/null 2>&1
+    if [ $? = 0 ] ; then
+		echo "$0: There already seems to be a PPPoE connection up (PID $PID)" >& 2
+		exit 0
+    fi
+    # Delete bogus PIDFILE
+    rm -f "$PIDFILE_CONNECT" "$PIDFILE_START"
+fi
+
+echo $$ > $PIDFILE_START
+
+pppoe-voipwan-connect "$@" > /dev/null 2>&1 &
+#pppoe-connect "$@" &
+
+CONNECT_PID=$!
+
+if [ "$CONNECT_TIMEOUT" = "" -o "$CONNECT_TIMEOUT" = 0 ] ; then
+    exit 0
+fi
+
+writeCSIDvalues
+
+# Don't monitor connection if dial-on-demand
+if [ "$DEMAND" != "" -a "$DEMAND" != "no" ] ; then
+    exit 0
+fi
+
+# Monitor connection
+TIME=0
+CONNECT_POLL=1
+CONNECT_TIMEOUT=20
+RESOLV_CONF="/etc/resolv.conf"
+PPP_RESOLV_CONF="/etc/ppp/resolv.conf"
+while [ true ] ; do
+	if [ -n "$VOIPWAN" ] ; then
+		route del -net 0.0.0.0 dev $PPP_IF
+		echo "route del -net 0.0.0.0 dev $PPP_IF"
+		pppoe-voipwan-status $VOIPWAN > /dev/null 2>&1
+	fi
+    #pppoe-status $CONFIG
+    # Looks like the interface came up
+    if [ $? = 0 ] ; then
+		echo "$0: Connected!"
+		#sleep 2  #Important! it must be waited for pppd writing the csids	
+		#Bug: while initilizing VoIPWAN, /etc/ppp/resolv.conf should be created, and copy the result to /etc/resolv.conf
+		#     but it doesn't. 
+		#     so we create /etc/resolv.conf here
+		if [ -n "$VOIPWAN" ] ; then
+			echo -n > $RESOLV_CONF"voipwan$VOIPWAN"
+			pridns=`rdcsman 0x8004051$TMP ipv4`
+			secdns=`rdcsman 0x8004061$TMP ipv4`
+			if [ $secdns == "0.0.0.0" -a $pridns == "0.0.0.0" ] ; then
+				#this case is for ppp0 is up, but DNS of VoIPWAN is NULL
+				pppoe-voipwan-action restart $VOIPWAN > /dev/null 2>&1
+			else
+				if [ ! $pridns == "0.0.0.0" ] ; then
+					echo nameserver $pridns >> $RESOLV_CONF"voipwan$VOIPWAN"
+				fi
+				if [ ! $secdns == "0.0.0.0" ] ; then
+					echo nameserver $secdns >> $RESOLV_CONF"voipwan$VOIPWAN"
+				fi
+			fi
+		fi
+		exit 0
+    fi
+
+	if [ -f /var/run/ppp_auth_fail ] ; then
+		echo "$0: Authentication Fail!"
+		if [ -n "$VOIPWAN" ] ; then
+			wrcsman	"0x8001027$VOIPWAN 0x06 &&\
+					 0x8004071$TMP 0x06"
+		fi
+		exit 0
+	fi
+
+    sleep $CONNECT_POLL
+    TIME=$(($TIME + $CONNECT_POLL))
+    if [ $TIME -gt $CONNECT_TIMEOUT ] ; then
+	break
+    fi
+done
+
+echo "TIMED OUT" >& 2
+
+# Clean up PIDFILE(s)
+rm -f "$PIDFILE_START"
+
+exit 1
+

@@ -1,0 +1,537 @@
+#!/bin/bash
+#
+# Script for check Strongswan UCI configuration
+#
+
+export UCI_CONFIG_DIR="/home/digi"
+
+CONFIGFILE="/etc/ipsec.conf"
+SECRETFILE="/etc/ipsec.secrets"
+CHECKRESULT="/home/digi/ipsec_test_result"
+
+. /lib/functions.sh
+. /lib/config/uci.sh
+
+
+#####################Default Values#####################
+default_state="off"
+default_local="%any"
+default_peer=""
+default_local_network=""
+default_local_netmask=""
+default_remote_network=""
+default_remote_netmask=""
+default_esp_authentication="sha1"
+default_esp_encryption="aes128"
+default_esp_diffie_hellman="modp1024"
+default_auth_by="psk"
+default_local_id=""
+default_local_psk=""
+default_remote_id=""
+default_remote_psk=""
+default_ike="1"
+default_ike_mode="main"
+default_ike_encryption="aes128"
+default_ike_authentication="sha1"
+default_ike_diffie_hellman="modp1024"
+default_ike_lifetime="3600"
+default_ike_tries="3"
+default_lifebytes="1m"
+default_margintime="540"
+default_marginbytes="100k"
+default_random="100"
+default_dpddelay="30"
+default_dpdtimeout="150"
+default_dpdaction="none"
+###############################################################
+
+ipsec_tun_config(){
+	
+	local cfg="$1"
+	echo "******************************************************************************************************">> $CHECKRESULT
+	config_get state $cfg state $default_state
+
+ if [ "$state" == "off" ]; then
+        #######state is off, not need to check#######
+        echo "=====$section state is $state , not need to check config!!=====" >> $CHECKRESULT
+        return 0
+ else
+		#initial counter
+		total=0
+		success=0
+		fail=0
+		#######state is on, check config#######
+		echo "=====$section state is $state , check config!!=====" >> $CHECKRESULT
+		
+		check_start="conn $section"
+		check_end="###conn_$section"_"config_end###"
+		echo "Check range from \"$check_start\" to \"$check_end\"" >> $CHECKRESULT
+		#######Check conn#######
+        check_string="conn $section"
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+         echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		 total=$(($total+1))
+		 fail=$(($fail+1))
+        else
+         echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		 total=$(($total+1))
+		 success=$(($success+1))
+        fi
+		
+		#######Check "auto"#######
+        check_string=" auto=start"
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+         echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		 total=$(($total+1))
+		 fail=$(($fail+1))
+        else
+         echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		 total=$(($total+1))
+		 success=$(($success+1))
+        fi
+		
+		#######Check "local"#######
+		config_get local $cfg local $default_local
+		if [ -n "$local" ]; then
+           check_string=" left=$local"
+           if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+              echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			  total=$(($total+1))
+              fail=$(($fail+1))
+           else
+              echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      success=$(($success+1))
+           fi
+        fi
+		#######Check "peer"#######
+		config_get peer $cfg peer $default_peer
+		if [ -n "$peer" ]; then
+           check_string=" right=$peer"
+           if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+              echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      fail=$(($fail+1))
+           else
+              echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      success=$(($success+1))
+           fi
+        fi
+		
+		#######Check remote_network & remote_netmask#######
+		config_get remote_network $cfg remote_network $default_remote_network
+		config_get remote_netmask $cfg remote_netmask $default_remote_netmask
+        if [ -n "$remote_network" ] && [ -n "$remote_netmask" ]; then
+           check_string=" rightsubnet=$remote_network/$remote_netmask"
+           if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+              echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      fail=$(($fail+1))
+           else
+              echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      success=$(($success+1))
+           fi
+        fi
+		
+		#######Check local_network & local_netmask#######
+		config_get local_network $cfg local_network $default_local_network
+		config_get local_netmask $cfg local_netmask $default_local_netmask
+        if [ -n "$local_network" ] && [ -n "$local_netmask" ]; then
+           check_string=" leftsubnet=$local_network/$local_netmask"
+           if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+              echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      fail=$(($fail+1))
+           else
+              echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      success=$(($success+1))
+           fi
+        fi
+		
+		#######Check phase2 encryption & authentication#######
+		config_get esp_authentication $cfg esp_authentication $default_esp_authentication
+		config_get esp_encryption $cfg esp_encryption $default_esp_encryption
+		config_get esp_diffie_hellman $cfg esp_diffie_hellman $default_esp_diffie_hellman
+        check_string=" esp=$esp_encryption"-"$esp_authentication"-"$esp_diffie_hellman!"
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		#######Check authby#######
+		config_get auth_by $cfg auth_by $default_auth_by
+        check_string=" authby=$auth_by"
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		#######Check local_id & remote_id#######
+		config_get local_id $cfg local_id $default_local_id
+		config_get remote_id $cfg remote_id $default_remote_id
+		config_get local_psk $cfg local_psk $default_local_psk
+		config_get remote_psk $cfg remote_psk $default_remote_psk
+		if [ -n "$local_id" ]; then
+           check_string=" leftid=$local_id"
+           if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+              echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      fail=$(($fail+1))
+           else
+              echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      success=$(($success+1))
+           fi
+		  #######Check local_psk#######
+		  config_get local_psk $cfg local_psk $default_local_psk
+           if [ -n "$local_psk" ]; then
+		      compare_string="\"$local_id\" : PSK \"$local_psk\""
+              if [ "`grep -wc \"$compare_string\" $SECRETFILE`" == "0" ]; then
+                 echo "Can't find \"$compare_string\" .......... Check fail !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         fail=$(($fail+1))
+              else
+                 echo "Find \"$compare_string\" .......... Check success !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         success=$(($success+1))
+              fi
+           fi
+        else
+             if [ -n "$local_psk" ]; then
+				compare_string="$local : PSK \"$local_psk\""
+                if [ "`grep -wc \"$compare_string\" $SECRETFILE`" == "0" ]; then
+                   echo "Can't find \"$compare_string\" .......... Check fail !!" >> $CHECKRESULT
+				   total=$(($total+1))
+		           fail=$(($fail+1))
+                else
+                   echo "Find \"$compare_string\" .......... Check success !!" >> $CHECKRESULT
+				   total=$(($total+1))
+		           success=$(($success+1))
+                fi
+             fi
+        fi
+		
+       if [ -n "$remote_id" ]; then
+           check_string=" rightid=$remote_id"
+           if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+              echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      fail=$(($fail+1))
+           else
+              echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      success=$(($success+1))
+           fi
+		  #######Check remote_psk#######
+		  config_get remote_psk $cfg remote_psk $default_remote_psk
+           if [ -n "$remote_psk" ]; then
+		      compare_string="\"$remote_id\" : PSK \"$remote_psk\""
+              if [ "`grep -wc \"$compare_string\" $SECRETFILE`" == "0" ]; then
+                 echo "Can't find \"$compare_string\" .......... Check fail !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         fail=$(($fail+1))
+              else
+                 echo "Find \"$compare_string\" .......... Check success !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         success=$(($success+1))
+              fi
+           fi
+       else
+             if [ -n "$remote_psk" ]; then
+			    compare_string="$peer : PSK \"$remote_psk\""
+                if [ "`grep -wc \"$compare_string\" $SECRETFILE`" == "0" ]; then
+                   echo "Can't find \"$compare_string\" .......... Check fail !!" >> $CHECKRESULT
+				   total=$(($total+1))
+		           fail=$(($fail+1))
+                else
+                   echo "Find \"$compare_string\" .......... Check success !!" >> $CHECKRESULT
+				   total=$(($total+1))
+		           success=$(($success+1))
+                fi
+             fi
+       fi
+		#######Check ike version#######
+		config_get ike $cfg ike $default_ike
+       if [ "$ike" = "1" ]; then
+          check_string=" keyexchange=ikev1"
+          if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+             echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     fail=$(($fail+1))
+          else
+             echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		     total=$(($total+1))
+		     success=$(($success+1))
+          fi
+       elif [ "$ike" = "2" ]; then
+          check_string=" keyexchange=ikev2"
+          if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+             echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     fail=$(($fail+1))
+          else
+             echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     success=$(($success+1))
+          fi
+       else
+          check_string=" keyexchange=ike"
+          if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+             echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     fail=$(($fail+1))
+          else
+             echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     success=$(($success+1))
+          fi
+       fi
+		
+		#######Check ike mode#######
+		config_get ike_mode $cfg ike_mode $default_ike_mode
+       if [ "$ike_mode" = "main" ]; then
+          check_string=" aggressive=no"
+          if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+             echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     fail=$(($fail+1))
+          else
+             echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     success=$(($success+1))
+          fi
+       else
+          check_string=" aggressive=yes"
+          if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+             echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     fail=$(($fail+1))
+          else
+             echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     success=$(($success+1))
+          fi
+       fi
+		
+		#######Check phase1 encryption & authentication#######
+		config_get ike_authentication $cfg ike_authentication $default_ike_authentication
+		config_get ike_encryption $cfg ike_encryption $default_ike_encryption
+		config_get ike_diffie_hellman $cfg ike_diffie_hellman $ike_diffie_hellman
+        check_string=" ike=$ike_encryption-$ike_authentication-$ike_diffie_hellman!"
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		#######Check ike lifetime & tries & bytes#######
+		config_get ike_lifetime $cfg ike_lifetime $default_ike_lifetime
+        check_string=" ikelifetime=$ike_lifetime"s""
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		config_get ike_tries $cfg ike_tries $default_ike_tries
+		check_string=" keyingtries=$ike_tries"
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+          echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		  total=$(($total+1))
+		  fail=$(($fail+1))
+        else
+          echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		  total=$(($total+1))
+		  success=$(($success+1))
+        fi
+		#######Write ike lifebytes#######
+		config_get lifebytes $cfg lifebytes $default_lifebytes
+		m_count="`echo "$lifebytes" | grep -c m`"
+        if [ "$m_count" = "0" ]; then
+		   #units is not m
+           k_count="`echo "$lifebytes" | grep -c k`"
+           if [ "$k_count" = "0" ]; then
+           #units is not m and k
+              check_string=" lifebytes=$lifebytes"
+              if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+                 echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         fail=$(($fail+1))
+              else
+                 echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         success=$(($success+1))
+              fi
+          else
+		  #units is k
+		      lifebytes_value="`echo "$lifebytes" |  cut -d 'k' -f 1`"
+              check_string=" lifebytes=$lifebytes_value"000""
+              if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+                 echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         fail=$(($fail+1))
+              else
+                 echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         success=$(($success+1))
+               fi
+          fi
+		else
+		 #units is m
+		  lifebytes_value="`echo "$lifebytes" |  cut -d 'm' -f 1`"
+          check_string=" lifebytes=$lifebytes_value"000000""
+          if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+             echo "Can't find \"%check_string\" .......... Check fail !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     fail=$(($fail+1))
+          else
+             echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			 total=$(($total+1))
+		     success=$(($success+1))
+          fi
+        fi
+		
+		#######Write margin time & bytes#######
+		config_get margintime $cfg margintime $default_margintime
+        check_string=" margintime=$margintime"s""
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+        config_get marginbytes $cfg marginbytes $default_marginbytes
+        m_count="`echo "$marginbytes" | grep -c m`"
+        if [ "$m_count" = "0" ]; then
+           #units is not m
+           k_count="`echo "$marginbytes" | grep -c k`"
+           if [ "$k_count" = "0" ]; then
+               #units is not m and k
+              check_string=" marginbytes=$marginbytes"
+              if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+                 echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         fail=$(($fail+1))
+              else
+                 echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+                 total=$(($total+1))
+		         success=$(($success+1))
+			 fi
+          else
+           #units is k
+           marginbytes_value="`echo "$marginbytes" |  cut -d 'k' -f 1`"
+              check_string=" marginbytes=$marginbytes_value"000""
+              if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+                 echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         fail=$(($fail+1))
+              else
+                 echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+				 total=$(($total+1))
+		         success=$(($success+1))
+              fi
+          fi
+		else
+           #units is m
+           marginbytes_value="`echo "$marginbytes" |  cut -d 'm' -f 1`"
+           echo " marginbytes=$marginbytes_value"000000" " >> $CONFIGFILE
+           check_string=" marginbytes=$marginbytes_value"000000""
+           if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+              echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      fail=$(($fail+1))
+           else
+              echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+			  total=$(($total+1))
+		      success=$(($success+1))
+           fi
+        fi
+		
+		#######Write random#######
+		config_get random $cfg random $default_random
+        check_string=" rekeyfuzz=$random"%""
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		
+		#######Write dpd parameters#######
+		config_get dpdaction $cfg dpdaction $default_dpdaction
+        check_string=" dpdaction=$dpdaction"
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		config_get dpddelay $cfg dpddelay $default_dpddelay
+        check_string=" dpddelay=$dpddelay"s""
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		config_get dpdtimeout $cfg dpdtimeout $default_dpdtimeout
+        check_string=" dpdtimeout=$dpdtimeout"s""
+        if [ "`awk "/$check_start/,/$check_end/" $CONFIGFILE | grep -c "$check_string"`" == "0" ]; then
+           echo "Can't find \"$check_string\" .......... Check fail !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   fail=$(($fail+1))
+        else
+           echo "Find \"$check_string\" .......... Check success !!" >> $CHECKRESULT
+		   total=$(($total+1))
+		   success=$(($success+1))
+        fi
+		echo "==========\"$section\" check result==========" >> $CHECKRESULT
+		echo "  *Total:$total	*Success:$success	*Fail:$fail " >> $CHECKRESULT
+		echo "=============================================" >> $CHECKRESULT
+
+ fi	
+
+}
+
+#
+# Starts here
+#
+
+[ -f "$CHECKRESULT" ] && rm -f "$CHECKRESULT"
+config_load ipsec
+
+echo "=====Start Check Strongswan config=====" >> $CHECKRESULT
+
+# each tunnel config
+config_foreach ipsec_tun_config ipsec
+echo "******************************************************************************************************">> $CHECKRESULT
+echo "=====Check Strongswan config done=====">> $CHECKRESULT

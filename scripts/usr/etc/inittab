@@ -1,0 +1,6 @@
+# < id >:< runlevels >:< action >:< process >
+::sysinit:/bin/mount -a
+::respawn:/usr/bin/nlmon &>/dev/null
+::sysinit:/usr/etc/init.d/rcS
+ttyUSB3::respawn:/usr/bin/cli -m serial1
+::once:/usr/etc/init.d/autorun_cmds.sh &>/dev/null

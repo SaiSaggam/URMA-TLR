@@ -1,0 +1,49 @@
+#!/bin/sh
+
+export UCI_CONFIG_DIR="/home/digi/uci"
+OPERATIONFILE="/home/digi/uci/ntpclient_operation"
+
+. /home/digi/uci/functions.sh
+
+default_interval="600"
+default_freq="0"
+default_hostname=""
+default_port=""
+
+ntpclient_interval()
+{
+        local cfg="$1"
+        config_get interval $cfg interval $default_interval
+}
+
+ntpclient_freq()
+{
+        local cfg="$1"
+        config_get freq $cfg freq $default_freq
+}
+
+ntpclient_server_add()
+{
+        local cfg="$1"
+        config_get hostname $cfg hostname $default_hostname
+        config_get port $cfg port $default_port
+
+        if [ -n "$port" ]; then
+                echo "ntpclient -s -i $interval -f $freq -h $hostname -p $port" >> $OPERATIONFILE
+        else
+                echo "ntpclient -s -i $interval -f $freq -h $hostname" >> $OPERATIONFILE
+        fi
+}
+
+#start here
+
+[ -f "$OPERATIONFILE" ] && rm -f "$OPERATIONFILE"
+
+config_load ntpclient_config
+
+config_foreach ntpclient_interval ntpclient
+config_foreach ntpclient_freq ntpdrift
+config_foreach ntpclient_server_add ntpserver          
+
+echo "convert finish."                                                                                                                                                                            
+

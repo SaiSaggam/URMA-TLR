@@ -1,0 +1,10 @@
+DSL Status and Statistics
+-------------------------
+Description      :
+Admin Status     : Down
+Oper Status      : Down
+HW Version       :
+FW Version       :
+System FW ID     :
+
+Line Status      :

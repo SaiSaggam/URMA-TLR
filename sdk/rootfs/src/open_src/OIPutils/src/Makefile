@@ -1,0 +1,122 @@
+#
+# Configuration
+#
+
+# Libraries
+ADDLIB=
+# Linker flags
+LDFLAG_STATIC=-Wl,-Bstatic
+LDFLAG_DYNAMIC=-Wl,-Bdynamic
+LDFLAG_CAP=-lcap
+LDFLAG_GCRYPT=-lgcrypt
+LDFLAG_CRYPTO=-lcrypto
+LDFLAG_IDN=-lidn
+LDFLAG_RESOLV=-lresolv
+LDFLAG_SYSFS=-lsysfs
+
+#
+# Options
+#
+
+# Capability support (with libcap) [yes|static|no]
+USE_CAP=no
+# sysfs support (with libsysfs - deprecated) [no|yes|static]
+USE_SYSFS=no
+# IDN support (experimental) [no|yes|static]
+USE_IDN=no
+
+# Do not use getifaddrs [no|yes|static]
+WITHOUT_IFADDRS=yes
+
+# Libgcrypt (for MD5) for ping6 [yes|no|static]
+USE_GCRYPT=no
+# Crypto library for ping6 [shared|static|no]
+USE_CRYPTO=no
+# Resolv library for ping6 [yes|static]
+USE_RESOLV=yes
+
+# -------------------------------------
+# What a pity, all new gccs are buggy and -Werror does not work. Sigh.
+# CCOPT=-fno-strict-aliasing -Wstrict-prototypes -Wall -Werror -g
+CCOPT=-fno-strict-aliasing -Wstrict-prototypes -Wall -g
+CCOPTOPT=-O3
+GLIBCFIX=-D_GNU_SOURCE
+DEFINES=
+LDLIB=
+
+FUNC_LIB = $(if $(filter static,$(1)),$(LDFLAG_STATIC) $(2) $(LDFLAG_DYNAMIC),$(2))
+
+# USE_GCRYPT: DEF_GCRYPT, LIB_GCRYPT
+# USE_CRYPTO: LIB_CRYPTO
+ifneq ($(USE_GCRYPT),no)
+	LIB_CRYPTO = $(call FUNC_LIB,$(USE_GCRYPT),$(LDFLAG_GCRYPT))
+	DEF_CRYPTO = -DUSE_GCRYPT
+else
+ifneq ($(USE_CRYPTO),no)
+	LIB_CRYPTO = $(call FUNC_LIB,$(USE_CRYPTO),$(LDFLAG_CRYPTO))
+	DEF_CRYPTO = -DUSE_OPENSSL
+endif
+endif
+
+# USE_RESOLV: LIB_RESOLV
+LIB_RESOLV = $(call FUNC_LIB,$(USE_RESOLV),$(LDFLAG_RESOLV))
+
+# USE_CAP:  DEF_CAP, LIB_CAP
+ifneq ($(USE_CAP),no)
+	DEF_CAP = -DCAPABILITIES
+	LIB_CAP = $(call FUNC_LIB,$(USE_CAP),$(LDFLAG_CAP))
+endif
+
+# USE_SYSFS: DEF_SYSFS, LIB_SYSFS
+ifneq ($(USE_SYSFS),no)
+	DEF_SYSFS = -DUSE_SYSFS
+	LIB_SYSFS = $(call FUNC_LIB,$(USE_SYSFS),$(LDFLAG_SYSFS))
+endif
+
+# USE_IDN: DEF_IDN, LIB_IDN
+ifneq ($(USE_IDN),no)
+	DEF_IDN = -DUSE_IDN
+	LIB_IDN = $(call FUNC_LIB,$(USE_IDN),$(LDFLAG_IDN))
+endif
+
+# WITHOUT_IFADDRS: DEF_WITHOUT_IFADDRS
+ifneq ($(WITHOUT_IFADDRS),no)
+	DEF_WITHOUT_IFADDRS = -DWITHOUT_IFADDRS
+endif
+
+# -------------------------------------
+IPV4_TARGETS=ping
+IPV6_TARGETS=ping6
+TARGETS=$(IPV4_TARGETS) $(IPV6_TARGETS)
+
+CFLAGS=$(CCOPTOPT) $(CCOPT) $(GLIBCFIX) $(DEFINES)
+LDLIBS=$(LDLIB) $(ADDLIB)
+
+# -------------------------------------
+.PHONY: all clean
+
+all: $(TARGETS)
+
+%.s: %.c
+	$(COMPILE.c) $< $(DEF_$(patsubst %.o,%,$@)) -S -o $@
+%.o: %.c
+	$(COMPILE.c) $< $(DEF_$(patsubst %.o,%,$@)) -o $@
+$(TARGETS): %: %.o
+	$(LINK.o) $^ $(LIB_$@) $(LDLIBS) -o $@
+
+# -------------------------------------
+# ping / ping6
+DEF_ping_common = $(DEF_CAP) $(DEF_IDN)
+DEF_ping  = $(DEF_CAP) $(DEF_IDN) $(DEF_WITHOUT_IFADDRS)
+LIB_ping  = $(LIB_CAP) $(LIB_IDN)
+DEF_ping6 = $(DEF_CAP) $(DEF_IDN) $(DEF_WITHOUT_IFADDRS) $(DEF_CRYPTO)
+LIB_ping6 = $(LIB_CAP) $(LIB_IDN) $(LIB_RESOLV) $(LIB_CRYPTO)
+
+ping: ping_common.o
+ping6: ping_common.o
+ping.o ping_common.o: ping_common.h
+ping6.o: ping_common.h in6_flowlabel.h
+
+# -------------------------------------
+clean:
+	@rm -f *.o $(TARGETS)

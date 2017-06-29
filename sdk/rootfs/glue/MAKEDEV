@@ -1,0 +1,813 @@
+#!/bin/sh
+#	$Id: MAKEDEV,v 1.8 2003/04/01 19:43:06 awarner Exp $
+
+DST_DIR=$1/dev
+CONFIG=../../project_config/project.config
+RT6856=`cat $CONFIG | grep "CP_RT6856_BIN=1"`
+MT7620=`cat $CONFIG | grep "CP_MT7620_BIN=1"`
+TC3262=`cat $CONFIG | grep "TC3262=1"`
+MT7621=`cat $CONFIG | grep "KERNEL_SDK=41007621"`
+
+[ $1 = "" ] && exit 1
+
+#Make Node for DB25 parallel port by stanley
+mknod -m 755 ${DST_DIR}/lp0 c 6 0
+mknod -m 755 ${DST_DIR}/lp1 c 6 1
+
+#Make cdrom device node
+mknod -m 660 ${DST_DIR}/scd0 b 11 0 
+mknod -m 660 ${DST_DIR}/scd1 b 11 1 
+mknod -m 660 ${DST_DIR}/scd2 b 11 2 
+mknod -m 660 ${DST_DIR}/scd3 b 11 3 
+mknod -m 660 ${DST_DIR}/scd4 b 11 4 
+mknod -m 660 ${DST_DIR}/scd5 b 11 5 
+mknod -m 660 ${DST_DIR}/scd6 b 11 6 
+mknod -m 660 ${DST_DIR}/scd7 b 11 7 
+mknod -m 660 ${DST_DIR}/scd8 b 11 8 
+mknod -m 660 ${DST_DIR}/scd9 b 11 9 
+mknod -m 660 ${DST_DIR}/scd10 b 11 10 
+mknod -m 660 ${DST_DIR}/scd11 b 11 11 
+mknod -m 660 ${DST_DIR}/scd12 b 11 12 
+mknod -m 660 ${DST_DIR}/scd13 b 11 13 
+mknod -m 660 ${DST_DIR}/scd14 b 11 14 
+mknod -m 660 ${DST_DIR}/scd15 b 11 15 
+
+mknod -m 660 ${DST_DIR}/ttyACM0 c 166 0
+mknod -m 660 ${DST_DIR}/ttyACM1 c 166 1
+mknod -m 660 ${DST_DIR}/ttyACM2 c 166 2
+mknod -m 660 ${DST_DIR}/ttyACM3 c 166 3
+mknod -m 660 ${DST_DIR}/ttyACM4 c 166 4
+mknod -m 660 ${DST_DIR}/ttyACM5 c 166 5
+mknod -m 660 ${DST_DIR}/ttyACM6 c 166 6
+mknod -m 660 ${DST_DIR}/ttyACM7 c 166 7
+mknod -m 660 ${DST_DIR}/ttyACM8 c 166 8
+mknod -m 660 ${DST_DIR}/ttyACM9 c 166 9
+mknod -m 660 ${DST_DIR}/ttyACM10 c 166 10
+mknod -m 660 ${DST_DIR}/ttyACM11 c 166 11
+mknod -m 660 ${DST_DIR}/ttyACM12 c 166 12
+
+mknod ${DST_DIR}/noz0 c 241 0
+mknod ${DST_DIR}/noz2 c 241 2
+
+mknod -m 660 ${DST_DIR}/ttyHS0 c 251 0
+mknod -m 660 ${DST_DIR}/ttyHS1 c 251 1
+mknod -m 660 ${DST_DIR}/ttyHS2 c 251 2
+mknod -m 660 ${DST_DIR}/ttyHS3 c 251 3
+mknod -m 660 ${DST_DIR}/ttyHS4 c 251 4
+mknod -m 660 ${DST_DIR}/ttyHS5 c 251 5
+mknod -m 660 ${DST_DIR}/ttyHS6 c 251 6
+mknod -m 660 ${DST_DIR}/ttyHS7 c 251 7
+#mknod -m 660 ${DST_DIR}/scd0 b 11 0
+
+#Make Node for usbserial device
+mknod -m 660 ${DST_DIR}/ttyUSB0 c 188 0
+mknod -m 660 ${DST_DIR}/ttyUSB1 c 188 1
+mknod -m 660 ${DST_DIR}/ttyUSB2 c 188 2
+mknod -m 660 ${DST_DIR}/ttyUSB3 c 188 3
+mknod -m 660 ${DST_DIR}/ttyUSB4 c 188 4
+mknod -m 660 ${DST_DIR}/ttyUSB5 c 188 5
+mknod -m 660 ${DST_DIR}/ttyUSB6 c 188 6
+mknod -m 660 ${DST_DIR}/ttyUSB7 c 188 7
+mknod -m 660 ${DST_DIR}/ttyUSB8 c 188 8
+mknod -m 660 ${DST_DIR}/ttyUSB9 c 188 9
+mknod -m 660 ${DST_DIR}/ttyUSB10 c 188 10
+mknod -m 660 ${DST_DIR}/ttyUSB11 c 188 11
+mknod -m 660 ${DST_DIR}/ttyUSB12 c 188 12
+mknod -m 660 ${DST_DIR}/ttyUSB13 c 188 13
+mknod -m 660 ${DST_DIR}/ttyUSB14 c 188 14
+mknod -m 660 ${DST_DIR}/ttyUSB15 c 188 15
+
+mknod -m 660 ${DST_DIR}/ttyIPWp0 c 250 0
+mknod -m 660 ${DST_DIR}/ttyIPWp8 c 250 8
+
+mknod -m 660 ${DST_DIR}/VIAUSBModem0 c 167 0
+
+mknod -m 660 ${DST_DIR}/hda b 3 0 
+mknod -m 660 ${DST_DIR}/hda1 b 3 1 
+mknod -m 660 ${DST_DIR}/hda2 b 3 2 
+mknod -m 660 ${DST_DIR}/hda3 b 3 3 
+mknod -m 660 ${DST_DIR}/hda4 b 3 4 
+mknod -m 660 ${DST_DIR}/hda5 b 3 5 
+mknod -m 660 ${DST_DIR}/hda6 b 3 6 
+mknod -m 660 ${DST_DIR}/hda7 b 3 7 
+mknod -m 660 ${DST_DIR}/hda8 b 3 8 
+mknod -m 660 ${DST_DIR}/hdb b 3 64	
+mknod -m 660 ${DST_DIR}/hdb1 b 3 65 
+mknod -m 660 ${DST_DIR}/hdb2 b 3 66 
+mknod -m 660 ${DST_DIR}/hdb3 b 3 67 
+mknod -m 660 ${DST_DIR}/hdb4 b 3 68 
+mknod -m 660 ${DST_DIR}/hdb5 b 3 69 
+mknod -m 660 ${DST_DIR}/hdb6 b 3 70 
+mknod -m 660 ${DST_DIR}/hdb7 b 3 71 
+mknod -m 660 ${DST_DIR}/hdb8 b 3 72 
+mknod -m 660 ${DST_DIR}/hdc b 22 0 
+mknod -m 660 ${DST_DIR}/hdc1 b 22 1 
+mknod -m 660 ${DST_DIR}/hdc2 b 22 2 
+mknod -m 660 ${DST_DIR}/hdc3 b 22 3 
+mknod -m 660 ${DST_DIR}/hdc4 b 22 4 
+mknod -m 660 ${DST_DIR}/hdc5 b 22 5 
+mknod -m 660 ${DST_DIR}/hdc6 b 22 6 
+mknod -m 660 ${DST_DIR}/hdc7 b 22 7 
+mknod -m 660 ${DST_DIR}/hdc8 b 22 8 
+mknod -m 660 ${DST_DIR}/hdd b 22 64 
+mknod -m 660 ${DST_DIR}/hdd1 b 22 65 
+mknod -m 660 ${DST_DIR}/hdd2 b 22 66 
+mknod -m 660 ${DST_DIR}/hdd3 b 22 67 
+mknod -m 660 ${DST_DIR}/hdd4 b 22 68 
+mknod -m 660 ${DST_DIR}/hdd5 b 22 69 
+mknod -m 660 ${DST_DIR}/hdd6 b 22 70 
+mknod -m 660 ${DST_DIR}/hdd7 b 22 71 
+mknod -m 660 ${DST_DIR}/hdd8 b 22 72 
+
+#Make Node for IDE Hard Disk by Laroche
+#mknod -m 660 ${DST_DIR}/hde b 33 0 
+#mknod -m 660 ${DST_DIR}/hde1 b 33 1 
+#mknod -m 660 ${DST_DIR}/hde2 b 33 2 
+#mknod -m 660 ${DST_DIR}/hde3 b 33 3 
+#mknod -m 660 ${DST_DIR}/hde4 b 33 4 
+#mknod -m 660 ${DST_DIR}/hde5 b 33 5 
+#mknod -m 660 ${DST_DIR}/hde6 b 33 6 
+#mknod -m 660 ${DST_DIR}/hdf b 33 64 
+#mknod -m 660 ${DST_DIR}/hdf1 b 33 65 
+#mknod -m 660 ${DST_DIR}/hdf2 b 33 66 
+#mknod -m 660 ${DST_DIR}/hdf3 b 33 67 
+#mknod -m 660 ${DST_DIR}/hdf4 b 33 68 
+#mknod -m 660 ${DST_DIR}/hdf5 b 33 69 
+#mknod -m 660 ${DST_DIR}/hdf6 b 33 70 
+
+#Make Node for USB Printer by Laroche
+mknod -m 755 ${DST_DIR}/usblp0 c 180  0
+mknod -m 755 ${DST_DIR}/usblp1 c 180  1
+mknod -m 755 ${DST_DIR}/usblp2 c 180  2
+mknod -m 755 ${DST_DIR}/usblp3 c 180  3
+mknod -m 755 ${DST_DIR}/cdc-wdm0 c 180  176
+mknod -m 755 ${DST_DIR}/cdc-wdm1 c 180  177
+mknod -m 755 ${DST_DIR}/cdc-wdm2 c 180  178
+mknod -m 755 ${DST_DIR}/cdc-wdm3 c 180  179
+
+#   Make Node for USB Device by Laroche
+mknod -m 755 ${DST_DIR}/sda b 8 0 
+mknod -m 755 ${DST_DIR}/sda1 b 8 1 
+mknod -m 755 ${DST_DIR}/sda2 b 8 2 
+mknod -m 755 ${DST_DIR}/sda3 b 8 3 
+mknod -m 755 ${DST_DIR}/sda4 b 8 4 
+mknod -m 755 ${DST_DIR}/sda5 b 8 5 
+mknod -m 755 ${DST_DIR}/sda6 b 8 6 
+mknod -m 755 ${DST_DIR}/sda7 b 8 7 
+mknod -m 755 ${DST_DIR}/sda8 b 8 8 
+mknod -m 755 ${DST_DIR}/sda9 b 8 9 
+mknod -m 755 ${DST_DIR}/sda10 b 8 10 
+mknod -m 755 ${DST_DIR}/sda11 b 8 11 
+mknod -m 755 ${DST_DIR}/sda12 b 8 12 
+mknod -m 755 ${DST_DIR}/sda13 b 8 13 
+mknod -m 755 ${DST_DIR}/sda14 b 8 14 
+mknod -m 755 ${DST_DIR}/sda15 b 8 15 
+mknod -m 755 ${DST_DIR}/sdb b 8 16 
+mknod -m 755 ${DST_DIR}/sdb1 b 8 17 
+mknod -m 755 ${DST_DIR}/sdb2 b 8 18 
+mknod -m 755 ${DST_DIR}/sdb3 b 8 19 
+mknod -m 755 ${DST_DIR}/sdb4 b 8 20 
+mknod -m 755 ${DST_DIR}/sdb5 b 8 21 
+mknod -m 755 ${DST_DIR}/sdb6 b 8 22 
+mknod -m 755 ${DST_DIR}/sdb7 b 8 23 
+mknod -m 755 ${DST_DIR}/sdb8 b 8 24 
+mknod -m 755 ${DST_DIR}/sdb9 b 8 25 
+mknod -m 755 ${DST_DIR}/sdb10 b 8 26 
+mknod -m 755 ${DST_DIR}/sdb11 b 8 27 
+mknod -m 755 ${DST_DIR}/sdb12 b 8 28 
+mknod -m 755 ${DST_DIR}/sdb13 b 8 29 
+mknod -m 755 ${DST_DIR}/sdb14 b 8 30 
+mknod -m 755 ${DST_DIR}/sdb15 b 8 31 
+mknod -m 755 ${DST_DIR}/sdc b 8 32 
+mknod -m 755 ${DST_DIR}/sdc1 b 8 33 
+mknod -m 755 ${DST_DIR}/sdc2 b 8 34 
+mknod -m 755 ${DST_DIR}/sdc3 b 8 35 
+mknod -m 755 ${DST_DIR}/sdc4 b 8 36 
+mknod -m 755 ${DST_DIR}/sdc5 b 8 37 
+mknod -m 755 ${DST_DIR}/sdc6 b 8 38 
+mknod -m 755 ${DST_DIR}/sdc7 b 8 39 
+mknod -m 755 ${DST_DIR}/sdc8 b 8 40 
+mknod -m 755 ${DST_DIR}/sdc9 b 8 41 
+mknod -m 755 ${DST_DIR}/sdc10 b 8 42 
+mknod -m 755 ${DST_DIR}/sdc11 b 8 43 
+mknod -m 755 ${DST_DIR}/sdc12 b 8 44 
+mknod -m 755 ${DST_DIR}/sdc13 b 8 45 
+mknod -m 755 ${DST_DIR}/sdc14 b 8 46 
+mknod -m 755 ${DST_DIR}/sdc15 b 8 47 
+mknod -m 755 ${DST_DIR}/sdd b 8 48 
+mknod -m 755 ${DST_DIR}/sdd1 b 8 49 
+mknod -m 755 ${DST_DIR}/sdd2 b 8 50 
+mknod -m 755 ${DST_DIR}/sdd3 b 8 51 
+mknod -m 755 ${DST_DIR}/sdd4 b 8 52 
+mknod -m 755 ${DST_DIR}/sdd5 b 8 53 
+mknod -m 755 ${DST_DIR}/sdd6 b 8 54 
+mknod -m 755 ${DST_DIR}/sdd7 b 8 55 
+mknod -m 755 ${DST_DIR}/sdd8 b 8 56 
+mknod -m 755 ${DST_DIR}/sdd9 b 8 57 
+mknod -m 755 ${DST_DIR}/sdd10 b 8 58 
+mknod -m 755 ${DST_DIR}/sdd11 b 8 59 
+mknod -m 755 ${DST_DIR}/sdd12 b 8 60 
+mknod -m 755 ${DST_DIR}/sdd13 b 8 61 
+mknod -m 755 ${DST_DIR}/sdd14 b 8 62 
+mknod -m 755 ${DST_DIR}/sdd15 b 8 63 
+mknod -m 755 ${DST_DIR}/sde b 8 64 
+mknod -m 755 ${DST_DIR}/sde1 b 8 65 
+mknod -m 755 ${DST_DIR}/sde2 b 8 66 
+mknod -m 755 ${DST_DIR}/sde3 b 8 67 
+mknod -m 755 ${DST_DIR}/sde4 b 8 68 
+mknod -m 755 ${DST_DIR}/sde5 b 8 69 
+mknod -m 755 ${DST_DIR}/sde6 b 8 70 
+mknod -m 755 ${DST_DIR}/sde7 b 8 71 
+mknod -m 755 ${DST_DIR}/sde8 b 8 72 
+mknod -m 755 ${DST_DIR}/sde9 b 8 73 
+mknod -m 755 ${DST_DIR}/sde10 b 8 74 
+mknod -m 755 ${DST_DIR}/sde11 b 8 75 
+mknod -m 755 ${DST_DIR}/sde12 b 8 76 
+mknod -m 755 ${DST_DIR}/sde13 b 8 77 
+mknod -m 755 ${DST_DIR}/sde14 b 8 78 
+mknod -m 755 ${DST_DIR}/sde15 b 8 79 
+mknod -m 755 ${DST_DIR}/sdf b 8 80 
+mknod -m 755 ${DST_DIR}/sdf1 b 8 81 
+mknod -m 755 ${DST_DIR}/sdf2 b 8 82 
+mknod -m 755 ${DST_DIR}/sdf3 b 8 83 
+mknod -m 755 ${DST_DIR}/sdf4 b 8 84 
+mknod -m 755 ${DST_DIR}/sdf5 b 8 85 
+mknod -m 755 ${DST_DIR}/sdf6 b 8 86 
+mknod -m 755 ${DST_DIR}/sdf7 b 8 87 
+mknod -m 755 ${DST_DIR}/sdf8 b 8 88 
+mknod -m 755 ${DST_DIR}/sdf9 b 8 89 
+mknod -m 755 ${DST_DIR}/sdf10 b 8 90 
+mknod -m 755 ${DST_DIR}/sdf11 b 8 91 
+mknod -m 755 ${DST_DIR}/sdf12 b 8 92 
+mknod -m 755 ${DST_DIR}/sdf13 b 8 93 
+mknod -m 755 ${DST_DIR}/sdf14 b 8 94 
+mknod -m 755 ${DST_DIR}/sdf15 b 8 95 
+mknod -m 755 ${DST_DIR}/sdg b 8 96 
+mknod -m 755 ${DST_DIR}/sdg1 b 8 97 
+mknod -m 755 ${DST_DIR}/sdg2 b 8 98 
+mknod -m 755 ${DST_DIR}/sdg3 b 8 99 
+mknod -m 755 ${DST_DIR}/sdg4 b 8 100 
+mknod -m 755 ${DST_DIR}/sdg5 b 8 101 
+mknod -m 755 ${DST_DIR}/sdg6 b 8 102 
+mknod -m 755 ${DST_DIR}/sdg7 b 8 103 
+mknod -m 755 ${DST_DIR}/sdg8 b 8 104 
+mknod -m 755 ${DST_DIR}/sdg9 b 8 105 
+mknod -m 755 ${DST_DIR}/sdg10 b 8 106 
+mknod -m 755 ${DST_DIR}/sdg11 b 8 107 
+mknod -m 755 ${DST_DIR}/sdg12 b 8 108 
+mknod -m 755 ${DST_DIR}/sdg13 b 8 109 
+mknod -m 755 ${DST_DIR}/sdg14 b 8 110 
+mknod -m 755 ${DST_DIR}/sdg15 b 8 111 
+mknod -m 755 ${DST_DIR}/sdh b 8 112 
+mknod -m 755 ${DST_DIR}/sdh1 b 8 113 
+mknod -m 755 ${DST_DIR}/sdh2 b 8 114 
+mknod -m 755 ${DST_DIR}/sdh3 b 8 115 
+mknod -m 755 ${DST_DIR}/sdh4 b 8 116 
+mknod -m 755 ${DST_DIR}/sdh5 b 8 117 
+mknod -m 755 ${DST_DIR}/sdh6 b 8 118 
+mknod -m 755 ${DST_DIR}/sdh7 b 8 119 
+mknod -m 755 ${DST_DIR}/sdh8 b 8 120 
+mknod -m 755 ${DST_DIR}/sdh9 b 8 121 
+mknod -m 755 ${DST_DIR}/sdh10 b 8 122 
+mknod -m 755 ${DST_DIR}/sdh11 b 8 123 
+mknod -m 755 ${DST_DIR}/sdh12 b 8 124 
+mknod -m 755 ${DST_DIR}/sdh13 b 8 125 
+mknod -m 755 ${DST_DIR}/sdh14 b 8 126 
+mknod -m 755 ${DST_DIR}/sdh15 b 8 127 
+mknod -m 755 ${DST_DIR}/sdi b 8 128 
+mknod -m 755 ${DST_DIR}/sdi1 b 8 129 
+mknod -m 755 ${DST_DIR}/sdi2 b 8 130 
+mknod -m 755 ${DST_DIR}/sdi3 b 8 131 
+mknod -m 755 ${DST_DIR}/sdi4 b 8 132 
+mknod -m 755 ${DST_DIR}/sdi5 b 8 133 
+mknod -m 755 ${DST_DIR}/sdi6 b 8 134 
+mknod -m 755 ${DST_DIR}/sdi7 b 8 135 
+mknod -m 755 ${DST_DIR}/sdi8 b 8 136 
+mknod -m 755 ${DST_DIR}/sdi9 b 8 137 
+mknod -m 755 ${DST_DIR}/sdi10 b 8 138 
+mknod -m 755 ${DST_DIR}/sdi11 b 8 139 
+mknod -m 755 ${DST_DIR}/sdi12 b 8 140 
+mknod -m 755 ${DST_DIR}/sdi13 b 8 141 
+mknod -m 755 ${DST_DIR}/sdi14 b 8 142 
+mknod -m 755 ${DST_DIR}/sdi15 b 8 143 
+mknod -m 755 ${DST_DIR}/sdj b 8 144 
+mknod -m 755 ${DST_DIR}/sdj1 b 8 145 
+mknod -m 755 ${DST_DIR}/sdj2 b 8 146 
+mknod -m 755 ${DST_DIR}/sdj3 b 8 147 
+mknod -m 755 ${DST_DIR}/sdj4 b 8 148 
+mknod -m 755 ${DST_DIR}/sdj5 b 8 149 
+mknod -m 755 ${DST_DIR}/sdj6 b 8 150 
+mknod -m 755 ${DST_DIR}/sdj7 b 8 151 
+mknod -m 755 ${DST_DIR}/sdj8 b 8 152 
+mknod -m 755 ${DST_DIR}/sdj9 b 8 153 
+mknod -m 755 ${DST_DIR}/sdj10 b 8 154 
+mknod -m 755 ${DST_DIR}/sdj11 b 8 155 
+mknod -m 755 ${DST_DIR}/sdj12 b 8 156 
+mknod -m 755 ${DST_DIR}/sdj13 b 8 157 
+mknod -m 755 ${DST_DIR}/sdj14 b 8 158 
+mknod -m 755 ${DST_DIR}/sdj15 b 8 159 
+mknod -m 755 ${DST_DIR}/sdk b 8 160 
+mknod -m 755 ${DST_DIR}/sdk1 b 8 161 
+mknod -m 755 ${DST_DIR}/sdk2 b 8 162 
+mknod -m 755 ${DST_DIR}/sdk3 b 8 163 
+mknod -m 755 ${DST_DIR}/sdk4 b 8 164 
+mknod -m 755 ${DST_DIR}/sdk5 b 8 165 
+mknod -m 755 ${DST_DIR}/sdk6 b 8 166 
+mknod -m 755 ${DST_DIR}/sdk7 b 8 167 
+mknod -m 755 ${DST_DIR}/sdk8 b 8 168 
+mknod -m 755 ${DST_DIR}/sdk9 b 8 169 
+mknod -m 755 ${DST_DIR}/sdk10 b 8 170 
+mknod -m 755 ${DST_DIR}/sdk11 b 8 171 
+mknod -m 755 ${DST_DIR}/sdk12 b 8 172 
+mknod -m 755 ${DST_DIR}/sdk13 b 8 173 
+mknod -m 755 ${DST_DIR}/sdk14 b 8 174 
+mknod -m 755 ${DST_DIR}/sdk15 b 8 175 
+mknod -m 755 ${DST_DIR}/sdl b 8 176 
+mknod -m 755 ${DST_DIR}/sdl1 b 8 177 
+mknod -m 755 ${DST_DIR}/sdl2 b 8 178 
+mknod -m 755 ${DST_DIR}/sdl3 b 8 179 
+mknod -m 755 ${DST_DIR}/sdl4 b 8 180 
+mknod -m 755 ${DST_DIR}/sdl5 b 8 181 
+mknod -m 755 ${DST_DIR}/sdl6 b 8 182 
+mknod -m 755 ${DST_DIR}/sdl7 b 8 183 
+mknod -m 755 ${DST_DIR}/sdl8 b 8 184 
+mknod -m 755 ${DST_DIR}/sdl9 b 8 185 
+mknod -m 755 ${DST_DIR}/sdl10 b 8 186 
+mknod -m 755 ${DST_DIR}/sdl11 b 8 187 
+mknod -m 755 ${DST_DIR}/sdl12 b 8 188 
+mknod -m 755 ${DST_DIR}/sdl13 b 8 189 
+mknod -m 755 ${DST_DIR}/sdl14 b 8 190 
+mknod -m 755 ${DST_DIR}/sdl15 b 8 191 
+mknod -m 755 ${DST_DIR}/sdm b 8 192 
+mknod -m 755 ${DST_DIR}/sdm1 b 8 193 
+mknod -m 755 ${DST_DIR}/sdm2 b 8 194 
+mknod -m 755 ${DST_DIR}/sdm3 b 8 195 
+mknod -m 755 ${DST_DIR}/sdm4 b 8 196 
+mknod -m 755 ${DST_DIR}/sdm5 b 8 197 
+mknod -m 755 ${DST_DIR}/sdm6 b 8 198 
+mknod -m 755 ${DST_DIR}/sdm7 b 8 199 
+mknod -m 755 ${DST_DIR}/sdm8 b 8 200 
+mknod -m 755 ${DST_DIR}/sdm9 b 8 201 
+mknod -m 755 ${DST_DIR}/sdm10 b 8 202 
+mknod -m 755 ${DST_DIR}/sdm11 b 8 203 
+mknod -m 755 ${DST_DIR}/sdm12 b 8 204 
+mknod -m 755 ${DST_DIR}/sdm13 b 8 205 
+mknod -m 755 ${DST_DIR}/sdm14 b 8 206 
+mknod -m 755 ${DST_DIR}/sdm15 b 8 207 
+mknod -m 755 ${DST_DIR}/sdn b 8 208 
+mknod -m 755 ${DST_DIR}/sdn1 b 8 209 
+mknod -m 755 ${DST_DIR}/sdn2 b 8 210 
+mknod -m 755 ${DST_DIR}/sdn3 b 8 211 
+mknod -m 755 ${DST_DIR}/sdn4 b 8 212 
+mknod -m 755 ${DST_DIR}/sdn5 b 8 213 
+mknod -m 755 ${DST_DIR}/sdn6 b 8 214 
+mknod -m 755 ${DST_DIR}/sdn7 b 8 215 
+mknod -m 755 ${DST_DIR}/sdn8 b 8 216 
+mknod -m 755 ${DST_DIR}/sdn9 b 8 217 
+mknod -m 755 ${DST_DIR}/sdn10 b 8 218 
+mknod -m 755 ${DST_DIR}/sdn11 b 8 219 
+mknod -m 755 ${DST_DIR}/sdn12 b 8 220 
+mknod -m 755 ${DST_DIR}/sdn13 b 8 221 
+mknod -m 755 ${DST_DIR}/sdn14 b 8 222 
+mknod -m 755 ${DST_DIR}/sdn15 b 8 223 
+mknod -m 755 ${DST_DIR}/sdo b 8 224 
+mknod -m 755 ${DST_DIR}/sdo1 b 8 225 
+mknod -m 755 ${DST_DIR}/sdo2 b 8 226 
+mknod -m 755 ${DST_DIR}/sdo3 b 8 227 
+mknod -m 755 ${DST_DIR}/sdo4 b 8 228 
+mknod -m 755 ${DST_DIR}/sdo5 b 8 229 
+mknod -m 755 ${DST_DIR}/sdo6 b 8 230 
+mknod -m 755 ${DST_DIR}/sdo7 b 8 231 
+mknod -m 755 ${DST_DIR}/sdo8 b 8 232 
+mknod -m 755 ${DST_DIR}/sdo9 b 8 233 
+mknod -m 755 ${DST_DIR}/sdo10 b 8 234 
+mknod -m 755 ${DST_DIR}/sdo11 b 8 235 
+mknod -m 755 ${DST_DIR}/sdo12 b 8 236 
+mknod -m 755 ${DST_DIR}/sdo13 b 8 237 
+mknod -m 755 ${DST_DIR}/sdo14 b 8 238 
+mknod -m 755 ${DST_DIR}/sdo15 b 8 239 
+mknod -m 755 ${DST_DIR}/sdp b 8 240 
+mknod -m 755 ${DST_DIR}/sdp1 b 8 241 
+mknod -m 755 ${DST_DIR}/sdp2 b 8 242 
+mknod -m 755 ${DST_DIR}/sdp3 b 8 243 
+mknod -m 755 ${DST_DIR}/sdp4 b 8 244 
+mknod -m 755 ${DST_DIR}/sdp5 b 8 245 
+mknod -m 755 ${DST_DIR}/sdp6 b 8 246 
+mknod -m 755 ${DST_DIR}/sdp7 b 8 247 
+mknod -m 755 ${DST_DIR}/sdp8 b 8 248 
+mknod -m 755 ${DST_DIR}/sdp9 b 8 249 
+mknod -m 755 ${DST_DIR}/sdp10 b 8 250 
+mknod -m 755 ${DST_DIR}/sdp11 b 8 251 
+mknod -m 755 ${DST_DIR}/sdp12 b 8 252 
+mknod -m 755 ${DST_DIR}/sdp13 b 8 253 
+mknod -m 755 ${DST_DIR}/sdp14 b 8 254 
+mknod -m 755 ${DST_DIR}/sdp15 b 8 255 
+mknod -m 755 ${DST_DIR}/sdq b 65 0 
+mknod -m 755 ${DST_DIR}/sdq1 b 65 1 
+mknod -m 755 ${DST_DIR}/sdq2 b 65 2 
+mknod -m 755 ${DST_DIR}/sdq3 b 65 3 
+mknod -m 755 ${DST_DIR}/sdq4 b 65 4 
+mknod -m 755 ${DST_DIR}/sdq5 b 65 5 
+mknod -m 755 ${DST_DIR}/sdq6 b 65 6 
+mknod -m 755 ${DST_DIR}/sdq7 b 65 7 
+mknod -m 755 ${DST_DIR}/sdq8 b 65 8 
+mknod -m 755 ${DST_DIR}/sdq9 b 65 9 
+mknod -m 755 ${DST_DIR}/sdq10 b 65 10 
+mknod -m 755 ${DST_DIR}/sdq11 b 65 11 
+mknod -m 755 ${DST_DIR}/sdq12 b 65 12 
+mknod -m 755 ${DST_DIR}/sdq13 b 65 13 
+mknod -m 755 ${DST_DIR}/sdq14 b 65 14 
+mknod -m 755 ${DST_DIR}/sdq15 b 65 15 
+mknod -m 755 ${DST_DIR}/sdr b 65 16 
+mknod -m 755 ${DST_DIR}/sdr1 b 65 17 
+mknod -m 755 ${DST_DIR}/sdr2 b 65 18 
+mknod -m 755 ${DST_DIR}/sdr3 b 65 19 
+mknod -m 755 ${DST_DIR}/sdr4 b 65 20 
+mknod -m 755 ${DST_DIR}/sdr5 b 65 21 
+mknod -m 755 ${DST_DIR}/sdr6 b 65 22 
+mknod -m 755 ${DST_DIR}/sdr7 b 65 23 
+mknod -m 755 ${DST_DIR}/sdr8 b 65 24 
+mknod -m 755 ${DST_DIR}/sdr9 b 65 25 
+mknod -m 755 ${DST_DIR}/sdr10 b 65 26 
+mknod -m 755 ${DST_DIR}/sdr11 b 65 27 
+mknod -m 755 ${DST_DIR}/sdr12 b 65 28 
+mknod -m 755 ${DST_DIR}/sdr13 b 65 29 
+mknod -m 755 ${DST_DIR}/sdr14 b 65 30 
+mknod -m 755 ${DST_DIR}/sdr15 b 65 31 
+mknod -m 755 ${DST_DIR}/sds b 65 32 
+mknod -m 755 ${DST_DIR}/sds1 b 65 33 
+mknod -m 755 ${DST_DIR}/sds2 b 65 34 
+mknod -m 755 ${DST_DIR}/sds3 b 65 35 
+mknod -m 755 ${DST_DIR}/sds4 b 65 36 
+mknod -m 755 ${DST_DIR}/sds5 b 65 37 
+mknod -m 755 ${DST_DIR}/sds6 b 65 38 
+mknod -m 755 ${DST_DIR}/sds7 b 65 39 
+mknod -m 755 ${DST_DIR}/sds8 b 65 40 
+mknod -m 755 ${DST_DIR}/sds9 b 65 41 
+mknod -m 755 ${DST_DIR}/sds10 b 65 42 
+mknod -m 755 ${DST_DIR}/sds11 b 65 43 
+mknod -m 755 ${DST_DIR}/sds12 b 65 44 
+mknod -m 755 ${DST_DIR}/sds13 b 65 45 
+mknod -m 755 ${DST_DIR}/sds14 b 65 46 
+mknod -m 755 ${DST_DIR}/sds15 b 65 47 
+mknod -m 755 ${DST_DIR}/sdt b 65 48 
+mknod -m 755 ${DST_DIR}/sdt1 b 65 49 
+mknod -m 755 ${DST_DIR}/sdt2 b 65 50 
+mknod -m 755 ${DST_DIR}/sdt3 b 65 51 
+mknod -m 755 ${DST_DIR}/sdt4 b 65 52 
+mknod -m 755 ${DST_DIR}/sdt5 b 65 53 
+mknod -m 755 ${DST_DIR}/sdt6 b 65 54 
+mknod -m 755 ${DST_DIR}/sdt7 b 65 55 
+mknod -m 755 ${DST_DIR}/sdt8 b 65 56 
+mknod -m 755 ${DST_DIR}/sdt9 b 65 57 
+mknod -m 755 ${DST_DIR}/sdt10 b 65 58 
+mknod -m 755 ${DST_DIR}/sdt11 b 65 59 
+mknod -m 755 ${DST_DIR}/sdt12 b 65 60 
+mknod -m 755 ${DST_DIR}/sdt13 b 65 61 
+mknod -m 755 ${DST_DIR}/sdt14 b 65 62 
+mknod -m 755 ${DST_DIR}/sdt15 b 65 63 
+mknod -m 755 ${DST_DIR}/sdu b 65 64 
+mknod -m 755 ${DST_DIR}/sdu1 b 65 65 
+mknod -m 755 ${DST_DIR}/sdu2 b 65 66 
+mknod -m 755 ${DST_DIR}/sdu3 b 65 67 
+mknod -m 755 ${DST_DIR}/sdu4 b 65 68 
+mknod -m 755 ${DST_DIR}/sdu5 b 65 69 
+mknod -m 755 ${DST_DIR}/sdu6 b 65 70 
+mknod -m 755 ${DST_DIR}/sdu7 b 65 71 
+mknod -m 755 ${DST_DIR}/sdu8 b 65 72 
+mknod -m 755 ${DST_DIR}/sdu9 b 65 73 
+mknod -m 755 ${DST_DIR}/sdu10 b 65 74 
+mknod -m 755 ${DST_DIR}/sdu11 b 65 75 
+mknod -m 755 ${DST_DIR}/sdu12 b 65 76 
+mknod -m 755 ${DST_DIR}/sdu13 b 65 77 
+mknod -m 755 ${DST_DIR}/sdu14 b 65 78 
+mknod -m 755 ${DST_DIR}/sdu15 b 65 79 
+mknod -m 755 ${DST_DIR}/sdv b 65 80 
+mknod -m 755 ${DST_DIR}/sdv1 b 65 81 
+mknod -m 755 ${DST_DIR}/sdv2 b 65 82 
+mknod -m 755 ${DST_DIR}/sdv3 b 65 83 
+mknod -m 755 ${DST_DIR}/sdv4 b 65 84 
+mknod -m 755 ${DST_DIR}/sdv5 b 65 85 
+mknod -m 755 ${DST_DIR}/sdv6 b 65 86 
+mknod -m 755 ${DST_DIR}/sdv7 b 65 87 
+mknod -m 755 ${DST_DIR}/sdv8 b 65 88 
+mknod -m 755 ${DST_DIR}/sdv9 b 65 89 
+mknod -m 755 ${DST_DIR}/sdv10 b 65 90 
+mknod -m 755 ${DST_DIR}/sdv11 b 65 91 
+mknod -m 755 ${DST_DIR}/sdv12 b 65 92 
+mknod -m 755 ${DST_DIR}/sdv13 b 65 93 
+mknod -m 755 ${DST_DIR}/sdv14 b 65 94 
+mknod -m 755 ${DST_DIR}/sdv15 b 65 95 
+mknod -m 755 ${DST_DIR}/sdw b 65 96 
+mknod -m 755 ${DST_DIR}/sdw1 b 65 97 
+mknod -m 755 ${DST_DIR}/sdw2 b 65 98 
+mknod -m 755 ${DST_DIR}/sdw3 b 65 99 
+mknod -m 755 ${DST_DIR}/sdw4 b 65 100 
+mknod -m 755 ${DST_DIR}/sdw5 b 65 101 
+mknod -m 755 ${DST_DIR}/sdw6 b 65 102 
+mknod -m 755 ${DST_DIR}/sdw7 b 65 103 
+mknod -m 755 ${DST_DIR}/sdw8 b 65 104 
+mknod -m 755 ${DST_DIR}/sdw9 b 65 105 
+mknod -m 755 ${DST_DIR}/sdw10 b 65 106 
+mknod -m 755 ${DST_DIR}/sdw11 b 65 107 
+mknod -m 755 ${DST_DIR}/sdw12 b 65 108 
+mknod -m 755 ${DST_DIR}/sdw13 b 65 109 
+mknod -m 755 ${DST_DIR}/sdw14 b 65 110 
+mknod -m 755 ${DST_DIR}/sdw15 b 65 111 
+mknod -m 755 ${DST_DIR}/sdx b 65 112 
+mknod -m 755 ${DST_DIR}/sdx1 b 65 113 
+mknod -m 755 ${DST_DIR}/sdx2 b 65 114 
+mknod -m 755 ${DST_DIR}/sdx3 b 65 115 
+mknod -m 755 ${DST_DIR}/sdx4 b 65 116 
+mknod -m 755 ${DST_DIR}/sdx5 b 65 117 
+mknod -m 755 ${DST_DIR}/sdx6 b 65 118 
+mknod -m 755 ${DST_DIR}/sdx7 b 65 119 
+mknod -m 755 ${DST_DIR}/sdx8 b 65 120 
+mknod -m 755 ${DST_DIR}/sdx9 b 65 121 
+mknod -m 755 ${DST_DIR}/sdx10 b 65 122 
+mknod -m 755 ${DST_DIR}/sdx11 b 65 123 
+mknod -m 755 ${DST_DIR}/sdx12 b 65 124 
+mknod -m 755 ${DST_DIR}/sdx13 b 65 125 
+mknod -m 755 ${DST_DIR}/sdx14 b 65 126 
+mknod -m 755 ${DST_DIR}/sdx15 b 65 127 
+mknod -m 755 ${DST_DIR}/sdy b 65 128 
+mknod -m 755 ${DST_DIR}/sdy1 b 65 129 
+mknod -m 755 ${DST_DIR}/sdy2 b 65 130 
+mknod -m 755 ${DST_DIR}/sdy3 b 65 131 
+mknod -m 755 ${DST_DIR}/sdy4 b 65 132 
+mknod -m 755 ${DST_DIR}/sdy5 b 65 133 
+mknod -m 755 ${DST_DIR}/sdy6 b 65 134 
+mknod -m 755 ${DST_DIR}/sdy7 b 65 135 
+mknod -m 755 ${DST_DIR}/sdy8 b 65 136 
+mknod -m 755 ${DST_DIR}/sdy9 b 65 137 
+mknod -m 755 ${DST_DIR}/sdy10 b 65 138 
+mknod -m 755 ${DST_DIR}/sdy11 b 65 139 
+mknod -m 755 ${DST_DIR}/sdy12 b 65 140 
+mknod -m 755 ${DST_DIR}/sdy13 b 65 141 
+mknod -m 755 ${DST_DIR}/sdy14 b 65 142 
+mknod -m 755 ${DST_DIR}/sdy15 b 65 143 
+mknod -m 755 ${DST_DIR}/sdz b 65 144 
+mknod -m 755 ${DST_DIR}/sdz1 b 65 145 
+mknod -m 755 ${DST_DIR}/sdz2 b 65 146 
+mknod -m 755 ${DST_DIR}/sdz3 b 65 147 
+mknod -m 755 ${DST_DIR}/sdz4 b 65 148 
+mknod -m 755 ${DST_DIR}/sdz5 b 65 149 
+mknod -m 755 ${DST_DIR}/sdz6 b 65 150 
+mknod -m 755 ${DST_DIR}/sdz7 b 65 151 
+mknod -m 755 ${DST_DIR}/sdz8 b 65 152 
+mknod -m 755 ${DST_DIR}/sdz9 b 65 153 
+mknod -m 755 ${DST_DIR}/sdz10 b 65 154 
+mknod -m 755 ${DST_DIR}/sdz11 b 65 155 
+mknod -m 755 ${DST_DIR}/sdz12 b 65 156 
+mknod -m 755 ${DST_DIR}/sdz13 b 65 157 
+mknod -m 755 ${DST_DIR}/sdz14 b 65 158 
+mknod -m 755 ${DST_DIR}/sdz15 b 65 159 
+
+
+
+
+
+mknod -m 666 ${DST_DIR}/ptmx c 5 2
+
+mkdir -m 755 ${DST_DIR}/pts 
+for i in 0 1 2 3
+do 
+	mknod -m 666 ${DST_DIR}/pts/$i c 136 $i
+done
+
+mknod -m 660 ${DST_DIR}/ram0 b 1 0 
+mknod -m 660 ${DST_DIR}/ram1 b 1 1 
+mknod -m 660 ${DST_DIR}/ram2 b 1 2 
+mknod -m 660 ${DST_DIR}/ram3 b 1 3 
+
+mknod -m 640 ${DST_DIR}/mem c 1 1 
+mknod -m 640 ${DST_DIR}/kmem c 1 2 
+mknod -m 666 ${DST_DIR}/null c 1 3 
+mknod -m 666 ${DST_DIR}/zero c 1 5 
+mknod -m 644 ${DST_DIR}/random c 1 8 
+mknod -m 644 ${DST_DIR}/urandom c 1 9 
+
+mknod -m 666 ${DST_DIR}/ptyp0 c 2 0 
+mknod -m 666 ${DST_DIR}/ptyp1 c 2 1 
+mknod -m 666 ${DST_DIR}/ptyp2 c 2 2 
+mknod -m 666 ${DST_DIR}/ptyp3 c 2 3 
+mknod -m 666 ${DST_DIR}/ptyp4 c 2 4 
+mknod -m 666 ${DST_DIR}/ptyp5 c 2 5 
+mknod -m 666 ${DST_DIR}/ptyp6 c 2 6 
+mknod -m 666 ${DST_DIR}/ptyp7 c 2 7 
+mknod -m 666 ${DST_DIR}/ptyp8 c 2 8 
+mknod -m 666 ${DST_DIR}/ptyp9 c 2 9 
+mknod -m 666 ${DST_DIR}/ptypa c 2 10 
+mknod -m 666 ${DST_DIR}/ptypb c 2 11 
+mknod -m 666 ${DST_DIR}/ptypc c 2 12 
+mknod -m 666 ${DST_DIR}/ptypd c 2 13 
+mknod -m 666 ${DST_DIR}/ptype c 2 14 
+mknod -m 666 ${DST_DIR}/ptypf c 2 15 
+
+mknod -m 666 ${DST_DIR}/ttyp0 c 3 0 
+mknod -m 666 ${DST_DIR}/ttyp1 c 3 1 
+mknod -m 666 ${DST_DIR}/ttyp2 c 3 2 
+mknod -m 666 ${DST_DIR}/ttyp3 c 3 3 
+mknod -m 666 ${DST_DIR}/ttyp4 c 3 4 
+mknod -m 666 ${DST_DIR}/ttyp5 c 3 5 
+mknod -m 666 ${DST_DIR}/ttyp6 c 3 6 
+mknod -m 666 ${DST_DIR}/ttyp7 c 3 7 
+mknod -m 666 ${DST_DIR}/ttyp8 c 3 8 
+mknod -m 666 ${DST_DIR}/ttyp9 c 3 9 
+mknod -m 666 ${DST_DIR}/ttypa c 3 10 
+mknod -m 666 ${DST_DIR}/ttypb c 3 11 
+mknod -m 666 ${DST_DIR}/ttypc c 3 12 
+mknod -m 666 ${DST_DIR}/ttypd c 3 13 
+mknod -m 666 ${DST_DIR}/ttype c 3 14 
+mknod -m 666 ${DST_DIR}/ttypf c 3 15 
+
+mknod -m 600 ${DST_DIR}/tty0 c 4 0 
+mknod -m 600 ${DST_DIR}/tty1 c 4 1 
+mknod -m 600 ${DST_DIR}/tty2 c 4 2 
+mknod -m 600 ${DST_DIR}/tty3 c 4 3 
+mknod -m 600 ${DST_DIR}/tty4 c 4 4 
+mknod -m 600 ${DST_DIR}/tty5 c 4 5 
+mknod -m 600 ${DST_DIR}/tty6 c 4 6 
+mknod -m 600 ${DST_DIR}/tty7 c 4 7 
+mknod -m 600 ${DST_DIR}/tty8 c 4 8 
+mknod -m 600 ${DST_DIR}/tty9 c 4 9 
+
+mknod -m 666 ${DST_DIR}/ttyS0 c 4 64 
+mknod -m 666 ${DST_DIR}/ttyS1 c 4 65 
+mknod -m 666 ${DST_DIR}/ttyS2 c 4 66 
+mknod -m 600 ${DST_DIR}/ttyS3 c 4 67 
+mknod -m 600 ${DST_DIR}/ttyS4 c 4 68 
+mknod -m 600 ${DST_DIR}/ttyS5 c 4 69 
+mknod -m 600 ${DST_DIR}/ttyS6 c 4 70 
+mknod -m 600 ${DST_DIR}/ttyS7 c 4 71 
+mknod -m 600 ${DST_DIR}/ttyS8 c 4 72 
+mknod -m 600 ${DST_DIR}/ttyS9 c 4 73 
+
+mknod -m 666 ${DST_DIR}/tty c 5 0 
+mknod -m 622 ${DST_DIR}/console c 5 1 
+
+mknod -m 660 ${DST_DIR}/cua0 c 5 64 
+mknod -m 660 ${DST_DIR}/cua1 c 5 65 
+mknod -m 660 ${DST_DIR}/cua2 c 5 66 
+mknod -m 660 ${DST_DIR}/cua3 c 5 67 
+mknod -m 660 ${DST_DIR}/cua4 c 5 68 
+mknod -m 660 ${DST_DIR}/cua5 c 5 69 
+mknod -m 660 ${DST_DIR}/cua6 c 5 70 
+mknod -m 660 ${DST_DIR}/cua7 c 5 71 
+mknod -m 660 ${DST_DIR}/cua8 c 5 72 
+mknod -m 660 ${DST_DIR}/cua9 c 5 73 
+
+
+mknod -m 644 ${DST_DIR}/rtc c 10 135 
+mknod -m 660 ${DST_DIR}/secdev c 10 140 
+mknod -m 660 ${DST_DIR}/bcopy c 10 141 
+
+mkdir ${DST_DIR}/misc
+mknod -m 666 ${DST_DIR}/misc/fuse c 10 229 
+ln -s /dev/misc/fuse ${DST_DIR}/fuse
+mknod -m 444 ${DST_DIR}/rom0 b 31 0 
+mknod -m 444 ${DST_DIR}/rom1 b 31 1 
+mknod -m 444 ${DST_DIR}/rom2 b 31 2 
+mknod -m 444 ${DST_DIR}/rom3 b 31 3 
+
+# Compulsory links.
+ln -s /proc/self/fd ${DST_DIR}/fd
+ln -s fd/0 ${DST_DIR}/stdin
+ln -s fd/1 ${DST_DIR}/stdout
+ln -s fd/2 ${DST_DIR}/stderr
+
+# Recommended links links.
+ln -s /proc/kcore ${DST_DIR}/core
+ln -s ram0 ${DST_DIR}/ramdisk
+
+# for 3G modem
+ln -s /var/dev/modem ${DST_DIR}/modem
+ln -s /var/dev/modem2 ${DST_DIR}/modem2
+
+# for memory technology devices (read: FLASH)
+for a in `seq 0 16`
+do 
+	mknod -m 660 ${DST_DIR}/mtd$a c 90 `expr $a + $a` 
+	mknod -m 660 ${DST_DIR}/mtdr$a c 90 `expr $a + $a + 1`
+	mknod -m 660 ${DST_DIR}/mtdblock$a b 31 $a 
+done	
+
+
+# ppp device (pppoe)
+mknod ${DST_DIR}/ppp c 108 0 
+
+#
+# Temp vpm device.
+#
+mknod ${DST_DIR}/vpm0 c 254 0 
+mknod ${DST_DIR}/vpm1 c 254 1 
+mknod ${DST_DIR}/vpm2 c 254 2 
+mknod ${DST_DIR}/vpm3 c 254 3 
+mknod ${DST_DIR}/vpm4 c 254 4 
+
+#
+# phonedev devices.
+#
+mknod ${DST_DIR}/phone0 c 100 0 
+mknod ${DST_DIR}/phone1 c 100 1 
+mknod ${DST_DIR}/phone2 c 100 2 
+mknod ${DST_DIR}/phone3 c 100 3 
+mknod ${DST_DIR}/phone4 c 100 4 
+
+#Beceem wimax
+mknod -m 660 ${DST_DIR}/tarang c 251 0
+mknod -m 660 ${DST_DIR}/sg0 c 21 0 
+mknod -m 660 ${DST_DIR}/sg1 c 21 1 
+mknod -m 660 ${DST_DIR}/sg2 c 21 2   
+mknod -m 660 ${DST_DIR}/sg3 c 21 3 
+
+#
+# Wireless Relay Device
+mknod ${DST_DIR}/wlan c 151 0 
+
+#
+# GPIO
+mknod -m 660 ${DST_DIR}/gpio c 252 0
+
+#i2c
+mknod -m 660 ${DST_DIR}/i2cM0 c 218 0
+
+#
+# CRYPTO
+mknod -m 664 ${DST_DIR}/crypto c 10 70
+#mknod -m 660 ${DST_DIR}/crypto c 70 0
+
+#
+# HWNAT
+mknod -m 660 ${DST_DIR}/hwnat0 c 220 0
+mknod -m 660 ${DST_DIR}/swnat0 c 210 0
+mknod -m 660 ${DST_DIR}/acl0 c 230 0
+mknod -m 660 ${DST_DIR}/ac0 c 240 0
+mknod -m 660 ${DST_DIR}/mtr0 c 250 0
+
+if [ -n "$RT6856" -o -n "$MT7620" ]; then
+    mknod -m 660 ${DST_DIR}/rdm0 c 253 0
+elif [ -n "$MT7621" ]; then
+    mknod -m 660 ${DST_DIR}/rdm0 c 253 0
+else
+    mknod -m 660 ${DST_DIR}/rdm0 c 254 0
+fi
+
+# SPI
+mknod -m 660 ${DST_DIR}/spiS0 c 217 0
+mknod -m 660 ${DST_DIR}/spiS1 c 217 1
+
+# SLIC
+mknod -m 660 ${DST_DIR}/slic0 c 152 0
+
+# WIBRO
+mknod -m 660 ${DST_DIR}/mwxu0 c 235 0
+
+# WATCHDOG
+mknod -m 755 ${DST_DIR}/watchdog c 10 130
+
+# LTE Dongle for LG VL600
+mknod -m 660 ${DST_DIR}/LGE-ATC0 c 30 0
+mknod -m 660 ${DST_DIR}/LGE-WMC0 c 31 0
+mknod -m 660 ${DST_DIR}/LGE-DM0 c 32 0
+
+mknod -m 660 ${DST_DIR}/pcm0 c 233 0
+
+# Pantech
+mknod -m 660 ${DST_DIR}/PT-UML290-serial0 c 250 0
+mknod -m 660 ${DST_DIR}/PT-UML290-diag0 c 251 0
+#For Gobi device
+if [ -n "$RT6856" -o -n "$MT7620" -o "$MT7621" ]; then
+    #mknod -m 660 ${DST_DIR}/qcqmi0 c 254 0
+    mknod -m 660 ${DST_DIR}/qcqmi0 c 180  176
+    mknod -m 660 ${DST_DIR}/qcqmi1 c 180  177
+    mknod -m 660 ${DST_DIR}/qcqmi2 c 180  178
+    mknod -m 660 ${DST_DIR}/qcqmi3 c 180  179
+    mknod -m 660 ${DST_DIR}/qcqmi4 c 180  180
+    mknod -m 660 ${DST_DIR}/qcqmi5 c 180  181
+elif [ -n "$TC3262" ]; then
+    mknod -m 660 ${DST_DIR}/qcqmi0 c 253 0
+else                                                                                                        
+    mknod -m 660 ${DST_DIR}/qcqmi0 c 251 0
+fi
+
+#For VDSL
+mknod -m 666 ${DST_DIR}/vdsl c 109 0
+
+mkdir -m 755 ${DST_DIR}/net
+mknod -m 666 ${DST_DIR}/net/tun c 10 200
+
+# For MitraStar LTE module
+if [ -n "$RT6856" ]; then
+    mknod -m 660 ${DST_DIR}/ttyLTE0 c 251 0
+    mknod -m 660 ${DST_DIR}/ttyLTE1 c 251 1
+    mknod -m 660 ${DST_DIR}/ttyLTE2 c 251 2
+    mknod -m 660 ${DST_DIR}/ttyLTE3 c 251 3
+else
+    mknod -m 660 ${DST_DIR}/ttyLTE0 c 250 0
+    mknod -m 660 ${DST_DIR}/ttyLTE1 c 250 1
+    mknod -m 660 ${DST_DIR}/ttyLTE2 c 250 2
+    mknod -m 660 ${DST_DIR}/ttyLTE3 c 250 3
+fi
+
+# End of file MAKEDEV

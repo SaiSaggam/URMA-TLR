@@ -1,0 +1,36 @@
+.panel-full-width, .panel-medium, .panel-wide, .panel-narrow {
+  @include clearfix;
+  @include span-columns(6);
+  margin-bottom: $spacing-unit*2;
+}
+
+.panel-wide {
+  @include media($medium){
+    @include span-columns(4 of 8);
+  }
+  @include media($large){
+    @include span-columns(6 of 12);
+  }
+}
+
+.panel-medium {
+  @include media($medium){
+    @include span-columns(8 of 8);
+  }
+  @include media($large){
+    @include span-columns(4 of 12);
+  }
+}
+
+.panel-narrow {
+  @include media($medium){
+    @include span-columns(4 of 8);
+  }
+  @include media($large){
+    @include span-columns(4 of 12);
+  }
+}
+
+.panel-wide--half {
+  @include span-columns(3 of 6);
+}

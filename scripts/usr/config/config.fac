@@ -1,0 +1,83 @@
+#
+# TransPort LR54 - Factory Default Configuration
+#
+
+#
+# Default Admin User
+#
+user 1 name admin
+user 1 password default
+
+#
+# LAN network 
+#
+lan 1 description "Ethernet and Wi-Fi LAN network"
+lan 1 state on
+lan 1 interfaces eth2,eth3,eth4,wifi1,wifi5g1
+lan 1 ip-address 192.168.1.1
+
+#
+# Guest Wi-Fi network, disabled by default
+#
+lan 2 description "Guest Wi-Fi network"
+lan 2 interfaces wifi2,wifi5g2
+lan 2 ip-address 192.168.2.1
+lan 2 mask 255.255.255.0
+
+#
+# Wi-Fi Access Points, security defaults to WPA2-Personal
+#
+wifi 1 state on
+wifi 1 ssid LR54-2.4G-%s
+wifi 1 password wifidefault
+
+wifi5g 1 state on
+wifi5g 1 ssid LR54-5G-%s
+wifi5g 1 password wifidefault
+
+#
+# Wi-Fi Guest Access Points, no security, disabled by default
+#
+wifi 2 ssid LR54-2.4G-Public-%s
+wifi 2 security none
+wifi5g 2 ssid LR54-5G-Public-%s
+wifi5g 2 security none
+
+#
+# DHCP Server for Ethernet/Wi-Fi network
+#
+dhcp-server 1 state on
+dhcp-server 1 ip-address-start 192.168.1.100
+dhcp-server 1 ip-address-end 192.168.1.199
+dhcp-server 1 mask 255.255.255.0
+dhcp-server 1 gateway 192.168.1.1
+dhcp-server 1 dns1 192.168.1.1
+
+#
+# DHCP Server for Wi-Fi guest network, disabled by default
+#
+dhcp-server 2 ip-address-start 192.168.2.100
+dhcp-server 2 ip-address-end 192.168.2.199
+dhcp-server 2 mask 255.255.255.0
+dhcp-server 2 gateway 192.168.2.1
+dhcp-server 2 dns1 192.168.2.1
+
+#
+# WAN configuration
+#
+wan 1 interface eth1
+wan 2 interface dsl
+wan 3 interface cellular1
+wan 4 interface cellular2
+
+#
+# Default routes for Ethernet WAN, DSL and cellular - to be removed when wan configuration is complete
+#
+defroute 1 interface eth1
+defroute 1 metric 1
+defroute 2 interface dsl
+defroute 2 metric 2
+defroute 3 interface cellular1
+defroute 3 metric 3
+defroute 4 interface cellular2
+defroute 4 metric 3

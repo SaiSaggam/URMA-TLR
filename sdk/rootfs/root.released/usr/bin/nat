@@ -1,0 +1,223 @@
+#!/bin/sh
+#
+# nat.sh  This script go for starting/stop NAT/QoS services using iptables
+#
+
+# Paths to programs
+UVM=/usr/bin/uvm
+UO_PATH=/usr/uo
+#UO_PATH=/var/usb/C/uo/
+NAT_PATH=/var/nat
+WAN=""
+FUNC=""
+
+## All Basic iptables functions are in nat-draft
+NATD=nat-draft
+ADJ_KNL=adjust-kernel
+DM_FLTR=domain-filter
+MAC_CTL=mac-control
+PORT_FWD=port-forwarding
+PK_FLTR=pkt-filter
+L7_FLTR=l7appblk
+L7_FLTR_CHAT=l7appblk-chat
+L7_FLTR_P2P=l7appblk-p2p
+L7_FLTR_PROXY=l7appblk-proxy
+L7_FLTR_STREAMING=l7appblk-streaming
+PK_FLTR_V6=pkt-filterv6
+PK_FLTR_DDC=pkt-filter-ddc
+RATECTL=rate-control
+QOSPKT=qos-smallpkt
+ADMIN=admin
+SPI=spi
+STEALTH=stealth-mode
+URL_BLK=url-block
+VCOMP=virtual-computer
+WANALIAS=wanalias-externrule
+PROXY=proxy
+CALL_KLOGD=call-klogd
+IPSEC=ipsec
+GRE=gre
+RECENT=fwd-recent
+MWLB=mwlb
+ADJUST_MSS=adjust_mss
+ALG=alg
+DISCARD_PING=discard_ping
+IN_BLK_WAN=inblkwpkts
+
+start() 
+{
+    if [ "$1" = "$RECENT" ]; then
+        rm -f $NAT_PATH/$RECENT.uyg
+        [ -e $UO_PATH/$RECENT.uyg.uo ]  		&& $UVM -m 740 -o $NAT_PATH/$RECENT.uyg  	  $UO_PATH/$RECENT.uyg.uo	
+        $NAT_PATH/$NATD.uyg "start" "$WAN" "$RECENT"	
+    else
+    mkdir -p $NAT_PATH
+    rm -f $NAT_PATH/*.uyg
+    echo "1" > /var/run/nat.run
+    echo "==== NAT START (WAN:$WAN Func:$FUNC) ===="
+    [ -e $UO_PATH/$NATD.uyg.uo     ]    && $UVM -m 740 -o $NAT_PATH/$NATD.uyg     $UO_PATH/$NATD.uyg.uo
+    [ -e $UO_PATH/$ADJ_KNL.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$ADJ_KNL.uyg  $UO_PATH/$ADJ_KNL.uyg.uo
+    [ -e $UO_PATH/$PK_FLTR.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$PK_FLTR.uyg  $UO_PATH/$PK_FLTR.uyg.uo
+    [ -e $UO_PATH/$L7_FLTR.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$L7_FLTR.uyg  $UO_PATH/$L7_FLTR.uyg.uo
+    [ -e $UO_PATH/$L7_FLTR_CHAT.uyg.uo      ] && $UVM -m 740 -o $NAT_PATH/$L7_FLTR_CHAT.uyg  $UO_PATH/$L7_FLTR_CHAT.uyg.uo
+    [ -e $UO_PATH/$L7_FLTR_P2P.uyg.uo       ] && $UVM -m 740 -o $NAT_PATH/$L7_FLTR_P2P.uyg  $UO_PATH/$L7_FLTR_P2P.uyg.uo
+    [ -e $UO_PATH/$L7_FLTR_PROXY.uyg.uo     ] && $UVM -m 740 -o $NAT_PATH/$L7_FLTR_PROXY.uyg  $UO_PATH/$L7_FLTR_PROXY.uyg.uo
+    [ -e $UO_PATH/$L7_FLTR_STREAMING.uyg.uo ] && $UVM -m 740 -o $NAT_PATH/$L7_FLTR_STREAMING.uyg  $UO_PATH/$L7_FLTR_STREAMING.uyg.uo
+    [ -e $UO_PATH/$PK_FLTR_DDC.uyg.uo ] && $UVM -m 740 -o $NAT_PATH/$PK_FLTR_DDC.uyg  $UO_PATH/$PK_FLTR_DDC.uyg.uo
+    [ -e $UO_PATH/$DM_FLTR.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$DM_FLTR.uyg  $UO_PATH/$DM_FLTR.uyg.uo
+    [ -e $UO_PATH/$URL_BLK.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$URL_BLK.uyg  $UO_PATH/$URL_BLK.uyg.uo
+    [ -e $UO_PATH/$MAC_CTL.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$MAC_CTL.uyg  $UO_PATH/$MAC_CTL.uyg.uo
+    [ -e $UO_PATH/$PORT_FWD.uyg.uo ]    && $UVM -m 740 -o $NAT_PATH/$PORT_FWD.uyg $UO_PATH/$PORT_FWD.uyg.uo
+    [ -e $UO_PATH/$VCOMP.uyg.uo    ]    && $UVM -m 740 -o $NAT_PATH/$VCOMP.uyg    $UO_PATH/$VCOMP.uyg.uo
+	[ -e $UO_PATH/$WANALIAS.uyg.uo ] 	&& $UVM -m 740 -o $NAT_PATH/$WANALIAS.uyg $UO_PATH/$WANALIAS.uyg.uo
+    [ -e $UO_PATH/$PROXY.uyg.uo    ]    && $UVM -m 740 -o $NAT_PATH/$PROXY.uyg    $UO_PATH/$PROXY.uyg.uo
+    [ -e $UO_PATH/$RATECTL.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$RATECTL.uyg  $UO_PATH/$RATECTL.uyg.uo
+    [ -e $UO_PATH/$QOSPKT.uyg.uo   ]    && $UVM -m 740 -o $NAT_PATH/$QOSPKT.uyg   $UO_PATH/$QOSPKT.uyg.uo
+    [ -e $UO_PATH/$ADMIN.uyg.uo  ]      && $UVM -m 740 -o $NAT_PATH/$ADMIN.uyg    $UO_PATH/$ADMIN.uyg.uo
+    [ -e $UO_PATH/$SPI.uyg.uo  ]        && $UVM -m 740 -o $NAT_PATH/$SPI.uyg      $UO_PATH/$SPI.uyg.uo
+    [ -e $UO_PATH/$STEALTH.uyg.uo  ]    && $UVM -m 740 -o $NAT_PATH/$STEALTH.uyg  $UO_PATH/$STEALTH.uyg.uo
+    [ -e $UO_PATH/$PK_FLTR_V6.uyg.uo ]  && $UVM -m 740 -o $NAT_PATH/$PK_FLTR_V6.uyg  $UO_PATH/$PK_FLTR_V6.uyg.uo
+    [ -e $UO_PATH/$CALL_KLOGD.uyg.uo ]  && $UVM -m 740 -o $NAT_PATH/$CALL_KLOGD.uyg  $UO_PATH/$CALL_KLOGD.uyg.uo
+    [ -e $UO_PATH/$IPSEC.uyg.uo ]       && $UVM -m 740 -o $NAT_PATH/$IPSEC.uyg  $UO_PATH/$IPSEC.uyg.uo
+    [ -e $UO_PATH/$GRE.uyg.uo ]         && $UVM -m 740 -o $NAT_PATH/$GRE.uyg  $UO_PATH/$GRE.uyg.uo 
+    [ -e $UO_PATH/$RECENT.uyg.uo ]      && $UVM -m 740 -o $NAT_PATH/$RECENT.uyg  $UO_PATH/$RECENT.uyg.uo 
+    [ -e $UO_PATH/$MWLB.uyg.uo ]        && $UVM -m 740 -o $NAT_PATH/$MWLB.uyg  $UO_PATH/$MWLB.uyg.uo 
+    [ -e $UO_PATH/$ADJUST_MSS.uyg.uo ]  && $UVM -m 740 -o $NAT_PATH/$ADJUST_MSS.uyg  $UO_PATH/$ADJUST_MSS.uyg.uo 
+    [ -e $UO_PATH/$ALG.uyg.uo ]         && $UVM -m 740 -o $NAT_PATH/$ALG.uyg   $UO_PATH/$ALG.uyg.uo 
+    [ -e $UO_PATH/$DISCARD_PING.uyg.uo ] && $UVM -m 740 -o $NAT_PATH/$DISCARD_PING.uyg $UO_PATH/$DISCARD_PING.uyg.uo 
+	[ -e $UO_PATH/$IN_BLK_WAN.uyg.uo ]        && $UVM -m 740 -o $NAT_PATH/$IN_BLK_WAN.uyg  $UO_PATH/$IN_BLK_WAN.uyg.uo
+	$NAT_PATH/$NATD.uyg "start" "$WAN" "$FUNC"
+    rm -f /var/run/nat.run
+	fi
+}
+
+stop() 
+{
+	echo "=== NAT STOP (WAN:$WAN Func:$FUNC) ===="
+	$NAT_PATH/$NATD.uyg "stop" "$WAN" "$FUNC" 
+}
+
+usage() 
+{
+	echo "AmitNATServ Usage: $0 [action] [wan] [options]"
+	echo "action:"
+	echo "  start/stop/restart"
+	echo ""
+	echo "wan:"
+	echo "  wanx/wan1/wan2/..."
+	echo ""
+	echo "options:"
+	echo "  mactl        : MAC Control"
+	echo "  urlblk       : URL Blocking"
+	echo "  urlblkfileext: URL File Extension Blocking"
+	echo "  dmfilter     : Domain Filter"
+	echo "  pktfilter    : Packet Filter"
+	echo "  pktfilterv6  : Packet Filter V6"
+	echo "  portfwd      : Port Forward"
+	echo "  vcomp        : Virtual Computer"
+	echo "  wanalias     : Wan Alias Extern Rule"
+	echo "  proxy        : Proxy Client"
+	echo "  ratectl      : Rate Controller"
+	echo "  stealth      : Stealth Mode"
+	echo "  qospkt       : QoS for small size packets (NO support Multi WAN strt/stop/restrt)"
+	echo "  admin        : Remote Admin"
+	echo "  dmz          : DMZ"
+	echo "  spi          : SPI Mode"
+	echo "  l7appblk     : Layer 7 Application Blocking"
+	echo "  blkicmp      : Block ICMP from WAN (NO support Multi WAN strt/stop/restrt)"
+	echo "  blkwan       : Block Packets from WAN (NO support Multi WAN strt/stop/restrt)"
+	echo "  masq         : Masquerade "
+	echo "  upnp         : UPnP"
+	echo "  mupnpd       : Mini-UPnP"
+	echo "  alg          : PPTP/L2TP/IPsec Passthrough"
+	echo "  mwbif        : Some Services need bind IF. when Multi WAN (NO support Multi WAN strt/stop/restrt)"
+	echo "  loopback     : NAT Loopback"
+	echo "  ipsec        : Do Masq. for Netkey-IPSec Tunnels"
+	echo "  gre          : GRE NAT"
+	echo "  mwlb         : Multiwan load balance"
+	echo "  misc         : Misc: admin, dmz, proxy, qospkt, spi, ratectl, upnp, mupnpd, alg, loopback"
+	echo "  inblkwpkts   : input_block_wan_pkts"
+	echo ""
+	exit 1
+}
+
+show()
+{
+    local cmd="$1"
+    local sub_cmd="$2"
+    if [ "$cmd" = "" ]; then
+        cmd="-t filter"
+    elif [ "`expr substr $cmd 1 1`" = "t" ]; then
+        if [ "$sub_cmd" != "" ]; then
+            tc qdisc show dev $sub_cmd
+        else
+            tc qdisc show
+        fi
+    elif [ "`expr substr $cmd 1 1`" = "f" ]; then
+        if [ "$sub_cmd" != "" ]; then
+            iptables --list-rules
+        else
+            iptables -L -v 
+        fi
+    elif [ "`expr substr $cmd 1 1`" = "n" ]; then
+        if [ "$sub_cmd" != "" ]; then
+            iptables -t nat --list-rules
+        else        
+            iptables -t nat -L -v
+        fi
+    elif [ "`expr substr $cmd 1 1`" = "m" ]; then
+        if [ "$sub_cmd" != "" ]; then
+            iptables -t mangle --list-rules
+        else             
+            iptables -t mangle -L -v
+        fi
+    else 
+        echo "Usage: "
+        echo "  nat show [filter|nat|mangle] [list] "
+        echo "  nat show [tc] [wan_if] "
+        echo ""
+    fi
+    exit 0
+}
+
+# +++++++++++++++ main ++++++++++++++++++++++ 
+[ "$1" = "" ] && usage
+[ "$1" = "show" ] && show "$2" "$3"
+
+if [ "$2" = "" ]; then
+    WAN="ALL"
+elif [ "$2" = "wanx" ] || [ "$2" = "ALL" ]; then
+    WAN="ALL"
+elif [ "$2" = "wan1" ] || [ "$2" = "wan2" ]; then
+    WAN="$2"
+else 
+    usage
+fi
+
+if [ "$3" = "" ]; then
+    FUNC="ALL"
+elif [ "$3" = "mactl"    ] || [ "$3" = "urlblk"   ] || [ "$3" = "urlblkfileext" ] ||
+     [ "$3" = "dmfilter" ] || [ "$3" = "qospkt"   ] || [ "$3" = "portfwd"       ] ||
+     [ "$3" = "vcomp"    ] || [ "$3" = "proxy"    ] || [ "$3" = "ratectl"       ] ||
+     [ "$3" = "stealth"  ] || [ "$3" = "qospkt"   ] || [ "$3" = "admin"         ] ||
+     [ "$3" = "dmz"      ] || [ "$3" = "spi"      ] || [ "$3" = "l7appblk"      ] || 
+     [ "$3" = "blkicmp"  ] || [ "$3" = "blkwan"   ] || [ "$3" = "masq"          ] || 
+     [ "$3" = "upnp"     ] || [ "$3" = "alg"      ] || [ "$3" = "pktfilter"     ] || 
+     [ "$3" = "mwbif"    ] || [ "$3" = "loopback" ] || [ "$3" = "pktfilterv6"   ] || 
+     [ "$3" = "mupnpd"   ] || [ "$3" = "ipsec"    ] || [ "$3" = "recent"        ] ||
+     [ "$3" = "gre"      ] || [ "$3" = "mwlb"     ] || [ "$3" = "misc"          ] ||
+	 [ "$3" = "inblkwpkts"] || [ "$3" = "wanalias"     ]; then
+    FUNC="$3"
+else
+    usage
+fi
+
+case "$1" in
+	"init")	    start ;;
+	"start")	start ;;
+	"stop")		stop  ;;
+	"restart")	start ;;
+	*)		    usage ;;
+esac
+exit 0
+

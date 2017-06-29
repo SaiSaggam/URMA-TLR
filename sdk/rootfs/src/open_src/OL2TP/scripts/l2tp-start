@@ -1,0 +1,401 @@
+#!/bin/sh
+
+. /usr/bin/scriptlib
+. /usr/bin/l2tpc-customer
+
+PIDFILE_L2TP="/var/run/rp-l2tp.pid"
+
+# Check if exist multiwan index
+if [ -n $1 ] ; then
+    MULTIWAN=$1
+else
+    MULTIWAN=
+fi
+
+if [ -z $MULTIWAN ] ; then
+	ETH=`rdcsman 0x8000F231 str`
+	L2TP_RESULT_FILE="/var/run/l2tp-result"
+	L2TP_SOCKET_FILE="/var/run/l2tpctrl"
+	PIDFILE_PPPD="/var/run/ppp-l2tp.pid"
+	L2TPD_CONF="/etc/l2tp/l2tp.conf"
+	
+	#read connect flag here, to avoid udhcp-start script change it.
+	CNT_FORCE=`rdcsman 0x8001000E u32`
+	L2TP_PHASE1_TYPE=`rdcsman 0x00060E00 u32`
+	CNTTYPE=`rdcsman 0x00060900 u32`
+		
+	# Get the ip of L2TP_LNSSERVER
+	L2TP_LNSSERVER=`rdcsman 0x00060600 str`
+	L2TP_LNSPORT=1701
+else
+	TMP2=$((MULTIWAN+2))
+	ETH=`rdcsman 0x8000F23$TMP2 str`
+	L2TP_RESULT_FILE="/var/run/l2tp$MULTIWAN-result"
+	L2TP_SOCKET_FILE="/var/run/l2tpctrl$MULTIWAN"
+	PIDFILE_PPPD="/var/run/ppp-l2tp$MULTIWAN.pid"
+	L2TPD_CONF="/etc/l2tp/l2tp$MULTIWAN.conf"
+	
+	#read connect flag here, to avoid udhcp-start script change it.
+	CNT_FORCE=`rdcsman 0x800101C$MULTIWAN u32`
+	L2TP_PHASE1_TYPE=`rdcsman 0x00062E0$MULTIWAN u32`
+	CNTTYPE=`rdcsman 0x0006290$MULTIWAN u32`
+	
+	# Get the ip of L2TP_LNSSERVER
+	L2TP_LNSSERVER=`rdcsman 0x0006260$MULTIWAN str`
+fi
+
+RESOLV_CONF="/etc/resolv.conf"
+#L2TP_LNSSERVER=`rdcsman 0x00060600 str`
+#L2TP_LNSPORT=1701
+
+l2tp_status()
+{
+	if [ -r $PIDFILE_PPPD ] ; then
+		sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+		if [ $? = 0 ] ; then		
+		    # check the cnt status is CONNECT 
+			if [ -z $MULTIWAN ] ; then
+				CNTSTATUS=`rdcsman 0x80060700 u16`
+			else
+				CNTSTATUS=`rdcsman 0x8006270$MULTIWAN u32`
+			fi
+			if [ $CNTSTATUS != 2 ] ; then
+				echo "CNTSTATUS=$CNTSTATUS"
+				return 1
+			fi	
+			logger -t "l2tp" "Link is up and running on interface $PPP_IF (PID: $PPP_PID)"
+			echo "l2tp-status: Link is up and running on interface $PPP_IF"
+            return 0
+    	fi
+	fi 		
+	return 1	
+}
+
+writeCSIDvalues () {
+#	sleep 8 #Important! it must be waited
+	
+	sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+
+	if [ -f /var/run/ppp_auth_fail ] ; then
+		echo "$0: Authentication fail!"
+		if [ -z $MULTIWAN ] ; then
+			wrcsman "0x80010007 0x06 && \
+					 0x80060700 0x06"
+		else
+			wrcsman "0x8001016$MULTIWAN 0x06 && \
+					 0x8006270$MULTIWAN 0x06"
+		fi
+		rm -rf $L2TP_RESULT_FILE
+		exit 0
+	fi
+
+	if [ -z $PPP_IF ] ; then
+		exit 1
+	fi
+	
+	if [ $? = 0 ] ; then		
+		sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+		sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+		sl_get_uptime CNTTIME
+
+		if [ "$IF_IP" = "10.64.64.64" ] ; then
+			if [ -z $MULTIWAN ] ; then
+				wrcsman "0x80060100 0x00 && \
+						 0x80060200 0x00 && \
+						 0x80060300 0x00 && \
+						 0x80060400 0x00 && \
+						 0x80060500 0x00 && \
+						 0x80060600 0x00 && \
+						 0x80060700 0x05 && \
+						 0x80010002 0x00 && \
+						 0x80010003 0x00 && \
+						 0x80010004 0x00 && \
+						 0x80010005 0x00 && \
+						 0x80010006 0x00 && \
+						 0x80010007 0x05"
+			else
+				wrcsman "0x8006210$MULTIWAN 0x00 && \
+						 0x8006220$MULTIWAN 0x00 && \
+						 0x8006230$MULTIWAN 0x00 && \
+						 0x8006240$MULTIWAN 0x00 && \
+						 0x8006250$MULTIWAN 0x00 && \
+						 0x8006260$MULTIWAN 0x00 && \
+						 0x8006270$MULTIWAN 0x05 && \
+						 0x8001011$MULTIWAN 0x00 && \
+						 0x8001012$MULTIWAN 0x00 && \
+						 0x8001013$MULTIWAN 0x00 && \
+						 0x8001014$MULTIWAN 0x00 && \
+						 0x8001015$MULTIWAN 0x00 && \
+						 0x8001016$MULTIWAN 0x05"
+			fi
+		else
+			if [ -z $MULTIWAN ] ; then
+				wrcsman "0x80060100 $CNTTIME && \
+						 0x80060200 {$IF_IP} && \
+						 0x80060300 {$IF_NM} && \
+						 0x80060400 {$IF_GW} && \
+						 0x80060500 {$IF_DNS1} && \
+						 0x80060600 {$IF_DNS2} && \
+						 0x80063000 \"$PPP_IF && \
+						 0x80060700 0x02 && \
+						 0x80010002 {$IF_IP} && \
+						 0x80010003 {$IF_NM} && \
+						 0x80010004 {$IF_GW} && \
+						 0x80010005 {$IF_DNS1} && \
+						 0x80010006 {$IF_DNS2} && \
+						 0x8001000B \"$PPP_IF && \
+						 0x80010007 0x02"
+			else
+				wrcsman "0x8006210$MULTIWAN $CNTTIME && \
+						 0x8006220$MULTIWAN {$IF_IP} && \
+						 0x8006230$MULTIWAN {$IF_NM} && \
+						 0x8006240$MULTIWAN {$IF_GW} && \
+						 0x8006250$MULTIWAN {$IF_DNS1} && \
+						 0x8006260$MULTIWAN {$IF_DNS2} && \
+						 0x80062b0$MULTIWAN \"$PPP_IF && \
+						 0x8006270$MULTIWAN 0x02 && \
+						 0x8001011$MULTIWAN {$IF_IP} && \
+						 0x8001012$MULTIWAN {$IF_NM} && \
+						 0x8001013$MULTIWAN {$IF_GW} && \
+						 0x8001014$MULTIWAN {$IF_DNS1} && \
+						 0x8001015$MULTIWAN {$IF_DNS2} && \
+						 0x8001019$MULTIWAN \"$PPP_IF && \
+						 0x8001016$MULTIWAN 0x02"
+			fi
+		fi
+	    return 0
+    fi
+	return 1
+}
+
+#clear last ppp auth fail temp file
+rm -rf /var/run/ppp_auth*
+
+#if [ -r $L2TP_RESULT_FILE ] ; then
+if [ -z $MULTIWAN ] ; then
+	l2tp-stop
+else
+	l2tp-stop $MULTIWAN
+fi
+#fi
+
+#L2TP_PHASE1_TYPE=`rdcsman 0x00060E00 u8`
+if [ "$L2TP_PHASE1_TYPE" = 0 ] ; then
+
+	if [ -z $MULTIWAN ] ; then
+		udhcpc-action stop
+		udhcpc-action start
+		RET=$?
+		[ $RET = 1 ] && exit 1
+	
+		IF_DNS1=`rdcsman 0x80035005 ipv4`
+		IF_DNS2=`rdcsman 0x80035006 ipv4`
+		[ -n "$IF_DNS1" ] && echo "nameserver $IF_DNS1" > $RESOLV_CONF.phase1
+		[ -n "$IF_DNS2" ] && echo "nameserver $IF_DNS2" >> $RESOLV_CONF.phase1	
+	else
+		udhcpc-action stop $MULTIWAN
+		udhcpc-action start $MULTIWAN
+		RET=$?
+		[ $RET = 1 ] && exit 1
+	
+		IF_DNS1=`rdcsman 0x8003514$MULTIWAN ipv4`
+		IF_DNS2=`rdcsman 0x8003515$MULTIWAN ipv4`
+		[ -n "$IF_DNS1" ] && echo "nameserver $IF_DNS1" > $RESOLV_CONF.phase1
+		[ -n "$IF_DNS2" ] && echo "nameserver $IF_DNS2" >> $RESOLV_CONF.phase1	
+	fi
+
+elif [ "$L2TP_PHASE1_TYPE" = 1 ] ; then 
+	
+	if [ -z $MULTIWAN ] ; then
+		IF_IP=`rdcsman 0x00060300 ipv4`
+		IF_NM=`rdcsman 0x00060400 ipv4`
+		IF_GW=`rdcsman 0x00060500 ipv4`
+		IF_DNS1=`rdcsman 0x00060700 ipv4`
+		IF_DNS2=`rdcsman 0x00060800 ipv4`
+	else
+		IF_IP=`rdcsman 0x0006230$MULTIWAN ipv4`
+		IF_NM=`rdcsman 0x0006240$MULTIWAN ipv4`
+		IF_GW=`rdcsman 0x0006250$MULTIWAN ipv4`
+		IF_DNS1=`rdcsman 0x0006270$MULTIWAN ipv4`
+		IF_DNS2=`rdcsman 0x0006280$MULTIWAN ipv4`
+	fi
+	
+	ifconfig $ETH $IF_IP netmask $IF_NM
+	route add default gw $IF_GW dev $ETH
+	
+    rm -f $RESOLV_CONF
+	[ -n "$IF_DNS1" ] && echo "nameserver $IF_DNS1" > $RESOLV_CONF
+    [ -n "$IF_DNS2" ] && echo "nameserver $IF_DNS2" >> $RESOLV_CONF
+    [ -n "$IF_DNS1" ] && echo "nameserver $IF_DNS1" > $RESOLV_CONF.phase1
+    [ -n "$IF_DNS2" ] && echo "nameserver $IF_DNS2" >> $RESOLV_CONF.phase1
+fi
+
+# Get the ip of L2TP_LNSSERVER
+if [ "$L2TP_LNSSERVER"  == "" ]; then
+    logger -t "l2tp" "No Peer IP/Domain for L2TP client !"
+    echo "No Peer IP/Domain for L2TP client !"
+    exit 1  
+fi
+echo "L2TP_LNSSERVER=$L2TP_LNSSERVER"
+
+# Find the default route
+echo "Find the default route"
+sl_get_IP_NM_GW_in_ifconfig $ETH IF_IP IF_NM IF_GW
+route add $L2TP_LNSSERVER gw $IF_GW dev $ETH	
+
+gen_l2tpd_wantype_conf
+
+#read connect flag here, to avoid udhcp-start script change it.
+#CNT_FORCE=`rdcsman 0x8001000E u16`
+if [ $CNT_FORCE -eq 1 ] ; then
+	echo "L2TP force connect!"
+    if [ -r "$PIDFILE_L2TP" ] ; then
+       echo "Stop L2TP Daemon (l2tp-control -s $L2TP_SOCKET_FILE \"exit\")"
+       l2tp-control -s $L2TP_SOCKET_FILE "exit" &
+       sleep 1
+    fi
+
+    echo "Start L2TP Daemon (l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TPD_CONF)"
+    l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TPD_CONF &
+    sleep 1
+    
+    echo "L2TP start to connect! ( l2tp-control -s $L2TP_SOCKET_FILE \"start-session $L2TP_LNSSERVER\" )"
+    l2tp-control -s $L2TP_SOCKET_FILE "start-session $L2TP_LNSSERVER" > $L2TP_RESULT_FILE &
+    sleep 2
+    
+    cat $L2TP_RESULT_FILE
+	CFG=`cat $L2TP_RESULT_FILE`
+	for s in $CFG
+	do
+		if [ $s = "OK" ] ; then
+			break
+		else
+			rm $L2TP_RESULT_FILE		
+			exit 1
+		fi		
+	done	 
+else
+#	CNTTYPE=`rdcsman 0x00060900 u32`
+	if [ $CNTTYPE = 0 ] ; then
+
+		if [ -z $MULTIWAN ] ; then
+			wrcsman "0x80060200 0x00 && \
+					 0x80060300 0x00 && \
+					 0x80060400 0x00 && \
+					 0x80060700 0x05 && \
+					 0x80010002 0x00 && \
+					 0x80010003 0x00 && \
+					 0x80010004 0x00 && \
+					 0x80010007 0x05"
+		else
+			wrcsman "0x8006220$MULTIWAN 0x00 && \
+					 0x8006230$MULTIWAN 0x00 && \
+					 0x8006240$MULTIWAN 0x00 && \
+					 0x8006270$MULTIWAN 0x05 && \
+					 0x8001011$MULTIWAN 0x00 && \
+					 0x8001012$MULTIWAN 0x00 && \
+					 0x8001013$MULTIWAN 0x00 && \
+					 0x8001016$MULTIWAN 0x05"
+		fi
+                 
+    local L2TPD_PID_VAL=""
+    [ -f "$PIDFILE_L2TP" ] && L2TPD_PID_VAL="`cat $PIDFILE_L2TP`"
+    if [ -z "$L2TPD_PID_VAL" ] || [ -z "`ps | grep l2tpd | grep \"$L2TPD_PID_VAL\" | grep -v grep`" ]; then
+       l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TPD_CONF
+    fi
+        
+        if [ -z "`ps | grep "l2tp-ondemand -wan" | grep -v grep`" ]; then
+            l2tp-ondemand -wan &
+        fi
+		exit 0
+	else
+    if [ -r "$PIDFILE_L2TP" ] ; then
+       echo "Stop L2TP Daemon (l2tp-control -s $L2TP_SOCKET_FILE \"exit\")"
+       l2tp-control -s $L2TP_SOCKET_FILE "exit" &
+       sleep 1
+    fi
+
+    echo "Start L2TP Daemon (l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TPD_CONF)"
+    l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TPD_CONF &
+    sleep 1
+    
+    echo "L2TP start to connect! ( l2tp-control -s $L2TP_SOCKET_FILE \"start-session $L2TP_LNSSERVER\" )"
+    l2tp-control -s $L2TP_SOCKET_FILE "start-session $L2TP_LNSSERVER" > $L2TP_RESULT_FILE &
+    sleep 2
+
+		cat $L2TP_RESULT_FILE
+		CFG=`cat $L2TP_RESULT_FILE`
+		for s in $CFG
+		do
+			if [ $s = "OK" ] ; then
+				break
+			else
+				rm $L2TP_RESULT_FILE		
+				exit 1
+			fi		
+		done	 
+	fi
+fi
+
+route del default  # resolving domain name server ip for l2tpd before deleting default gateway
+sleep 8
+local retry=0
+while [ true ]; do
+	if [ "$retry" = "30" ] ; then
+		echo "Timeout for waiting PPPoE connection !! "
+		break;
+	fi
+
+	if [ -r $PIDFILE_PPPD ] ; then
+		sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+		if [ "$PPP_IF" != "" ] ; then
+			sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+			if [ "$IF_IP" != "" ] ; then
+				break; # pppX interface is created
+			else
+				echo "No PPPoE interface ip"
+			fi
+		else
+			echo "No PPPoE interface"
+		fi
+	else
+		echo "No PPPoE pid"
+	fi
+
+	retry=$((retry+1))
+	sleep 1
+done
+
+writeCSIDvalues
+
+# Monitor connection
+TIME=0
+TIMEOUT=10
+while [ true ] ; do
+	#l2tp_status > /dev/null 2>&1
+	l2tp_status		
+
+	if [ $? = 0 ] ; then
+		echo "$0: Connected!"
+		# Must wait till executing ip-up completely..
+		sleep 1
+#		exit 0
+#    fi
+    
+#	if [ -f /var/run/ppp_auth_fail ] ; then
+#		echo "$0: Authentication fail!"
+#		wrcsman "0x80010007 0x06 && \
+#				 0x80060700 0x06"
+#		rm -rf $L2TP_RESULT_FILE
+		exit 0
+	fi
+		
+    sleep 1
+    TIME=$(($TIME+1))
+	if [ $TIME -gt $TIMEOUT ] ; then
+		echo "TIME_OUT" 
+		rm -rf $L2TP_RESULT_FILE
+		exit 1
+	fi	
+done
+

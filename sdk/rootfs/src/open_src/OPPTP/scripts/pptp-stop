@@ -1,0 +1,109 @@
+#!/bin/sh
+
+if [ -n $1 ]; then
+	MULTIWAN=$1
+else
+	MULTIWAN=
+fi
+
+if [ -z $MULTIWAN ]; then
+	PIDFILE="/var/run/pptp.pidfile"
+	PIDFILE_PPPD="/var/run/ppp-pptp.pid"
+	PPTP_PHASE1_TYPE=`rdcsman 00050e00 u32`
+else
+#	TMP=$((MULTIWAN+1))
+	TMP=`printf "%x" $((MULTIWAN+1))`
+	PIDFILE="/var/run/pptp$MULTIWAN.pidfile"
+	PIDFILE_PPPD="/var/run/ppp-pptp$MULTIWAN.pid"
+	PPTP_PHASE1_TYPE=`rdcsman 00050e0$TMP u32`
+fi
+
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+
+#CONFIG=/etc/ppp/pptp.conf
+#export CONFIG
+#. $CONFIG
+. /usr/bin/scriptlib
+
+# Ignore SIGTERM
+trap "" 15
+
+# Check for pidfile
+if [ -r $PIDFILE_CONNECT ]; then
+	PID=`cat $PIDFILE_CONNECT`
+
+	# Check if still running
+	kill -0 $PID > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		echo "$0: The pptp-connect script (PID $PID) appears to have died" >& 2
+	else
+		# Kill pptp-connect
+		echo "Killing pptp-connect ($PID)"
+		kill -9 $PID > /dev/null 2>&1
+	fi
+fi
+
+# Kill pppd, which should in turn kill pptp
+if [ -r $PIDFILE_PPPD ]; then
+	echo "pptp-stop: Killing pptp"
+  	sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+   	#echo "Killing pppd ($PPP_PID)"
+	#kill $PPP_PID > /dev/null 2>&1
+	#killall pptp > /dev/null 2>&1
+	if [ -z $MULTIWAN ]; then
+		PPTP_PNSSERVER="`rdcsman 0x00050600 str`"
+	else
+		PPTP_PNSSERVER="`rdcsman 0x0005060$TMP str`"
+	fi
+
+	# Kill user mode pptp client
+#	if [ "$KERNEL_MODE" != "1" ]; then
+	if [ ! -f "/lib/pptp.so" ]; then
+		pslist=`ps | grep "pptp: call for" | grep $PPTP_PNSSERVER `
+		if [ ! -z "$pslist" ]; then
+			PPTP_PID=
+			for i in $pslist
+			do
+				PPTP_PID=`echo $i`
+				break
+			done
+			echo "Killing pptp ($PPTP_PID)"
+			kill $PPTP_PID > /dev/null 2>&1
+		fi
+	fi
+
+	# Kill pppd for user/kernel mode
+	sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+	kill -0 $PPP_PID > /dev/null 2>&1
+	[ $? -eq 0 ] && kill $PPP_PID > /dev/null 2>&1
+	[ $? -ne 0 ] && kill -9 $PPP_PID > /dev/null 2>&1
+fi
+
+# Kill pptp-start
+if [ -r $PIDFILE_START ]; then
+	PIDS=`cat $PIDFILE_START`
+	kill -0 $PIDS > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		kill -9 $PIDS > /dev/null 2>&1
+	fi
+fi
+
+rm -f "$PIDFILE_START" "$PIDFILE_CONNECT" "$PIDFILE_PPPD"
+
+if [ $PPTP_PHASE1_TYPE -eq 0 ]; then
+	if [ -z $MULTIWAN ]; then
+		udhcpc-action stop
+	else
+		udhcpc-action stop $MULTIWAN
+	fi
+elif [ $PPTP_PHASE1_TYPE -eq 1 ]; then
+	if [ -z $MULTIWAN ]; then
+		fixip-action stop
+	else
+		fixip-action stop $MULTIWAN
+	fi
+fi
+
+exit 0
+

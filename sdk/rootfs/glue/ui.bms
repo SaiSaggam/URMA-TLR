@@ -1,0 +1,29 @@
+
+#========================#
+# BIN File for UI	 #
+#========================#
+
+r UI.sqfs
+
+#--- Section Tag Header
+#i stag
+#-bend 1
+#-id 5
+
+#--- Upgrade Header
+i auh20
+-bend 0
+-r "DGI6E4006001"
+-fm 0x6E40
+-es 0x4EA0000
+-el 0x0240000
+-do 0x4EA0000
+-it 0
+-si 5
+-lp 1
+
+#--- Section A done!!!
+w ui.bin
+#--- quit ---
+q
+

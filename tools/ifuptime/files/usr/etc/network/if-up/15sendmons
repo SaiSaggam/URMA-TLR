@@ -1,0 +1,16 @@
+#!/bin/sh
+
+case "$IFACE" in
+
+    "eth1" | "eth2" | "eth3" | "eth4")  # Only accept eth1  eth2  eth3  eth4 names
+        INSTANCE=${IFACE#eth}
+	    sendmsg ethmon 1 connected eth ${INSTANCE}
+	    ;;
+    bridge*) # inform bridge of state changes
+        INSTANCE=${IFACE#bridge}
+    	sendmsg bridgemon ${INSTANCE} connected bridge ${INSTANCE}
+	    ;;
+    *)
+    	;;
+esac
+

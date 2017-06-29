@@ -1,0 +1,215 @@
+#!/bin/bash
+#
+# Script for converting SNMP UCI configuration to native format
+#
+
+export UCI_CONFIG_DIR="/home/digi"
+
+CONFIGFILE="/etc/snmpd.conf"
+
+. /lib/functions.sh
+. /lib/config/uci.sh
+
+
+# Default Values
+default_v2c="off"
+default_v3="off"
+default_port="161"
+default_auth_traps="off"
+default_access="ro"
+default_authentication="none"
+default_privacy="none"
+
+#
+# SNMPv1/v2c Community configuration
+#
+snmp_com2sec_add() {
+
+	local cfg="$1"
+	
+	config_get community $cfg community
+	[ -n "$community" ] || return 0
+
+	echo "com2sec $community default $community" >> $CONFIGFILE
+}
+
+snmp_v2c_group_add() {
+
+	local cfg="$1"
+	local group="Group"
+
+	config_get community $cfg community
+	[ -n "$community" ] || return 0
+
+	echo "group $community$group v2c $community" >> $CONFIGFILE
+}
+
+snmp_v2c_access_add() {
+	
+	local cfg="$1"
+	local group="Group"
+
+	config_get community $cfg community
+	[ -n "$community" ] || return 0
+	config_get access $cfg access $default_access
+
+	if [ "$access" = "rw" ]; then
+		write="all"
+	else
+		write="none"
+	fi
+	echo "access $community$group \"\" v2c noauth exact all $write none" >> $CONFIGFILE
+		
+}
+
+
+#
+# SNMPv3 User configuration
+#
+snmp_createuser_add() {
+
+	local cfg="$1"
+
+	config_get user $cfg user
+	[ -n "$user" ] || return 0
+	config_get authentication $cfg authentication $default_authentication
+	config_get privacy $cfg privacy $default_privacy
+	config_get authentication_password $cfg authentication_password 
+	config_get privacy_password $cfg privacy_password
+			
+	if [ "$authentication" = "none" ]; then
+		level="noauth"
+		echo "createUser $user" >> $CONFIGFILE
+	elif [ "$authentication" = "sha1" -a "$privacy" = "none" ]; then
+		level="auth  "
+		echo "createUser $user SHA $authentication_password" >> $CONFIGFILE
+
+	elif [ "$authentication" = "md5" -a "$privacy" = "none" ]; then
+		level="auth  "
+		echo "createUser $user MD5 $authentication_password" >> $CONFIGFILE
+
+	elif [ "$authentication" = "sha1" -a "$privacy" = "des" ]; then		
+		level="priv  "
+		echo "createUser $user SHA $authentication_password DES $privacy_password" >> $CONFIGFILE
+		
+	elif [ "$authentication" = "sha1" -a "$privacy" = "aes" ]; then		
+		level="priv  "
+		echo "createUser $user SHA $authentication_password AES $privacy_password" >> $CONFIGFILE		
+		
+	elif [ "$authentication" = "md5" -a "$privacy" = "des" ]; then		
+		level="priv  "
+		echo "createUser $user MD5 $authentication_password DES $privacy_password" >> $CONFIGFILE
+		
+	elif [ "$authentication" = "md5" -a "$privacy" = "aes" ]; then		
+		level="priv  "
+		echo "createUser $user MD5 $authentication_password AES $privacy_password" >> $CONFIGFILE			
+	fi
+}
+
+snmp_authuser_add() {
+
+	local cfg="$1"
+
+	config_get user $cfg user
+	[ -n "$user" ] || return 0
+	config_get access $cfg access $default_access
+	config_get authentication $cfg authentication $default_authentication
+	config_get privacy $cfg privacy $default_privacy
+		
+	if [ "$access" = "rw" ]; then
+		user_access="read,write"
+	else
+		user_access="read      "
+	fi
+	
+	if [ "$authentication" = "none" ]; then
+		level="noauth"
+	elif [ "$privacy" = "none" ]; then
+		level="auth  "
+	else
+		level="priv  "
+	fi
+
+	echo "authuser $user_access -s usm $user $level" >> $CONFIGFILE
+}
+
+
+#
+# Starts here
+#
+
+[ -f "$CONFIGFILE" ] && rm -f "$CONFIGFILE"
+
+config_load snmp
+
+config_get_bool snmp_v2c snmp v2c $default_v2c
+config_get_bool snmp_v3 snmp v3 $default_v3
+config_get snmp_port snmp port $default_port
+config_get_bool snmp_auth_traps snmp authentication_traps $default_auth_traps
+
+echo "# Global SNMP configuration" >> $CONFIGFILE
+echo "agentaddress udp:$snmp_port" >> $CONFIGFILE
+echo >> $CONFIGFILE
+
+# com2sec configuration
+echo "#       sec.name  source  community" >> $CONFIGFILE
+if [ "$snmp_v2c" -eq "1" ]; then
+    config_foreach snmp_com2sec_add snmp_community
+fi
+echo >> $CONFIGFILE
+
+# Group configuration
+echo "#       groupName  securityModel  securityName" >> $CONFIGFILE
+if [ "$snmp_v2c" -eq "1" ]; then
+	config_foreach snmp_v2c_group_add snmp_community
+fi
+echo >> $CONFIGFILE
+
+# Access configuration
+echo "#       context sec.model sec.level match read write notif" >> $CONFIGFILE
+if [ "$snmp_v2c" -eq "1" ]; then
+	config_foreach snmp_v2c_access_add snmp_community
+fi
+echo >> $CONFIGFILE
+
+# SNMPv3 configuration
+if [ "$snmp_v3" -eq "1" ]; then
+	echo "# SNMPv3 Users" >> $CONFIGFILE
+	config_foreach snmp_createuser_add snmp_user 
+	echo >> $CONFIGFILE
+	echo "# SNMPv3 User authentication" >> $CONFIGFILE
+	config_foreach snmp_authuser_add snmp_user
+	echo >> $CONFIGFILE
+fi
+
+
+echo "view all included  .1  " >> $CONFIGFILE
+echo >> $CONFIGFILE
+
+# Active monitoring configuration
+echo "# Active monitoring configuration" >> $CONFIGFILE
+if [ "$snmp_auth_traps" -eq "1" ]; then
+    echo "authtrapenable 1" >> $CONFIGFILE
+else
+	echo "authtrapenable 2" >> $CONFIGFILE
+fi
+echo >> $CONFIGFILE
+
+
+#
+# System Configuration
+#
+config_load system
+
+config_get system_name system name
+config_get system_contact system contact
+config_get system_location system location
+
+echo "# System Configuration" >> $CONFIGFILE
+echo "sysContact $system_contact" >> $CONFIGFILE
+echo "sysName $system_name" >> $CONFIGFILE
+echo "sysLocation $system_location" >> $CONFIGFILE
+echo >> $CONFIGFILE
+
+# Translator result
+echo "Translator finished"

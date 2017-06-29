@@ -1,0 +1,1 @@
+This package contains the core URMA framework. It should be client (react) only code.

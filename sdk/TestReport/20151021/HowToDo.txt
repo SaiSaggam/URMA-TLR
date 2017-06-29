@@ -1,0 +1,12 @@
+1.Replace File
+put binboy at ./tools/priv/bin/binboy
+put Makefile at ./rootfs/glue/Makefile
+
+2.How to Check
+a.Creat a jffs2.img file, and put at ./image/jffs2.img
+b.Make again, and you will get user.bin
+c.Upgrade user.bin, it start at 0x9b20000/MTD6/User
+
+3.How to Creat jffs2.img
+mkfs.jffs2 -r /home/digi -o /tmp/jffs2.img -e 0x20000 -l --pad=0x500000
+

@@ -1,0 +1,6 @@
+
+# Etherios Device Cloud queries this system setting to display the information in root folder
+group setting system "System"
+    element contact "Contact" type hex32
+
+    

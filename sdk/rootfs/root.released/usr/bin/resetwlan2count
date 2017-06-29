@@ -1,0 +1,38 @@
+#!/bin/sh
+
+IWPRIV="/usr/sbin/iwpriv"
+
+WLAN1_IF=`rdcsman 0x8000F392 str`
+	$IWPRIV $WLAN1_IF set ResetAPcounter=$1
+	if [ "$1" != "" ]; then
+		TMPIDX=`printf "0x8044802%01X" $1`
+		wrcsman "$TMPIDX 0"
+		TMPIDX=`printf "0x8044803%01X" $1`
+		wrcsman "$TMPIDX 0"
+		TMPIDX=`printf "0x8044804%01X" $1`
+		wrcsman "$TMPIDX 0"
+		TMPIDX=`printf "0x8044805%01X" $1`
+		wrcsman "$TMPIDX 0"
+		TMPIDX=`printf "0x8044806%01X" $1`
+		wrcsman "$TMPIDX 0"
+		TMPIDX=`printf "0x8044807%01X" $1`
+		wrcsman "$TMPIDX 0"
+	else
+		IDX = 0
+		while [ $IDX -le 8 ]; do
+			TMPIDX=`printf "0x8044802%01X" $IDX`
+			wrcsman "$TMPIDX 0"
+			TMPIDX=`printf "0x8044803%01X" $IDX`
+			wrcsman "$TMPIDX 0"
+			TMPIDX=`printf "0x8044804%01X" $IDX`
+			wrcsman "$TMPIDX 0"
+			TMPIDX=`printf "0x8044805%01X" $IDX`
+			wrcsman "$TMPIDX 0"
+			TMPIDX=`printf "0x8044806%01X" $IDX`
+			wrcsman "$TMPIDX 0"
+			TMPIDX=`printf "0x8044807%01X" $IDX`
+			wrcsman "$TMPIDX 0"
+			let "IDX = $IDX + 1"
+		done
+	fi
+exit 0

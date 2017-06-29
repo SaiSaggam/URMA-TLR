@@ -1,0 +1,69 @@
+#!/bin/sh
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+ 
+Index_3G="$2"
+
+PWR_GPIO=`rdcsman 0x001e0033 u8`
+ACTIVE_GPIO=`rdcsman 0x001e2760${Index_3G} u8`
+MODULE_PWR_TYPE=`rdcsman 0x001e277${Index_3G} u8`
+echo gpio:${PWR_GPIO} ACTIVE:${ACTIVE_GPIO} MODULE_TYPE:${MODULE_PWR_TYPE}
+
+restart_modem()
+{
+     if [ "$MODULE_PWR_TYPE" -eq "1" ] ; then
+        echo "Into Power cycle for I2C type"
+        # Power I2C type
+        if [ "${Index_3G}" -eq "1" ] ; then
+            # For 3G2
+            /usr/bin/ctrl-74138 stop-ext
+            sleep 6
+            /usr/bin/ctrl-74138 start-ext
+        else
+            # For 3G1
+            /usr/bin/ctrl-74138 stop
+            sleep 6
+            /usr/bin/ctrl-74138 start
+        fi
+    else
+        # Power GPIO type
+        if [ ${PWR_GPIO} != "" ] && [ ${PWR_GPIO} -le 255 ];then
+        echo "Into Power cycle"
+            if [ "$ACTIVE_GPIO" -eq "1" ] ; then
+                gpio l ${PWR_GPIO} 0 4000 0 1 4000
+                sleep 3
+                gpio l ${PWR_GPIO} 4000 0 1 0 4000
+            else
+                gpio l ${PWR_GPIO} 4000 0 1 0 4000
+                sleep 3
+                gpio l ${PWR_GPIO} 0 4000 0 1 4000
+            fi
+        fi
+#if defined(IOG761AM_0TDA1)
+        if [ ${PWR_GPIO} == "" ] || [ ${PWR_GPIO} == "0" ] ;then
+        echo "Into Power cycle for I2C dongle"
+        # Power I2C type for general case's dongle
+					/usr/bin/ctrl-74138 stop-usb
+					sleep 6
+          /usr/bin/ctrl-74138 start-usb
+        fi
+#endif
+    fi
+    sleep 2
+}
+
+usage() {
+	 echo "$0 [restartm] [index_3g]"
+	 exit 1
+}
+
+# --------------- main --------------- 
+[ -z "$1" ] && usage;
+
+case "$1" in
+    restartm)       restart_modem ;;
+    *)              usage;;
+esac
+
+exit 0 
+

@@ -1,0 +1,157 @@
+#!/bin/sh
+
+RF1_CSID_SSID=1639424
+RF1_CSID_AUTHMODE=1643264
+RF1_CSID_ENCRY=1643520
+RF1_CSID_WLANAP_KEY0=1644544
+RF1_CSID_WLANAP_KEY1=1645056
+RF1_CSID_WLANAP_KEY2=1645568
+RF1_CSID_WLANAP_KEY3=1646080
+RF1_CSID_WLANAP_DEFKEYID=1644032
+RF1_CSID_WPAPSK=1646336
+RF1_CSID_QRCODE=2149168900
+RF1_EX_SSID=`expr $RF1_CSID_SSID + $2`
+RF1_EX_AUTHMODE=`expr $RF1_CSID_AUTHMODE  + $2`
+RF1_EX_ENCRY=`expr $RF1_CSID_ENCRY  + $2`
+RF1_EX_WLANAP_KEY0=`expr $RF1_CSID_WLANAP_KEY0  + $2`
+RF1_EX_WLANAP_KEY1=`expr $RF1_CSID_WLANAP_KEY1  + $2`
+RF1_EX_WLANAP_KEY2=`expr $RF1_CSID_WLANAP_KEY2  + $2`
+RF1_EX_WLANAP_KEY3=`expr $RF1_CSID_WLANAP_KEY3  + $2`
+RF1_EX_WLANAP_DEFKEYID=`expr $RF1_CSID_WLANAP_DEFKEYID  + $2`
+RF1_EX_WPAPSK=`expr $RF1_CSID_WPAPSK  + $2`
+RF1_SSID=`rdcsman $RF1_EX_SSID str`
+RF1_AUTHMODE=`rdcsman $RF1_EX_AUTHMODE u8`
+RF1_ENCRY=`rdcsman $RF1_EX_ENCRY u8`
+RF1_WLANAP_KEY0=`rdcsman $RF1_EX_WLANAP_KEY0 str`
+RF1_WLANAP_KEY1=`rdcsman $RF1_EX_WLANAP_KEY1 str`
+RF1_WLANAP_KEY2=`rdcsman $RF1_EX_WLANAP_KEY2 str`
+RF1_WLANAP_KEY3=`rdcsman $RF1_EX_WLANAP_KEY3 str`
+RF1_WLANAP_DEFKEYID=`rdcsman $RF1_EX_WLANAP_DEFKEYID u8`
+RF1_WPAPSK=`rdcsman $RF1_EX_WPAPSK str`
+RF2_CSID_SSID=4457472
+RF2_CSID_AUTHMODE=4461312
+RF2_CSID_ENCRY=4461568
+RF2_CSID_WLANAP_KEY0=4462592
+RF2_CSID_WLANAP_KEY1=4463104
+RF2_CSID_WLANAP_KEY2=4463616
+RF2_CSID_WLANAP_KEY3=4464128
+RF2_CSID_WLANAP_DEFKEYID=4462080
+RF2_CSID_WPAPSK=4464384
+RF2_CSID_QRCODE=2151986948
+RF2_EX_SSID=`expr $RF2_CSID_SSID + $2`
+RF2_EX_AUTHMODE=`expr $RF2_CSID_AUTHMODE  + $2`
+RF2_EX_ENCRY=`expr $RF2_CSID_ENCRY  + $2`
+RF2_EX_WLANAP_KEY0=`expr $RF2_CSID_WLANAP_KEY0  + $2`
+RF2_EX_WLANAP_KEY1=`expr $RF2_CSID_WLANAP_KEY1  + $2`
+RF2_EX_WLANAP_KEY2=`expr $RF2_CSID_WLANAP_KEY2  + $2`
+RF2_EX_WLANAP_KEY3=`expr $RF2_CSID_WLANAP_KEY3  + $2`
+RF2_EX_WLANAP_DEFKEYID=`expr $RF2_CSID_WLANAP_DEFKEYID  + $2`
+RF2_EX_WPAPSK=`expr $RF2_CSID_WPAPSK  + $2`
+RF2_SSID=`rdcsman $RF2_EX_SSID str`
+RF2_AUTHMODE=`rdcsman $RF2_EX_AUTHMODE u8`
+RF2_ENCRY=`rdcsman $RF2_EX_ENCRY u8`
+RF2_WLANAP_KEY0=`rdcsman $RF2_EX_WLANAP_KEY0 str`
+RF2_WLANAP_KEY1=`rdcsman $RF2_EX_WLANAP_KEY1 str`
+RF2_WLANAP_KEY2=`rdcsman $RF2_EX_WLANAP_KEY2 str`
+RF2_WLANAP_KEY3=`rdcsman $RF2_EX_WLANAP_KEY3 str`
+RF2_WLANAP_DEFKEYID=`rdcsman $RF2_EX_WLANAP_DEFKEYID u8`
+RF2_WPAPSK=`rdcsman $RF2_EX_WPAPSK str`
+
+convertrf1()
+{
+	ssid=$RF1_SSID
+
+	if [ $RF1_AUTHMODE = "0" ] || [ $RF1_AUTHMODE = "2" ]; then
+		if [ $RF1_ENCRY = 0 ]; then
+			security=nopass
+		else
+			security=WEP
+
+			case "$RF1_WLANAP_DEFKEYID" in
+				1)
+					password=$RF1_WLANAP_KEY0
+					;;
+				2)
+					password=$RF1_WLANAP_KEY1
+					;;
+				3)
+					password=$RF1_WLANAP_KEY2
+					;;
+				4)
+					password=$RF1_WLANAP_KEY3
+					;;
+			esac
+		fi
+		
+	elif [ $RF1_AUTHMODE = "3" ] || [ $RF1_AUTHMODE = "5" ] || [ $RF1_AUTHMODE = "7" ]; then
+		security=WPA
+		password=$RF1_WPAPSK
+	fi
+	return 0
+}
+
+
+convertrf2()
+{
+	ssid=$RF2_SSID
+
+	if [ $RF2_AUTHMODE = "0" ] || [ $RF2_AUTHMODE = "2" ]; then
+		if [ $RF2_ENCRY = 0 ]; then
+			security=nopass
+		else
+			security=WEP
+
+			case "$RF2_WLANAP_DEFKEYID" in
+				1)
+					password=$RF2_WLANAP_KEY0
+					;;
+				2)
+					password=$RF2_WLANAP_KEY1
+					;;
+				3)
+					password=$RF2_WLANAP_KEY2
+					;;
+				4)
+					password=$RF2_WLANAP_KEY3
+					;;
+			esac
+		fi
+		
+	elif [ $RF2_AUTHMODE = "3" ] || [ $RF2_AUTHMODE = "5" ] || [ $RF2_AUTHMODE = "7" ]; then
+		security=WPA
+		password=$RF2_WPAPSK
+	fi
+	return 0
+}
+
+case "$1" in
+	RF1)
+
+		RF1_QR=`echo $RF1_CSID_QRCODE | cut -c 1-9`
+		RF1_EX_QRCODE=`echo $RF1_QR$2`
+
+		convertrf1
+		echo "<!-- change -->" > /usr/www/wifixmlrf1_$2.xml
+		echo "<status>" >> /usr/www/wifixmlrf1_$2.xml
+		echo "<code>WIFI:S:"\"$ssid\"";T:$security;P:$password;R:12345678;;</code>" >> /usr/www/wifixmlrf1_$2.xml
+		echo "</status>" >> /usr/www/wifixmlrf1_$2.xml
+		;;
+	
+	RF2)
+
+		RF2_QR=`echo $RF2_CSID_QRCODE | cut -c 1-9`
+		RF2_EX_QRCODE=`echo $RF2_QR$2`
+		
+		convertrf2
+		echo "<!-- change -->" > /usr/www/wifixmlrf2_$2.xml
+		echo "<status>" >> /usr/www/wifixmlrf2_$2.xml
+		echo "<code>WIFI:S:"\"$ssid\"";T:$security;P:$password;R:12345678;;</code>" >> /usr/www/wifixmlrf2_$2.xml
+		echo "</status>" >> /usr/www/wifixmlrf2_$2.xml
+		;;
+	
+	
+	*)
+		exit 1 ;;
+esac
+exit 0	
+

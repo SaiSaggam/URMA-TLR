@@ -1,0 +1,29 @@
+
+
+{
+
+  "defaulturl" : {
+    "device1" : "http://10.9.120.101",
+    "device2" : "http://10.9.120.102",
+    "localhost" : "http://localhost:3000"
+  },
+
+  "defaultusername" : {
+    "device1" : "admin",
+    "device2" : "admin",
+    "localhost" : "admin"   
+  },
+
+  "defaultpassword" : {
+    "device1" : "admin",
+    "device2" : "admin",
+    "localhost" : "admin"  
+  },
+  
+  "defaultpath" : {
+    "device1" : "firmware_113.bin",
+    "device2" : "firmware_113.bin",
+    "localhost" : "firmware_113.bin"
+  }
+
+}

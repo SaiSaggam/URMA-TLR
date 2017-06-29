@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -e
+
+UCLIB_VER=0.9.30.3
+UCLIB_VER_NEW=0.9.33.2
+
+UCLIBCDIR=$2
+RAMFSDIR=$1
+
+cp $UCLIBCDIR/libuClibc-$UCLIB_VER.so $RAMFSDIR/lib/libc.so
+cp $UCLIBCDIR/libuClibc-$UCLIB_VER.so $RAMFSDIR/lib/libc.so.0
+cp $UCLIBCDIR/ld-uClibc-$UCLIB_VER.so $RAMFSDIR/lib/ld-uClibc.so.0
+cp $UCLIBCDIR/libcrypt-$UCLIB_VER_NEW.so $RAMFSDIR/lib/libcrypt.so.0
+cp $UCLIBCDIR/libresolv-$UCLIB_VER.so $RAMFSDIR/lib/libresolv.so.0
+cp $UCLIBCDIR/libdl-$UCLIB_VER.so $RAMFSDIR/lib/libdl.so.0
+cp $UCLIBCDIR/libnsl-$UCLIB_VER.so $RAMFSDIR/lib/libnsl.so.0
+cp $UCLIBCDIR/libm-$UCLIB_VER.so $RAMFSDIR/lib/libm.so.0
+cp $UCLIBCDIR/libutil-$UCLIB_VER.so $RAMFSDIR/lib/libutil.so.0
+cp $UCLIBCDIR/libpthread-$UCLIB_VER.so $RAMFSDIR/lib/libpthread.so.0
+cp $UCLIBCDIR/libz.so.1 $RAMFSDIR/lib/libz.so.1
+ln -s libz.so.1 $RAMFSDIR/lib/libz.so
+cp $UCLIBCDIR/libgcc_s.so.1 $RAMFSDIR/lib/libgcc_s.so.1
+cp $UCLIBCDIR/liblzo2.so.2 $RAMFSDIR/lib/liblzo2.so.2
+
+cp /opt/buildroot-gcc463/usr/mipsel-unknown-linux-uclibc/lib/librt.so.0 $RAMFSDIR/lib/librt.so.0
+cp /opt/buildroot-gcc463/usr/mipsel-unknown-linux-uclibc/lib/libstdc++.so.6 $RAMFSDIR/lib/libstdc++.so.6
+

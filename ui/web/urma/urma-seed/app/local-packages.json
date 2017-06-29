@@ -1,0 +1,8 @@
+{
+  "digi:urma-core": {
+    "path": "../../urma-framework/packages/urma-core"
+  },
+  "digi:urma-styles": {
+    "path": "../../urma-framework/packages/urma-styles"
+  }
+}

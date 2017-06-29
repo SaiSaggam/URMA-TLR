@@ -1,0 +1,14 @@
+globalerror load_fail "Load fail"
+globalerror save_fail "Save fail"
+globalerror memory_fail "Insufficient memory"
+    
+  
+group setting test_error "Testing error" "Testing error callback"
+    element start_session "Start session test" type string access read_write
+    element start_action "Start action test" type string access read_write
+    element start_group "Start group test" type string access read_write
+    element process_group "Process group test" type string access read_write
+    element end_group "End group test" type string access read_write
+    element end_action "End action test" type string access read_write
+    element end_session "End session test" type string access read_write
+

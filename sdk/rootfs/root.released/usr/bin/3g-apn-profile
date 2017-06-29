@@ -1,0 +1,177 @@
+#!/bin/sh
+#
+# mainly to get APN profile index to dial, and set mcc/mnc if it's been filled-out
+# only included if dial-up type is APN Profile List
+#
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+SIMSWITCH_CHECK_FILE="/tmp/apn_profile_do_simswitch_${Index_3G}"
+APN_PROFILE_IDX_FILE="/tmp/apn_profile_idx_${Index_3G}"
+SET_COPS_FILE="/tmp/apn_profile_set_cops_${Index_3G}"
+
+get_apn_profile_index() {
+	local NOW_CNT_ORDER_DEC="`rdcsman 0x801e7c8${Index_3G} u8`" NOW_CNT_ORDER_HEX APN_PROFILE_CSID_IDX TMP_CSID_IDX_DEC
+
+	NOW_CNT_ORDER_HEX=`printf "%x" ${NOW_CNT_ORDER_DEC}`
+
+    IDX_REORDER_BY_PRIORITY_DEC="`rdcsman 0x801e83${NOW_CNT_ORDER_HEX}${Index_3G} u8`"
+    if [ "${IDX_REORDER_BY_PRIORITY_DEC}" == "0" ] ; then
+		#not point to an effective profile index, re-start from the first order
+		NOW_CNT_ORDER_DEC=0
+		NOW_CNT_ORDER_HEX=0
+        IDX_REORDER_BY_PRIORITY_DEC="`rdcsman 0x801e83${NOW_CNT_ORDER_HEX}${Index_3G} u8`"
+
+        if [ "${CSID_C_3G_MULTIWAN_SIMCARD_MODE}" == "1" ] || [ "${CSID_C_3G_MULTIWAN_SIMCARD_MODE}" == "2" ] ; then
+            echo "1" > ${SIMSWITCH_CHECK_FILE}
+        fi
+    fi
+
+	if [ "${IDX_REORDER_BY_PRIORITY_DEC}" == "0" ]; then
+		APN_PROFILE_CSID_IDX="255"
+	else
+		TMP_CSID_IDX_DEC=`expr ${IDX_REORDER_BY_PRIORITY_DEC} - 1`
+		APN_PROFILE_CSID_IDX=`printf %x ${TMP_CSID_IDX_DEC}`
+	fi
+	echo "${APN_PROFILE_CSID_IDX}" > "${APN_PROFILE_IDX_FILE}"
+
+    if [ "${NOW_CNT_ORDER_DEC}" == "15" ] ; then
+        NOW_CNT_ORDER_DEC=0
+    else
+        #icrease one for next time connection
+        NOW_CNT_ORDER_DEC=`expr ${NOW_CNT_ORDER_DEC} + 1`
+    fi
+    wrcsman "0x801e7c8${Index_3G} ${NOW_CNT_ORDER_DEC}"
+}
+
+set_mcc_mnc_for_profile() {
+	local PROFILE_MCC PROFILE_MNC NETWORK_SEL_MODE MODEM1 USB_MODEM1 CMD_OK SEL_MODE REG_STATUS_CSID_IDX
+	local VENDOR_ID PRODUCT_ID CSID_3G_IDX SIM_MCC SIM_MNC
+	local APN_PROFILE_CSID_IDX=`cat ${APN_PROFILE_IDX_FILE}`
+
+	if [ ! -f "${SET_COPS_FILE}" ] ; then
+		echo "0" > "${SET_COPS_FILE}"
+	fi
+
+	if [ $CSID_C_3G_MULTIWAN_SIMCARD_MODE == "0" ] ; then
+		PROFILE_MCC="`rdcsman 0x001e72${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+		PROFILE_MNC="`rdcsman 0x001e74${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+	else
+		DUALSIM_CARDSTATUS="`rdcsman 0x801e756$Index_3G u16`"
+		if [ $DUALSIM_CARDSTATUS == "1" ] ; then
+			PROFILE_MCC="`rdcsman 0x001e72${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+			PROFILE_MNC="`rdcsman 0x001e74${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+		elif [ $DUALSIM_CARDSTATUS == "2" ] ; then
+			PROFILE_MCC="`rdcsman 0x001e73${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+			PROFILE_MNC="`rdcsman 0x001e75${APN_PROFILE_CSID_IDX}${Index_3G} str`"
+		fi
+	fi
+
+	NETWORK_SEL_MODE="`rdcsman 0x001e227${Index_3G} u8`"
+	MODEM1="`rdcsman 0x8055007${Index} str`"
+	USB_MODEM1="/dev/${MODEM1}"
+
+	if [ "${PROFILE_MCC}" != "" ] && [ "${PROFILE_MNC}" != "" ]; then
+		if [ "${NETWORK_SEL_MODE}" != "0" ] ; then      # manual selection
+			logger -t "O3G/SCRIPT" "Got APN profile with MCC/MNC [${PROFILE_MCC}${PROFILE_MNC}], but network sel mode is manual, not try to set"
+			echo "O3G/SCRIPT" "Got APN profile with MCC/MNC [${PROFILE_MCC}${PROFILE_MNC}], but network sel mode is manual, not try to set"
+		else                                            # auto selection
+			logger -t "O3G/SCRIPT" "Got APN profile with MCC/MNC [${PROFILE_MCC}${PROFILE_MNC}], set AT+COPS"
+			echo "Got APN profile with MCC/MNC [${PROFILE_MCC}${PROFILE_MNC}], set AT+COPS"
+
+			VENDOR_ID="`rdcsman 0x8055004${Index} u16`"
+			PRODUCT_ID="`rdcsman 0x8055005${Index} u16`"
+			CSID_3G_IDX=`expr ${Index_3G} + 1`
+			SIM_MCC="`rdcsman 0x801e2b4${CSID_3G_IDX} u16`"
+			SIM_MNC="`rdcsman 0x801e2b5${CSID_3G_IDX} u16`"
+			if [ "${VENDOR_ID}" == "4817" ] && [ "${PRODUCT_ID}" == "5491" ]; then		# for Huawei ME909u
+				# since it is always successful to set the COPS to manual selection first and then set the COPS with MCC/MNC to the one we want for ME909u
+				if [ ${SIM_MNC} -lt 10 ]; then
+					SIM_MNC="0${SIM_MNC}"
+				fi
+
+				#logger -t "O3G/SCRIPT" "Got SIM MCC/MNC [${SIM_MCC}${SIM_MNC}]"
+				${ATCMD_PROG} ${USB_MODEM1} AT+COPS=1,2,\"${SIM_MCC}${SIM_MNC}\"
+				sleep 1
+				${ATCMD_PROG} ${USB_MODEM1} AT+COPS=1,2,\"${PROFILE_MCC}${PROFILE_MNC}\"
+			else
+				${ATCMD_PROG} ${USB_MODEM1} AT+COPS=1,2,\"${PROFILE_MCC}${PROFILE_MNC}\"
+			fi
+
+			echo "1" > "${SET_COPS_FILE}"
+
+			# first write reg_status CSID to 2(searching network to register), and wait 3g_nodifyd or mal_daemon to renew reg_status
+			REG_STATUS_CSID_IDX=`expr ${Index_3G} + 1`
+			wrcsman "0x801e190${REG_STATUS_CSID_IDX} 2"
+
+			sleep 2
+		fi
+	else
+		SEL_MODE=`cat ${SET_COPS_FILE}`
+		#logger -t "O3G/SCRIPT" "SEL_MODE [${SEL_MODE}]"
+        
+		if [ "${SEL_MODE}" == "1" ] && [ "${NETWORK_SEL_MODE}" == "0" ]; then
+			${ATCMD_PROG} ${USB_MODEM1} AT+COPS=0
+			echo "0" > "${SET_COPS_FILE}"
+
+			# first write reg_status CSID to 2(searching network to register)
+			REG_STATUS_CSID_IDX=`expr ${Index_3G} + 1`
+			wrcsman "0x801e190${REG_STATUS_CSID_IDX} 2"
+
+			sleep 2
+		fi
+	fi
+}
+
+check_apn_profile() {
+	get_index "$1" "$2"
+	get_sim_mode
+
+	# reorder the connection sequence
+	get_apn_profile_priority ${Index_3G}
+
+	# get profile index here, and get profile config later in get_config
+	get_apn_profile_index ${Index_3G}
+	if [ ${IDX_REORDER_BY_PRIORITY_DEC} == 0 ] ; then
+		logger -t "O3G/SCRIPT" "No APN profile is enabled or be filled out, don't start the connection"
+		echo "No APN profile is enabled or be filled out, don't start the connection"
+
+		local CLEAN_INDEX=0
+		wrcsman "0x801e7c8${Index_3G} ${CLEAN_INDEX}"
+
+		return 1
+	else
+		local WAN_3G_INDEX=`expr ${Index_3G} + 1`
+		logger -t "O3G/SCRIPT" "Dail-up type is APN profile list, 3G${WAN_3G_INDEX} connect with profile index [${IDX_REORDER_BY_PRIORITY_DEC}]"
+		echo "Dail-up type is APN profile list, 3G${WAN_3G_INDEX} connect with profile index [${IDX_REORDER_BY_PRIORITY_DEC}]"
+	fi
+
+	# to check whether need to do SIM switch or not
+	if [ "${CSID_C_3G_MULTIWAN_SIMCARD_MODE}" == "1" -o "${CSID_C_3G_MULTIWAN_SIMCARD_MODE}" == "2" ] ; then
+		local SIMSWITCH_FOR_APN_PROFILE=`cat "${SIMSWITCH_CHECK_FILE}"`
+		if [ "${SIMSWITCH_FOR_APN_PROFILE}" == "1" ] ; then
+			logger -t "O3G/SCRIPT" "All APN profile is dialed, stop connection and do SIM switch"
+			echo "All APN profile is dialed, stop connection and do SIM switch"
+
+			local CLEAN_INDEX=0
+			wrcsman "0x801e7c8${Index_3G} ${CLEAN_INDEX}"
+
+			return 1
+		fi
+	fi
+
+	# to set MCC/MNC if profile got those configuration
+	set_mcc_mnc_for_profile ${Index} ${Index_3G}
+
+	return 0
+}
+
+remove_apn_profile_chk_file() {
+
+	#[ -f "${SIMSWITCH_CHECK_FILE}" ] && rm -f "${SIMSWITCH_CHECK_FILE}"
+	[ -f "${APN_PROFILE_IDX_FILE}" ] && rm -f "${APN_PROFILE_IDX_FILE}"
+	#[ -f "${SET_COPS_FILE}" ] && rm -f "${SET_COPS_FILE}"
+
+	return 0
+}

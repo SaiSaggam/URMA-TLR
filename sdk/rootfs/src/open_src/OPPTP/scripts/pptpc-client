@@ -1,0 +1,491 @@
+#!/bin/sh
+
+#PIDFILE_PPPD="/var/run/ppp$2.pid"
+PPP_PATH="/var/run/"
+PIDFILE_PPPD="/var/run/ppp-pptp.pid"
+
+#PID=`cat $PIDFILE_PPPD`
+
+PPTPC_CLI_ENABLE=`rdcsman 0x00051100 u8`
+
+
+#### main ####
+[ -z "$1" ] && usage
+case "$1" in
+
+# connect to remote pptp server
+  start)
+
+	pptpc-client stop 2
+
+	#CSID_S_PPTP_CLI_ALTERED
+    wrcsman "0x80051001 0x01"
+	#CSID_C_PPTP_CLI_ACTIVE
+    wrcsman "0x00051a00 0x01"
+
+   	e=`rdcsman 0x00051000 u8`
+    if [ $e = "1" ] ; then
+    	echo " PPTPClient Enabled ..... [WAITING]"
+    else
+        echo " PPTPClient Not enabled ..... [WARNING]"
+        exit
+    fi
+
+	#check if wantype do not get IP, break and exit.
+	cnt_tp=`rdcsman 0x00010003 u32`
+	if [ $cnt_tp -eq 0 ] ; then    #dynamic
+		d_ip=`rdcsman 0x80035002 ipv4`
+		if [ $d_ip -eq 0 ] ; then
+			echo "No WAN IP, Check WAN"
+        	exit
+		fi
+	elif [ $cnt_tp -eq 32 ]; then  #static
+		echo "Static IP"
+	    
+	elif [ $cnt_tp -eq 64 ]; then  #PPPOE
+        poe_ip=`rdcsman 0x80040200 ipv4`
+        if [ $poe_ip -eq 0 ] ; then
+            echo "No WAN IP, Check WAN"
+            exit
+        fi
+	fi
+
+   	i=0
+	CNTED=0 # for config connection status
+    while [ $i != 20 ]; do  #default 20 connection max
+        if [ $i -lt 10 ] ; then
+            PPTPC_CLI_ENABLE=`rdcsman 0x0005110$i u8`
+            if [ $PPTPC_CLI_ENABLE -eq 1 ] ; then
+            	# connect type, 0x00051700, on demand=0, auto=1, manual=2
+				CONNECT_TYPE=`rdcsman 0x0005170$i u8`
+				# auto type
+				if [ $CONNECT_TYPE -eq 1 ] ; then
+                	echo "pptpc-client, line 60: PPP Connectting"
+                	USER=`rdcsman 0x0005140$i str`
+                	PEERIP="`rdcsman 0x0005130$i ipv4`"
+
+					## check PEERIP in Connection status list
+					L=0
+					while [ $L != 20 ]; do
+						if [ $L -lt 10 ] ; then
+							LIST=`rdcsman 0x8005170$L u16`
+							#echo "LIST=$LIST"
+						fi
+						if [ $L -ge 10 ] ; then
+                            LIST=`rdcsman 0x800517$L u16`
+                            #echo "LIST=$LIST"
+                        fi
+						L_CHK=`expr $i + 1`
+						if [ $LIST -eq $L_CHK ] ; then
+							echo "Config ID already connected"
+							CNTED=1
+							break
+						fi
+						L=`expr $L + 1`
+                    done
+
+					# Reconnect times, default 5 times. If no connected, reconnect.
+					if [ $CNTED -eq 0 ] ; then
+						cnt_times=0
+	                    while [ $cnt_times != 5 ]; do
+                			echo 1 > /proc/fast_pptp
+                			echo 0 > /proc/hw_nat
+                			pptpc-action start $PEERIP 
+							echo "pptpc-client, line 95: pptpc-connect $PEERIP 1 $USER"
+                			pptpc-connect $PEERIP 1 $USER&
+							sleep 2
+							echo "sleep 2 sec"
+							if [ -r $PIDFILE_PPPD ] ; then
+								cat $PIDFILE_PPPD
+						     	PPP_IF=`awk "{if(NR==2) print}" $PIDFILE_PPPD`
+								#get virtual IP
+                        		Virtual_IP="`ifconfig $PPP_IF | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`"
+                        		echo "Virtual_IP= $Virtual_IP"
+								if [ -z $Virtual_IP ] ; then
+									echo "empty IP value, connect fail, retry again"
+								else
+									echo "connect successful!"
+									break
+								fi
+							else
+								echo "connect fail, retry again"
+							fi
+				        	cnt_times=`expr $cnt_times + 1`
+						done
+					fi
+
+					# if connected, record it
+					if [ $CNTED -eq 0 ] ; then
+                    	if [ -r $PIDFILE_PPPD ] ; then
+							echo "PPPD"
+							cat $PIDFILE_PPPD
+							PPP_PID=`awk "{if(NR==1) print}" $PIDFILE_PPPD`
+							PPP_IF=`awk "{if(NR==2) print}" $PIDFILE_PPPD`
+							echo "PPP_PID=$PPP_PID, PPP_IF=$PPP_IF"
+							#get real IP
+                        	Real_IP=`ifconfig eth1 | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`
+                        	echo "Real_IP=$Real_IP"
+							#get virtual IP
+							Virtual_IP=`ifconfig $PPP_IF | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`
+							echo "1. Virtual_IP=$Virtual_IP"
+                        	Virtual_IP="`ifconfig $PPP_IF | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`"
+                        	echo "2. Virtual_IP=$Virtual_IP"
+							#get interface remote server
+							Remote_IP=`ifconfig $PPP_IF | awk -F ":" '/Mask:/ {printf $3}' | awk '{printf $1}'`				
+							echo "Remote_IP=$Remote_IP"
+							k=0
+                        	if [ -z $Virtual_IP ] ; then
+                            	echo "empty Virtual IP value, do not save it in CSID"
+								k=20
+                        	else
+                            	echo "prepare to save in CSID"
+                        	fi
+							echo "k=$k, if 20, not save CSID"
+							while [ $k != 20 ]; do
+								if [ $k -lt 10 ] ; then
+									CHECKPID=`rdcsman 0x8005140$k s32`
+									if [ $CHECKPID -eq 0 ] ; then
+										ID=`expr $i + 1`
+                            			wrcsman "0x8005120$k {$Real_IP}"
+                            			wrcsman "0x8005130$k {$Virtual_IP}"
+                            			wrcsman "0x8005160$k {$Remote_IP}"
+                            			wrcsman "0x8005140$k $PPP_PID"
+                            			wrcsman "0x8005150$k \"$PPP_IF"
+										wrcsman "0x8005170$k $ID"
+										echo "line 155: save csid successful"
+										break
+									fi
+                        		fi
+                        		if [ $k -ge 10 ] ; then
+                                	CHECKPID=`rdcsman 0x800514$k str`
+                                	if [ $CHECKPID -eq 0 ] ; then
+                                    	ID=`expr $i + 1`
+      									wrcsman "0x800512$k {$Real_IP}"
+                            			wrcsman "0x800513$k {$Virtual_IP}"
+                            			wrcsman "0x800516$k {$Remote_IP}"
+                            			wrcsman "0x800514$k $PPP_PID"
+                            			wrcsman "0x800515$k \"$PPP_IF"
+                                    	wrcsman "0x800517$k $ID"
+                           				echo "line 169: save csid successful"
+                                    	break
+									fi
+                        		fi
+                        		k=`expr $k + 1`
+							done
+                   		fi
+					fi
+				fi
+            fi
+		fi
+
+       	if [ $i -ge 10 ] ; then
+            PPTPC_CLI_ENABLE=`rdcsman 0x000511$i u8`
+            if [ $PPTPC_CLI_ENABLE -eq 1 ] ; then
+                # connect type, 0x00051700, on demand=0, auto=1, manual=2
+                CONNECT_TYPE=`rdcsman 0x000517$i u8`
+                # auto type
+                if [ $CONNECT_TYPE -eq 1 ] ; then
+                    echo "pptpc-client, line 183: PPP Connectting"
+                    USER=`rdcsman 0x000514$i str`
+                    PEERIP="`rdcsman 0x000513$i ipv4`"
+
+                    ## check PEERIP in Connection status list
+                    L=0
+                    while [ $L != 20 ]; do
+                        if [ $L -lt 10 ] ; then
+                            LIST=`rdcsman 0x8005170$L u16`
+                            #echo "LIST=$LIST"
+                        fi
+                        if [ $L -ge 10 ] ; then
+                            LIST=`rdcsman 0x800517$L u16`
+                            #echo "LIST=$LIST"
+                        fi
+                        L_CHK=`expr $i + 1`
+                        if [ $LIST -eq $L_CHK ] ; then
+                            echo "Config ID already connected"
+							CNTED=1
+                            break
+                        fi
+                        L=`expr $L + 1`
+                    done
+
+                    # Reconnect times, default 5 times. If no connected, reconnect.
+                    if [ $CNTED -eq 0 ] ; then
+                        cnt_times=0
+                        while [ $cnt_times != 5 ]; do
+                            echo 1 > /proc/fast_pptp
+                            echo 0 > /proc/hw_nat
+                            pptpc-action start $PEERIP
+                            echo "pptpc-client, line 218: pptpc-connect $PEERIP 1 $USER"
+                            pptpc-connect $PEERIP 1 $USER&
+                            sleep 2
+                            echo "sleep 2 sec"
+                            if [ -r $PIDFILE_PPPD ] ; then
+								cat $PIDFILE_PPPD
+                                PPP_IF=`awk "{if(NR==2) print}" $PIDFILE_PPPD`
+                                #get virtual IP
+                                Virtual_IP="`ifconfig $PPP_IF | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`"
+                                echo "Virtual_IP= $Virtual_IP"
+                                if [ -z $Virtual_IP ] ; then
+                                    echo "empty IP value, connect fail, retry again"
+                                else
+                                    echo "connect successful!"
+                                    break
+                                fi
+                            else
+                                echo "connect fail, retry again"
+                            fi
+                            cnt_times=`expr $cnt_times + 1`
+                        done
+                    fi
+
+                    # if connected, record it
+ 					if [ $CNTED -eq 0 ] ; then
+                    	if [ -r $PIDFILE_PPPD ] ; then
+                        	echo "PPPD"
+                        	cat $PIDFILE_PPPD
+                        	PPP_PID=`awk "{if(NR==1) print}" $PIDFILE_PPPD`
+                        	PPP_IF=`awk "{if(NR==2) print}" $PIDFILE_PPPD`
+                        	echo "PPP_PID=$PPP_PID, PPP_IF=$PPP_IF"
+  							#get real IP
+                        	Real_IP=`ifconfig eth1 | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`
+                        	echo "Real_IP=$Real_IP"
+                        	#get virtual IP
+                        	Virtual_IP=`ifconfig $PPP_IF | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`
+                        	echo "1. Virtual_IP=$Virtual_IP"
+                        	Virtual_IP="`ifconfig $PPP_IF | awk -F ":" '/inet addr/ {printf $2}' | awk '{printf $1}'`"
+                        	echo "2. Virtual_IP=$Virtual_IP"
+                        	#get interface remote server
+                        	Remote_IP=`ifconfig $PPP_IF | awk -F ":" '/Mask:/ {printf $3}' | awk '{printf $1}'`
+                        	echo "Remote_IP=$Remote_IP"
+                       		k=0
+                        	if [ -z $Virtual_IP ] ; then
+                            	echo "empty Virtual IP value, do not save it in CSID"
+                            	k=20
+                        	else
+                            	echo "prepare to save in CSID"
+                        	fi
+                        	while [ $k != 20 ]; do
+                            	if [ $k -lt 10 ] ; then
+                                	CHECKPID=`rdcsman 0x8005140$k s32`
+                                	if [ $CHECKPID -eq 0 ] ; then
+                                    	ID=`expr $i + 1`
+                                    	wrcsman "0x8005120$k {$Real_IP}"
+                                    	wrcsman "0x8005130$k {$Virtual_IP}"
+                                    	wrcsman "0x8005160$k {$Remote_IP}"
+                                    	wrcsman "0x8005140$k $PPP_PID"
+                                    	wrcsman "0x8005150$k \"$PPP_IF"
+                                    	wrcsman "0x8005170$k $ID"
+                                    	echo "line 279: save csid successful"
+                                    	break
+                                	fi
+                            	fi
+                            	if [ $k -ge 10 ] ; then
+                                	CHECKPID=`rdcsman 0x800514$k str`
+                                	if [ $CHECKPID -eq 0 ] ; then
+                                    	ID=`expr $i + 1`
+                                    	wrcsman "0x800512$k {$Real_IP}"
+                                    	wrcsman "0x800513$k {$Virtual_IP}"
+                                    	wrcsman "0x800516$k {$Remote_IP}"
+                                    	wrcsman "0x800514$k $PPP_PID"
+                                    	wrcsman "0x800515$k \"$PPP_IF"
+                                    	wrcsman "0x800517$k $ID"
+                                    	echo "line 293: save csid successful"
+                                    	break
+                                	fi
+                            	fi
+                            	k=`expr $k + 1`
+                        	done
+                    	fi
+					fi
+                fi
+            fi
+        fi
+        i=`expr $i + 1`
+		CNTED=0
+    done
+
+	echo "pptpc-client, line 301: finished..."
+
+    echo
+    ;;
+
+# disconnect from remote pptp server
+  stop)
+	#clear show connect status test
+    #pptp-action stop& 
+
+	#kill all active connection
+	if [ $2 = 1 ] ; then
+		echo "kill all pptp connection"
+		k=0
+    	while [ $k != 20 ]; do
+	    	if [ $k -lt 10 ] ; then
+   				PEER_PID=`rdcsman 0x8005140$k s32`
+				PEER_IF=`rdcsman 0x8005150$k str`
+				if [ $PEER_PID -gt 0 ] ; then
+	   				echo "Killing pptp-connect ($PEER_PID, $PEER_IF.pid killed)"
+        			kill $PEER_PID > /dev/null 2>&1
+					wrcsman "0x8005120$k 0"
+                	wrcsman "0x8005130$k 0"
+                	wrcsman "0x8005160$k 0"
+       				wrcsman "0x8005140$k 0"
+                	wrcsman "0x8005150$k \""
+                	wrcsman "0x8005170$k 0"
+				fi
+			fi
+       		if [ $k -ge 10 ] ; then
+            	PEER_PID=`rdcsman 0x800514$k s32`
+            	PEER_IF=`rdcsman 0x800515$k str`
+            	if [ $PEER_PID -gt 0 ] ; then
+                	echo "Killing pptp-connect ($PEER_PID, $PEER_IF.pid killed)"
+                	kill $PEER_PID > /dev/null 2>&1
+              		wrcsman "0x800512$k 0"
+                	wrcsman "0x800513$k 0"
+                	wrcsman "0x800516$k 0"
+					wrcsman "0x800514$k 0"
+                	wrcsman "0x800515$k \""
+                	wrcsman "0x800517$k 0"
+            	fi
+        	fi
+			k=`expr $k + 1`
+		done
+	fi
+	# remove unexist ppp connection in connection status list
+	if [ $2 = 2 ] ; then
+		echo "remove unexist ppp record"
+      	k=0
+        while [ $k != 20 ]; do
+            if [ $k -lt 10 ] ; then
+                PEER_IF="`rdcsman 0x8005150$k str`"
+				PPP_PATH=$PPP_PATH$PEER_IF.pid
+				#echo "PPP_PATH=$PPP_PATH"
+ 				if [ -e $PPP_PATH ] ; then
+					echo "$PPP_PATH connection still alive"
+				else
+					if [ -z $PEER_IF ] ; then  #-z empty string, -n not empty string
+						echo "no ppp$k connection, skip"
+					else
+						echo "$PPP_PATH connection die, remove in list"
+                    	echo "Killing pptp-connect ($PEER_PID, $PEER_IF.pid killed)"
+                    	kill $PEER_PID > /dev/null 2>&1
+						wrcsman "0x8005120$k 0"
+                    	wrcsman "0x8005130$k 0"
+                    	wrcsman "0x8005160$k 0"
+                    	wrcsman "0x8005140$k 0"
+                    	wrcsman "0x8005150$k \""
+                    	wrcsman "0x8005170$k 0"
+						# sorting status list
+						m=0
+						n=`expr 20 - $k`
+						o=$k
+						while [ $m != $n ]; do
+							ne=`expr $o + 1`
+							if [ $o -lt 9 ] ; then
+								T_RIP=`rdcsman 0x8005120$ne ipv4`
+								T_VIP=`rdcsman 0x8005130$ne ipv4`
+                                T_ReIP=`rdcsman 0x8005160$ne ipv4`
+								T_PID=`rdcsman 0x8005140$ne s32`
+                				T_IF=`rdcsman 0x8005150$ne str`
+                                T_ID=`rdcsman 0x8005170$ne ipv4`
+								wrcsman "0x8005120$o {$T_RIP}"
+                                wrcsman "0x8005130$o {$T_VIP}"
+                                wrcsman "0x8005160$o {$T_ReIP}"
+                                wrcsman "0x8005140$o $T_PID"
+                                wrcsman "0x8005150$o \"$T_IF"
+                                wrcsman "0x8005170$o $T_ID"
+							fi
+							if [ $o -eq 9 ] ; then
+                                T_RIP=`rdcsman 0x800512$ne ipv4`
+                                T_VIP=`rdcsman 0x800513$ne ipv4`
+                                T_ReIP=`rdcsman 0x800516$ne ipv4`
+                                T_PID=`rdcsman 0x800514$ne s32`
+                                T_IF=`rdcsman 0x800515$ne str`
+                                T_ID=`rdcsman 0x800517$ne ipv4`
+                                wrcsman "0x8005120$o {$T_RIP}"
+                                wrcsman "0x8005130$o {$T_VIP}"
+                                wrcsman "0x8005160$o {$T_ReIP}"
+                                wrcsman "0x8005140$o $T_PID"
+                                wrcsman "0x8005150$o \"$T_IF"
+                                wrcsman "0x8005170$o $T_ID"
+                            fi
+							if [ $o -ge 10 ] ; then
+                                T_RIP=`rdcsman 0x800512$ne ipv4`
+                                T_VIP=`rdcsman 0x800513$ne ipv4`
+                                T_ReIP=`rdcsman 0x800516$ne ipv4`
+                                T_PID=`rdcsman 0x800514$ne s32`
+                                T_IF=`rdcsman 0x800515$ne str`
+                                T_ID=`rdcsman 0x800517$ne ipv4`
+                                wrcsman "0x800512$o {$T_RIP}"
+                                wrcsman "0x800513$o {$T_VIP}"
+                                wrcsman "0x800516$o {$T_ReIP}"
+                                wrcsman "0x800514$o $T_PID"
+                                wrcsman "0x800515$o \"$T_IF"
+                                wrcsman "0x800517$o $T_ID"
+                            fi							
+							o=`expr $o + 1`
+      						m=`expr $m + 1`
+        				done #end sorting
+					fi
+				fi
+            fi
+            if [ $k -ge 10 ] ; then
+                PEER_IF=`rdcsman 0x800515$k str`
+            	PPP_PATH=$PPP_PATH$PEER_IF.pid
+                #echo "PPP_PATH=$PPP_PATH"
+                if [ -e $PPP_PATH ] ; then
+                    echo "$PPP_PATH connection still alive"
+                else
+                    if [ -z $PEER_IF ] ; then #-z empty, -n not empty
+                        echo "no ppp$k connection, skip"
+                    else
+                    	echo "$PPP_PATH connection die, remove in list"
+                    	echo "Killing pptp-connect ($PEER_PID, $PEER_IF.pid killed)"
+                    	kill $PEER_PID > /dev/null 2>&1
+                    	wrcsman "0x800512$k 0"
+                    	wrcsman "0x800513$k 0"
+                    	wrcsman "0x800516$k 0"
+                    	wrcsman "0x800514$k 0"
+                    	wrcsman "0x800515$k \""
+                    	wrcsman "0x800517$k 0"
+                        # sorting status list
+                        m=0
+                        n=`expr 20 - $k`
+                        o=$k
+                        while [ $m != $n ]; do
+                            ne=`expr $o + 1`
+                            T_RIP=`rdcsman 0x800512$ne ipv4`
+                            T_VIP=`rdcsman 0x800513$ne ipv4`
+                            T_ReIP=`rdcsman 0x800516$ne ipv4`
+                            T_PID=`rdcsman 0x800514$ne s32`
+                            T_IF=`rdcsman 0x800515$ne str`
+                            T_ID=`rdcsman 0x800517$ne ipv4`
+                            wrcsman "0x800512$o {$T_RIP}"
+                            wrcsman "0x800513$o {$T_VIP}"
+                            wrcsman "0x800516$o {$T_ReIP}"
+                            wrcsman "0x800514$o $T_PID"
+                            wrcsman "0x800515$o \"$T_IF"
+                            wrcsman "0x800517$o $T_ID"
+                            o=`expr $o + 1`
+                            m=`expr $m + 1`
+                        done #end sorting
+					fi
+                fi
+            fi
+            k=`expr $k + 1`
+			PPP_PATH="/var/run/"
+        done
+	fi
+
+    echo
+    ;;
+  *)
+    echo "Usage: $0 {start|stop 1}"
+    echo "start: pptp-client start"
+    echo "stop: pptp-client stop ppp0"
+    exit 1
+esac
+
+exit 0
+
+

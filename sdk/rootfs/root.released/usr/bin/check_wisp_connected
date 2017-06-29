@@ -1,0 +1,15 @@
+#!/bin/sh
+
+IWCONF="/usr/sbin/iwconfig"
+ETH="apcli0"
+STRING="Not-Associated"
+	
+local CFG s  
+	
+CFG=`$IWCONF $ETH`
+for s in $CFG
+do		
+    if [ "$s" = "$STRING" ] ; then
+		wrcsman "0x80365007 1" # change CSID_S_WISP_CNT_STATUS to WISP_CNT_STATUS_CONNECTING
+	fi
+done

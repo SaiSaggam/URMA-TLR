@@ -1,0 +1,58 @@
+{
+  "name": "urma-seed",
+  "version": "1.0.0",
+  "description": "Unified Remote Management Architecture (URMA) seed app for a new device UI",
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@stash.digi.com/idigi/urma-seed.git"
+  },
+  "author": "",
+  "contributers": [
+    "Dave Hutchison <dave.hutchison@digi.com>",
+    "Dana Immertreu <dana.immertreau@digi.com>",
+    "Jeff Ryan <jeff.ryan@digi.com>"
+  ],
+  "license": "ISC",
+  "private": true,
+  "main": "entry/client/entry.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "global_install": "node .tools/global_installer.js",
+    "postinstall": "mgp",
+    "start": "meteor",
+    "build": "gulp --cwd . --gulpfile .tools/gulpfile.js",
+    "build_debug": "gulp --cwd . --gulpfile .tools/gulpfile.js meteorDebugDist",
+    "test": "meteor test-packages --driver-package=practicalmeteor:mocha digi:urma-tlr"
+  },
+  "dependencies": {
+    "browser": "^0.2.6",
+    "busboy": "^0.2.12",
+    "chai": "^3.5.0",
+    "events": "^1.1.0",
+    "growl": "^1.9.2",
+    "gulp": "^3.9.1",
+    "history": "^1.17.0",
+    "jade": "^1.11.0",
+    "mkdirp": "^0.5.1",
+    "mocha": "^2.4.5",
+    "package-script": "^0.0.8",
+    "react": "^0.14.7",
+    "react-addons-create-fragment": "0.14.7",
+    "react-addons-linked-state-mixin": "0.14.7",
+    "react-addons-pure-render-mixin": "0.14.7",
+    "react-addons-test-utils": "0.14.7",
+    "react-addons-transition-group": "0.14.7",
+    "react-addons-update": "0.14.7",
+    "react-dom": "^0.14.7",
+    "react-fileupload-progress": "^0.3.0",
+    "react-helmet": "^2.3.0",
+    "react-mixin": "^3.0.3",
+    "react-modal-dialog": "^2.0.0",
+    "react-router": "^2.4.0",
+    "jstz":"1.0.7",
+    "formsy-react": "^0.18.0"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,75 @@
+#!/bin/sh
+
+print_usage()
+{
+	echo "ctrl-74138 use for cut on/off USB by 74138, apply at I-serial product"
+	echo "Usage:"
+	echo "-----------------------------"
+	echo "On-Board 3G"
+	echo "ctrl-74138 start"
+	echo "ctrl-74138 stop"
+	echo "Extend 3G"
+        echo "ctrl-74138 start-ext"
+        echo "ctrl-74138 stop-ext"
+        echo "USB 3G"
+        echo "ctrl-74138 start-usb"
+        echo "ctrl-74138 stop-usb"
+	echo "-----------------------------"
+}
+
+case "$1" in
+
+stop)
+	gpio l 18 4000 0 1 0 4000
+	sleep 1
+	gpio l 33 4000 0 1 0 4000
+	gpio l 34 0 4000 0 1 4000
+	gpio l 35 4000 0 1 0 4000
+	sleep 1
+	gpio l 18 0 4000 0 1 4000
+	;;
+		
+start)
+        gpio l 18 4000 0 1 0 4000
+	sleep 1
+        gpio l 33 0 4000 0 1 4000
+        gpio l 34 0 4000 0 1 4000
+        gpio l 35 0 4000 0 1 4000
+	;;
+
+stop-usb)
+	gpio l 35 0 4000 0 1 4000
+	gpio l 34 4000 0 1 0 4000
+	gpio l 33 4000 0 1 0 4000
+	gpio l 18 0 4000 0 1 4000
+	;;
+
+start-usb)
+	gpio l 35 0 4000 0 1 4000
+	gpio l 34 4000 0 1 0 4000
+	gpio l 33 4000 0 1 0 4000
+	gpio l 18 4000 0 1 0 4000
+	;;	
+	
+stop-ext)
+        gpio l 33 0 4000 0 1 4000
+        gpio l 34 0 4000 0 1 4000
+        gpio l 35 4000 0 1 0 4000
+        gpio l 18 0 4000 0 1 4000
+        ;;
+
+start-ext)
+        gpio l 33 0 4000 0 1 4000
+        gpio l 34 0 4000 0 1 4000
+        gpio l 35 4000 0 1 0 4000
+        gpio l 18 4000 0 1 0 4000
+        ;;
+		
+    *)
+        print_usage
+        exit 1
+esac
+
+exit 0		
+				
+			

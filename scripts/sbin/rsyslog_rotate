@@ -1,0 +1,13 @@
+#!/bin/sh
+
+logfile="$1"
+
+/bin/mv -f "$logfile" "$logfile.0"
+
+status=$?
+
+/usr/bin/logger -t rsyslogd -p syslog.info "Rollover of log file $logfile"
+
+/usr/bin/killall -HUP rsyslogd
+
+exit $status

@@ -1,0 +1,12 @@
+.progress-bar-wrapper {
+  border-radius: 4px;
+}
+.progress-bar {
+  max-width: 100% !important;
+  height: 10px;
+  background-color: $secondarycolor;
+  box-shadow: 1px 1px 1px rgba(0,0,0,0.4);
+  border-radius: 0 1px 1px 0;
+  -webkit-transition: .4s width, .4s background-color;
+  transition: .4s width, .4s background-color;
+}

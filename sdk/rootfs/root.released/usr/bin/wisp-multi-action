@@ -1,0 +1,535 @@
+#!/bin/sh
+
+. /usr/bin/scriptlib
+
+DEBUG=1
+DBG_WPS_INFO=/tmp/wisp-action.flow 
+UDHCPC="udhcpc"
+UDHCPC_PID_FILE="/var/run/udhcpc_multi.pid"
+PIDFILE_CONNECT="/var/run/udhcpc_multi.pid.connect"
+DEMAND_FILE="/var/run/udhcpc_multi.demand"
+UDHCPC_DEFAULT_SCRIPT="/usr/bin/wisp_multi.script"
+UDHCPC_MULTI_INDEX="/var/run/wisp_multi.index"
+IWCONF="/usr/sbin/iwconfig"
+IWPRIV="/usr/sbin/iwpriv"
+
+CSID_C_WISP_CNT_TYPE="0x0036500a"
+CSID_C_WISP_HOSTNAME="0x00365002"
+CSID_C_LOCAL_WANTYPE="0x00010003"
+CSID_S_SYS_LAN0_INTERFACE="0x8000F201"
+CSID_S_LOCAL_WAN_CNT_FORCE="0x8001000e"
+CSID_S_SYS_IF_WLAN0="0x8000F391"
+CSID_S_SYS_IF_WLAN1="0x8000F392"
+#CSID_C_WLANAPCLI_WIRELESSMODE="0x00320008"
+CSID_C_WLANAPCLI_CHANNEL="0x00320002"
+CSID_C_WLANAPCLI_AUTHMODE="0x0032000d"
+CSID_C_WLANAPCLI_ENCRYPTYPE="0x0032000e"
+CSID_C_WLANAPCLI_DEFKEYID="0x00320010"
+CSID_C_WLANAPCLI_KEY0="0x00320012"
+CSID_C_WLANAPCLI_KEY1="0x00320014"
+CSID_C_WLANAPCLI_KEY2="0x00320016"
+CSID_C_WLANAPCLI_KEY3="0x00320018"
+CSID_C_WLANAPCLI_SSID="0x00320004"
+CSID_C_WLANAPCLI_WPAPSK="0x00320019"
+CSID_S_WLANAPCLI_STATUS="0x80320003"
+CSID_C_WLANAPCLI_ENABLE="0x00320001"
+CSID_C_WLANAPCLI2_ENABLE="0x00450001"
+CSID_S_WLANAPCLI_MAC="0x80320200"
+CSID_S_WLANAPCLI2_MAC="0x80450200"
+CSID_C_WLANAP_CHANNEL="0x00190200"
+CSID_C_WLANAP2_CHANNEL="0x00440200"
+CSID_C_LOCAL_HOSTNAME="0x00010001"
+CSID_C_WLANAP_HT_BSSCOEXISTENCE="0x00198f01" 
+CSID_S_PROFILE_WISP_UI_RESELECT="0x80980009"
+CSID_C_WLANAPCLI_EXTCHANNEL="0x00320021"
+CSID_C_WLANAP_HT_EXTCHA="0x00198200"
+CSID_C_LOCAL_WLAN2ENABLE="0x00010018"
+
+LANIF=`rdcsman $CSID_S_SYS_LAN0_INTERFACE str`
+CNTTYPE=`rdcsman $CSID_C_WISP_CNT_TYPE u16`
+WANTYPE=`rdcsman $CSID_C_LOCAL_WANTYPE u16`
+HOSTNAME=`rdcsman $CSID_C_WISP_HOSTNAME str`
+CNTFORCE=`rdcsman $CSID_S_LOCAL_WAN_CNT_FORCE u8`
+APCLICHANNEL=`rdcsman $CSID_C_WLANAPCLI_CHANNEL u32`
+APCLIAUTHMODE=`rdcsman $CSID_C_WLANAPCLI_AUTHMODE u8`
+APCLIENCRYPTYPE=`rdcsman $CSID_C_WLANAPCLI_ENCRYPTYPE u8`
+APCLIDEFKEYID=`rdcsman $CSID_C_WLANAPCLI_DEFKEYID u8`
+APCLIKEY1=`rdcsman $CSID_C_WLANAPCLI_KEY0 str`
+APCLIKEY2=`rdcsman $CSID_C_WLANAPCLI_KEY1 str`
+APCLIKEY3=`rdcsman $CSID_C_WLANAPCLI_KEY2 str`
+APCLIKEY4=`rdcsman $CSID_C_WLANAPCLI_KEY3 str`
+APCLISSID=`rdcsman $CSID_C_WLANAPCLI_SSID str`
+APCLIWPAPSK=`rdcsman $CSID_C_WLANAPCLI_WPAPSK str`
+BSSCOEXISTENCE=`rdcsman $CSID_C_WLANAP_HT_BSSCOEXISTENCE u8`
+APCLIEXTCHANNEL=`rdcsman $CSID_C_WLANAPCLI_EXTCHANNEL u8`
+EXTCHANNEL=`rdcsman $CSID_C_WLANAP_HT_EXTCHA u8`
+WLAN2ENABLE=`rdcsman $CSID_C_LOCAL_WLAN2ENABLE u8`
+
+#-----------------------------------------------------------#
+#   It's just a temporary Solution for Mutiwan CSID Status, #
+#   We Should re-design it for further requests             #
+#-----------------------------------------------------------#
+
+MULTIWAN=0
+MWAN_HEX="0"    #MULTIWAN Index to HEX
+if [ -n "$2" ]; then
+    MULTIWAN=$2
+    MWAN_HEX=`printf "%x" $MULTIWAN`
+else    #If no Specify Index, check CSID to get it!
+    WWAN_LIST="13 14 15"
+
+    #MWAN_HEX="0"        #MULTIWAN Index to HEX
+    for i in $WWAN_LIST 
+    do 
+        TMP=`printf "%x" $i`
+        ENABLE=`rdcsman 0x0001010$TMP u32`;
+        if [ $ENABLE -ne 0 ]; then
+            WAN_TYPE=`rdcsman 0x0001012$TMP u32`;
+            if [ $WAN_TYPE -eq 19 ]; then
+                MULTIWAN=$i
+                MWAN_HEX="$TMP";
+            fi
+        fi
+    done
+fi
+
+#-----------------------------------------------------------#
+
+#WIRELESSMODE=`rdcsman $CSID_C_WLANAPCLI_WIRELESSMODE u8`
+if  [ $APCLICHANNEL -ge 36 ] ; then
+#   [ $WIRELESSMODE = 2 ] ||
+#   [ $WIRELESSMODE = 8 ] ||
+#   [ $WIRELESSMODE = 11 ] || 
+#   [ $WIRELESSMODE = 14 ] ; then
+    APCLIENABLE=`rdcsman $CSID_C_WLANAPCLI2_ENABLE u8`
+    WLAN_IF=`rdcsman $CSID_S_SYS_IF_WLAN1 str`
+    
+    if  [ $WLAN_IF = "ra0" ] ; then
+    	ETH="apcli0"
+    else
+			ETH="apclii0"
+    fi
+    
+    CSID_C_WLAN_CHANNEL=$CSID_C_WLANAP2_CHANNEL
+    CSID_S_APCLI_MAC=$CSID_S_WLANAPCLI2_MAC
+else
+    WLAN_IF=`rdcsman $CSID_S_SYS_IF_WLAN0 str`
+    APCLIENABLE=`rdcsman $CSID_C_WLANAPCLI_ENABLE u8`
+
+    if  [ $WLAN_IF = "ra0" ] ; then
+    	ETH="apcli0"
+    else
+        ETH="apclii0"
+    fi
+    
+    CSID_C_WLAN_CHANNEL=$CSID_C_WLANAP_CHANNEL
+    CSID_S_APCLI_MAC=$CSID_S_WLANAPCLI_MAC
+fi
+
+dbg()
+{
+    local str="$1"
+    [ "$DEBUG" = "1" ] && echo "$str" >> $DBG_WPS_INFO
+}
+
+wisp_status()
+{
+	TIME=0
+	TIMEOUT=10
+	while [ true ] ; do	
+		sl_get_IP_NM_GW_in_ifconfig $ETH IF_IP IF_NM IF_GW
+		#echo "$0 : IF_IP=$IF_IP IF_NM=$IF_NM IF_GW=$IF_GW"	
+		if [ "${IF_IP}x" != "x" -a "${IF_NM}x" != "x" -a "${IF_GW}x" != "x" ] ; then	
+			return 0		
+		else			
+			sleep 1
+			TIME=$((TIME+1))
+			if [ $TIME -gt $TIMEOUT ] ; then
+				return 1	
+			fi			
+		fi
+	done
+}
+
+wisp_switch_channel()
+{
+    local CFG s CUR_CHANNEL match
+    CFG=`$IWCONF $WLAN_IF`
+    for s in $CFG
+    do      
+        if [ ${s%%=*} = "Channel" ] ; then
+            CUR_CHANNEL=${s##*=}
+        fi          
+    done
+    
+    match=1
+    if [ $APCLICHANNEL = 0 ]; then
+        return
+    fi
+    if [ "$CUR_CHANNEL" != "$APCLICHANNEL" ]; then
+        match=0    
+    fi
+#    if [ $BSSCOEXISTENCE = 1 ]; then
+#        match=0
+#    fi
+#    if [ $APCLIEXTCHANNEL != 0 ]; then
+#        if [ $APCLIEXTCHANNEL -gt $APCLICHANNEL ] && [ $EXTCHANNEL = 0 ]; then
+#            match=0
+#        fi
+#        if [ $APCLIEXTCHANNEL -lt $APCLICHANNEL ] && [ $EXTCHANNEL = 1 ]; then
+#            match=0
+#        fi
+#    fi
+
+    if [ $match = 1 ]; then
+        return
+    fi
+
+#    $IWPRIV $WLAN_IF set HtBssCoex=0
+#    dbg "$IWPRIV $WLAN_IF set HtBssCoex=0"
+
+#    $IWPRIV $WLAN_IF set HtBw=1
+#    dbg "$IWPRIV $WLAN_IF set HtBw=1"
+
+#    if [ $APCLICHANNEL -gt 7 ]; then
+#        $IWPRIV $WLAN_IF set HtExtcha=0
+#        dbg "$IWPRIV $WLAN_IF set HtExtcha=0"
+#        wrcsman "$CSID_C_WLANAP_HT_EXTCHA 0"
+#        dbg "wrcsman $CSID_C_WLANAP_HT_EXTCHA 0"
+#    elif [ $APCLICHANNEL -lt 5 ]; then 
+#        $IWPRIV $WLAN_IF set HtExtcha=1
+#        dbg "$IWPRIV $WLAN_IF set HtExtcha=1"
+#        wrcsman "$CSID_C_WLANAP_HT_EXTCHA 1"
+#        dbg "wrcsman $CSID_C_WLANAP_HT_EXTCHA 1"
+#    else
+#        if [ $APCLIEXTCHANNEL != 0 ] && [ $APCLIEXTCHANNEL -lt $APCLICHANNEL ]; then
+#            $IWPRIV $WLAN_IF set HtExtcha=0
+#            dbg "$IWPRIV $WLAN_IF set HtExtcha=0"
+#            wrcsman "$CSID_C_WLANAP_HT_EXTCHA 0"
+#            dbg "wrcsman $CSID_C_WLANAP_HT_EXTCHA 0"
+#        else
+#            $IWPRIV $WLAN_IF set HtExtcha=1
+#            dbg "$IWPRIV $WLAN_IF set HtExtcha=1"
+#            wrcsman "$CSID_C_WLANAP_HT_EXTCHA 1"
+#            dbg "wrcsman $CSID_C_WLANAP_HT_EXTCHA 1"
+#        fi
+#    fi
+#
+#    wrcsman "$CSID_C_WLANAP_HT_BSSCOEXISTENCE 0"
+#    dbg "wrcsman $CSID_C_WLANAP_HT_BSSCOEXISTENCE 0"
+
+    $IWPRIV $WLAN_IF set Channel=$APCLICHANNEL
+    dbg "$IWPRIV $WLAN_IF set Channel=$APCLICHANNEL"
+
+    wrcsman "$CSID_C_WLAN_CHANNEL $APCLICHANNEL"
+    dbg "wrcsman CSID_C_WLANAP(2)_CHANNEL=$CSID_C_WLAN_CHANNEL $APCLICHANNEL"
+
+    sleep 1
+}
+
+check_assoc()
+{
+    local CFG s wpakeymatched
+    if [ $APCLIENCRYPTYPE -gt 1 ] ; then
+        wpakeymatched="`$IWPRIV $WLAN_IF stat | grep WPAKeyMatched | awk '{print $2}'`"
+        if [ $wpakeymatched = 0 ] ; then
+            wrcsman "$CSID_S_PROFILE_WISP_UI_RESELECT 1"
+            dbg "wrcsman $CSID_S_PROFILE_WISP_UI_RESELECT 1"
+        fi
+    fi
+    CFG=`$IWCONF $ETH`
+    for s in $CFG
+    do		
+        if [ $s = "Not-Associated" ] ; then
+            return 1
+        fi
+    done
+    return 0
+}
+
+wisp_assoc()
+{   
+    $IWPRIV $ETH set ApCliEnable=0
+    dbg "$IWPRIV $ETH set ApCliEnable=0"
+
+    dbg "$IWPRIV $ETH set ApCliAuthMode=$APCLIAUTHMODE (0:OPEN,1:SHARED,2:OPEN,3:WPAPSK,5/7:WPA2PSK)"
+    case "$APCLIAUTHMODE" in
+        0) $IWPRIV $ETH set ApCliAuthMode=OPEN    ;;
+        1) $IWPRIV $ETH set ApCliAuthMode=SHARED  ;;
+        2) $IWPRIV $ETH set ApCliAuthMode=OPEN    ;; #WEPAUTO
+        3) $IWPRIV $ETH set ApCliAuthMode=WPAPSK  ;;
+        5) $IWPRIV $ETH set ApCliAuthMode=WPA2PSK ;;
+        7) $IWPRIV $ETH set ApCliAuthMode=WPA2PSK ;;
+        *)
+            dbg "Unknown WISP Authmode"
+            exit 1
+            ;;
+    esac
+
+    dbg "$IWPRIV $ETH set ApCliEncrypType=$APCLIENCRYPTYPE (0:NONE,1:WEP,2:TKIP,3/4:AES)"
+    case "$APCLIENCRYPTYPE" in
+	0) $IWPRIV $ETH set ApCliEncrypType=NONE ;;
+	1) $IWPRIV $ETH set ApCliEncrypType=WEP
+        $IWPRIV $ETH set ApCliDefaultKeyID=$APCLIDEFKEYID
+        dbg "$IWPRIV $ETH set ApCliDefaultKeyID=$APCLIDEFKEYID (1:$APCLIKEY1,2:$APCLIKEY2,3:$APCLIKEY3,4:$APCLIKEY4)"
+        case "$APCLIDEFKEYID" in
+            1) $IWPRIV $ETH set ApCliKey1=$APCLIKEY1 ;;
+            2) $IWPRIV $ETH set ApCliKey2=$APCLIKEY2 ;;
+            3) $IWPRIV $ETH set ApCliKey3=$APCLIKEY3 ;;
+            4) $IWPRIV $ETH set ApCliKey4=$APCLIKEY4 ;;
+            *)  
+                dbg "Unknown WISP DefKeyId"
+                exit 1
+                ;;
+        esac
+		;;
+	2) $IWPRIV $ETH set ApCliEncrypType=TKIP ;;
+	3) $IWPRIV $ETH set ApCliEncrypType=AES ;;
+	4) $IWPRIV $ETH set ApCliEncrypType=AES ;;
+	*)
+        dbg "Unknown WISP Encryptype"
+        exit 1
+		;;
+    esac
+
+    dbg "$IWPRIV $ETH set ApCliSsid=\"$APCLISSID\""
+    $IWPRIV $ETH set ApCliSsid="$APCLISSID"
+    if [ "$APCLIENCRYPTYPE" == "2" ] || 
+       [ "$APCLIENCRYPTYPE" == "3" ] || 
+       [ "$APCLIENCRYPTYPE" == "4" ] ; then #TKIP or AES
+        dbg "$IWPRIV $ETH set ApCliWPAPSK=$APCLIWPAPSK"
+        $IWPRIV $ETH set ApCliWPAPSK=$APCLIWPAPSK
+    fi
+    dbg "$IWPRIV $ETH set ApCliEnable=1"
+    $IWPRIV $ETH set ApCliEnable=1
+}
+
+get_mac()
+{
+    local mac_addr
+    mac_addr="`rdcsman $CSID_S_APCLI_MAC str`"
+    if [ "$mac_addr" != "" ]; then
+        return 0
+    fi
+
+    mac_addr="`ifconfig | grep $ETH | awk '{print $5}'`"
+    if [ "$mac_addr" != "" ]; then
+        wrcsman "$CSID_S_APCLI_MAC \"$mac_addr"
+        dbg "wrcsman $CSID_S_APCLI_MAC $mac_addr"
+    fi
+    
+	return 0
+}
+
+chk_hostname()
+{
+    if [ "$HOSTNAME" == "" ]; then
+        HOSTNAME="`rdcsman $CSID_C_LOCAL_HOSTNAME str`"
+        if [ "$HOSTNAME" == "" ]; then
+            if [ -f /etc/hostname ]; then
+                HOSTNAME="`cat /etc/hostname`"
+                logger -t "udhcpc" "Warning: No specify Hostname, using default Hostname ($HOSTNAME) for DHCP connection"
+                echo "Warning: No specify Hostname, using default Hostname ($HOSTNAME) for DHCP connection"
+            else
+                logger -t "udhcpc" "Warning: No specify Hostname"
+                echo "Warning: No specify Hostname"
+            fi
+        fi
+    fi
+}
+
+
+wisp_start()
+{
+    if [ "$MWAN_HEX" = "0" ]; then
+        dbg "No WISP Enable"
+        return 1;
+    fi
+    
+    echo "$MULTIWAN" > $UDHCPC_MULTI_INDEX
+    
+    chk_hostname
+    if [ $CNTFORCE -eq 1 ] ; then
+        $UDHCPC -n -i $ETH -p $UDHCPC_PID_FILE -s $UDHCPC_DEFAULT_SCRIPT --hostname="$HOSTNAME"
+        wrcsman "0x8001000e 0x00"
+    elif [ $CNTTYPE = 0 -a $WANTYPE = 0 ] ; then
+        #udhcpc-connect &
+        $UDHCPC -n -d -l $LANIF -i $ETH -p $UDHCPC_PID_FILE -s $UDHCPC_DEFAULT_SCRIPT --hostname="$HOSTNAME"
+    else
+        $UDHCPC -n -i $ETH -p $UDHCPC_PID_FILE -s $UDHCPC_DEFAULT_SCRIPT --hostname="$HOSTNAME"
+    fi
+	return $?
+}
+
+wisp_stop()
+{
+    [ -f "$DEMAND_FILE" ] && rm -f $DEMAND_FILE
+    
+    if [ -f "$PIDFILE_CONNECT" ] ; then
+        CONNECT_PID=`cat $PIDFILE_CONNECT`
+        kill $CONNECT_PID > /dev/null 2>&1
+        rm -f $PIDFILE_CONNECT > /dev/null 2>&1	
+    fi		
+
+    if [ -f "$UDHCPC_PID_FILE" -a -r "$UDHCPC_PID_FILE" ] ; then 
+        UDHCPC_PID=`cat $UDHCPC_PID_FILE`
+        rm -f $UDHCPC_PID_FILE
+        kill $UDHCPC_PID > /dev/null 2>&1 || exit 1
+    fi
+        
+    ifconfig $ETH 0.0.0.0 				 		
+    $IWPRIV $ETH set ApCliEnable=0
+    dbg "$IWPRIV $ETH set ApCliEnable=0"
+
+    if [ $WLAN2ENABLE -eq 1 ] ; then
+        if [ "$ETH" == "apcli0" ] ; then
+            ETH2="apclii0"
+        else
+            ETH2="apcli0"
+        fi
+    
+        ifconfig $ETH2 0.0.0.0 				 		
+        $IWPRIV $ETH2 set ApCliEnable=0
+        dbg "$IWPRIV $ETH2 set ApCliEnable=0"
+    fi        
+    
+    wrcsman "0x80365007 0x00"
+    
+    wrcsman "0x80365002 0x00 && \
+             0x80365003 0x00 && \
+             0x80365004 0x00 && \
+             0x80365005 0x00 && \
+             0x80365006 0x00 && \
+             0x80365009 0x00 && \
+             0x80035009 0x00;"
+    
+    #IF_IP      0x8001011$MWAN_HEX
+    #IF_NM      0x8001012$MWAN_HEX
+    #IF_GW      0x8001013$MWAN_HEX
+    #IF_DNS1    0x8001014$MWAN_HEX
+    #IF_DNS2    0x8001015$MWAN_HEX
+    #IF_NAME    0x8001019$MWAN_HEX
+    #CNT_STAT   0x8001016$MWAN_HEX
+    
+    if [ -f "$UDHCPC_MULTI_INDEX" ]; then
+        MULTIWAN=`cat $UDHCPC_MULTI_INDEX`
+        MWAN_HEX=`printf "%x" $MULTIWAN`
+        
+        rm -f $UDHCPC_MULTI_INDEX;
+        
+        wrcsman "0x8001011$MWAN_HEX 0x00 && \
+                 0x8001012$MWAN_HEX 0x00 && \
+                 0x8001013$MWAN_HEX 0x00 && \
+                 0x8001014$MWAN_HEX 0x00 && \
+                 0x8001015$MWAN_HEX 0x00 && \
+                 0x8001019$MWAN_HEX 0x00 && \
+                 0x8001016$MWAN_HEX 0x00 "
+    fi
+    
+    return 0;
+    
+    [ -f "$UDHCPC_MULTI_INDEX" ] && rm -f $UDHCPC_MULTI_INDEX
+    
+#    if [ "$MWAN_HEX" = "0" ]; then
+#        dbg "No WISP Enable"
+#        return 1;
+#    fi
+    
+    wrcsman "0x8001011$MWAN_HEX 0x00 && \
+             0x8001012$MWAN_HEX 0x00 && \
+             0x8001013$MWAN_HEX 0x00 && \
+             0x8001014$MWAN_HEX 0x00 && \
+             0x8001015$MWAN_HEX 0x00 && \
+             0x8001019$MWAN_HEX 0x00 && \
+             0x8001016$MWAN_HEX 0x00 "
+    
+	return 0
+}
+
+# main ##########################################################
+case "$1" in
+	start)
+        if [ $APCLIENABLE = 1 ] ; then
+            wisp_switch_channel
+            ifconfig $ETH up
+            dbg "ifconfig $ETH up"
+            get_mac
+            wisp_assoc
+            sleep 4
+            if [ $APCLIAUTHMODE = 0 ] && [ $APCLIENCRYPTYPE = 1 ] ; then
+                check_assoc
+                if [ $? = 1 ] ; then
+                    $IWPRIV $ETH set ApCliAuthMode=SHARED
+                    dbg "Switch to SHARED/WEP"
+                fi
+                sleep 1
+            fi
+            check_assoc
+        fi
+		wisp_start
+		if [ $? = 1 ] ; then
+			ifconfig $ETH 0.0.0.0 
+			exit 1
+		fi	
+		exit 0	
+		;;
+	
+	stop)
+        dbg "-----> wisp-action stop"
+		wisp_stop
+        if [ $APCLIENABLE = 0 ] ; then
+            ifconfig $ETH down
+            dbg "ifconfig $ETH down"
+        fi
+        dbg "<----- wisp-action stop"
+		;;
+	
+	release)
+		if [ -f "$UDHCPC_PID_FILE" -a -r "$UDHCPC_PID_FILE" ] ; then 
+			UDHCPC_PID=`cat $UDHCPC_PID_FILE`
+			kill -USR2 $UDHCPC_PID			
+		fi		
+		exit 0		
+		;;
+	
+	renew)
+		if [ $CNTTYPE = 0 ] ; then
+			wisp_stop
+			wisp_start
+		elif [ -f "$UDHCPC_PID_FILE" -a -r "$UDHCPC_PID_FILE" ] ; then 
+			UDHCPC_PID=`cat $UDHCPC_PID_FILE`
+			kill -USR1 $UDHCPC_PID
+			wisp_status			 			 
+		else
+            chk_hostname
+			$UDHCPC -n -i $ETH -p $UDHCPC_PID_FILE -s $UDHCPC_DEFAULT_SCRIPT --hostname="$HOSTNAME"
+		fi
+
+		if [ $? = 1 ] ; then
+            wrcsman "0x80365007 0x00"
+            wrcsman "0x8001016$MWAN_HEX 0x00"
+            exit 1
+        fi
+		exit 0									
+		;;
+
+    check_wisp_connected)
+        check_assoc
+        if [ $? = 1 ] ; then
+            wrcsman "0x80365007 1" # change CSID_S_WISP_CNT_STATUS to WISP_CNT_STATUS_CONNECTING
+            wrcsman "0x8001016$MWAN_HEX 1"
+        fi
+        exit 0
+        ;;
+
+    get_apcli_mac)
+        get_mac
+        exit 0
+        ;;
+		
+	*)
+		exit 1
+		;;
+esac
+exit 0		
+			

@@ -1,0 +1,180 @@
+#!/bin/sh
+#
+# 3g-multi-action                     
+# This script do a job for 3g ppp link
+#
+
+PIDFILE_PPPD="/var/run/ppp-3g$2.pid"
+PIDFILE_PPPD_BAK="/var/run/bak.ppp-3g$2.pid"
+RUNNING="/var/run/3g-multi-action-$2-running"
+
+# Check if exist multiwan index
+if [ -n $2 ] ; then
+    MULTIWAN=$2
+else
+	usage
+fi
+
+TMP8=$((MULTIWAN+13))
+TMP8HEX=`printf "%x" $TMP8`
+CNT_FORCE=`rdcsman 0x800101C$TMP8HEX u32`
+
+TMP1=$MULTIWAN
+INDEX_3G=`expr ${TMP1} + 1`
+
+M_INDEX=`rdcsman 0x801e501$TMP1 u16`
+M_STAT=`rdcsman 0x801e502$TMP1 u16`
+
+FW_LOADING=`rdcsman 0x8002F006 u32`
+if [ $FW_LOADING -eq 1 ]; then
+	logger -p 8.7 -t "O3G/script" "up FW loading, not to do 3g"
+	exit 0
+fi
+
+start() {
+# Make sure only one default script running.
+while :
+do
+    if [ ! -f "$RUNNING" ] ; then
+		echo "start run ppp-3g$2" >>/tmp/3g-running
+        break
+    fi
+    #echo "exist $RUNNING"
+	echo "ppp-3g$2 exist" >>/tmp/3g-running
+    sleep 1
+done
+echo 1 > $RUNNING
+
+i=0
+while [ $i != 30 ]; do
+	M_STAT=`rdcsman 0x801e502$TMP1 u16`
+    if [ $M_STAT -eq 1 ] ; then
+        break
+    fi
+    echo "3G not Ready"
+    sleep 1
+	i=`expr $i + 1`
+done
+
+logger -p 8.7 -t "O3G/script" "Start 3G multiwan! Index_usb=$M_INDEX Index_3G=$TMP1"
+echo "Start Call 3G"
+echo "3g-action start $M_INDEX" $TMP1 >> /tmp/call-3g
+ 
+3g-action start $M_INDEX $TMP1 
+ 
+#writeCSIDvalues
+PPP_IF=`rdcsman 0x8055016$M_INDEX str`
+              
+# write csid for 3G_MULTIWAN [index_usb] [index_3g] 
+3g-wrmulti-csid write $M_INDEX $TMP1
+
+if [ -z $PPP_IF ] ; then
+	rm $RUNNING 
+	exit 1
+else
+	CNTTIME="`rdcsman 0x8055017$M_INDEX u32`" 
+	IF_IP="`rdcsman 0x805500f$M_INDEX ipv4`"
+ 	IF_NM="`rdcsman 0x8055011$M_INDEX ipv4`"
+	IF_GW="`rdcsman 0x8055012$M_INDEX ipv4`"
+	IF_DNS1="`rdcsman 0x8055013$M_INDEX ipv4`"
+	IF_DNS2="`rdcsman 0x8055014$M_INDEX ipv4`"
+
+       	wrcsman "0x8001011$TMP8HEX {$IF_IP} && \
+        	0x8001012$TMP8HEX {$IF_NM} && \
+              	0x8001013$TMP8HEX {$IF_GW} && \
+            	0x8001014$TMP8HEX {$IF_DNS1} && \
+             	0x8001015$TMP8HEX {$IF_DNS2} && \
+             	0x8001019$TMP8HEX \"$PPP_IF && \
+               	0x8001016$TMP8HEX 0x02"
+	echo "3g-multi-action start $2, M_INDEX=$M_INDEX, M_STAT=$M_STAT" >> /tmp/log-3g
+	echo "IF_IP=$IF_IP,IF_NM=$IF_NM,IF_GW=$IF_GW,IF_DNS1=$IF_DNS1,IF_DNS2=$IF_DNS2, TMP8HEX=$TMP8HEX" >> /tmp/log-3g
+fi
+        
+if [ $? = 0 ] ; then
+	exit 0
+else
+	wrcsman "0x801e070$TMP1 0x03 && \
+			0x8001016$TMP8HEX 0x03"
+			rm $RUNNING
+	exit 1
+fi
+ 
+}
+
+stop() {
+	# in the case of that the modem is not ready
+	local CNT_STATUS=`rdcsman 0x801e070${INDEX_3G} u16`
+	if [ "${M_STAT}" != "1" -a "${CNT_STATUS}" != "2" ]; then
+		echo -e "3G${TMP1} is not ready, do not do stop action\n"
+		exit 1
+	elif [ "${M_STAT}" != "1" -a "${CNT_STATUS}" == "2" ]; then
+		echo -e "3G${TMP1} is not ready but cnt_status is connected, do clean CSID\n"
+
+		# down the interface
+		local INF_NAME=`rdcsman 0x801e220${INDEX_3G} str`
+		ifconfig ${INF_NAME} down
+
+		wrcsman "0x8001011$TMP8HEX 0x00 && \
+				 0x8001012$TMP8HEX 0x00 && \
+				 0x8001013$TMP8HEX 0x00 && \
+				 0x8001014$TMP8HEX 0x00 && \
+				 0x8001015$TMP8HEX 0x00 && \
+				 0x8001016$TMP8HEX 0x00"
+		rm $RUNNING
+		3g-wrmulti-csid clean $M_INDEX $TMP1
+		exit 1
+	fi
+
+	local SIM_STATUS=`rdcsman 0x801e3c0${INDEX_3G} u16` 
+	if [ "${SIM_STATUS}" == "4" ]; then		# PIN code not inserted yet
+		echo -e "SIM status is not ready, do not do stop action\n"
+		exit 1
+	fi
+
+	if [ $M_INDEX == "0" ]; then
+		local CNT_PATH="/tmp/3G${TMP1}_connect"
+		if [ -f "${CNT_PATH}" ]; then
+			Index_usb="`grep 'Index_usb' $CNT_PATH | cut -d: -f2`"
+			M_INDEX="$Index_usb"
+		fi
+	fi
+
+	local err; err=0
+	echo -e " Start Shutting down 3G PPP link...\n"
+    	logger -p 8.7 -t "O3G/script" "Stop 3G multiwan! Index_usb=$M_INDEX Index_3G=$TMP1"
+    	3g-action stop $M_INDEX $TMP1
+	err=$?
+ 
+	wrcsman "0x8001011$TMP8HEX 0x00 && \
+		0x8001012$TMP8HEX 0x00 && \
+		0x8001013$TMP8HEX 0x00 && \
+		0x8001014$TMP8HEX 0x00 && \
+		0x8001015$TMP8HEX 0x00 && \
+		0x8001016$TMP8HEX 0x00"
+
+	rm $RUNNING
+	3g-wrmulti-csid clean $M_INDEX $TMP1
+
+	exit $err
+}
+
+
+usage() {
+	echo "$0 [start|stop|restart] index"
+	rm $RUNNING
+	exit 1
+}
+
+# +++++++++++++++ main ++++++++++++++++++++++ 
+[ -z "$1" ] && usage;
+
+case "$1" in
+	start)		start;;
+	stop)		stop;;
+	restart)	stop; start;;
+	*)			usage;;
+esac
+
+rm $RUNNING
+
+exit 0

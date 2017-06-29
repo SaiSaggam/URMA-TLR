@@ -1,0 +1,19 @@
+config cellular cellular1
+  option state 'on'
+  option preferred_mode 'auto'
+  option apn 'apn'
+  option apn_username 'username'
+  option apn_password 'password'
+  option sim_pin '1234'
+  option auth_type 'pap'
+  option force_ppp 'off'
+
+config cellular cellular2
+  option state 'off'
+  option preferred_mode 'auto'
+  option apn 'apn1'
+  option apn_username 'username1'
+  option apn_password 'password1'
+  option sim_pin '1234'
+  option auth_type 'auto'
+  option force_ppp 'off'

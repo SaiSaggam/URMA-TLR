@@ -1,0 +1,103 @@
+
+#========================#
+# BIN File for Section B #
+#========================#
+r jboot.rom
+
+i auh20
+-bend 0 
+-r "DGI6E4006001"
+-fm 0x6E40 
+-es 0x0
+-el 0x400000
+-do 0x0
+-si 1
+-it 0
+-lp 1
+
+w BOOT.bin
+
+#========================#
+# BIN File for Section A #
+#========================#
+
+r zImage.lzma
+
+#--- Start Code Header
+i sch2
+-kf zImage.lzma
+-rf squashfs.o
+-cp 0x03
+-ma 0x80001000
+-sa 0x8000f500
+-ra 0x00640000
+
+#--- Section Tag Header
+i stag
+-bend 0
+-id 4
+
+#--- Upgrade Header
+i auh20
+-bend 0
+-r "DGI6E4006001"
+-fm 0x6E40
+-es 0x400000
+-el 0x240000
+-do 0x400000
+-si 4
+-lp 1
+
+#--- Section A done!!!
+w kernel.bin
+
+#========================#
+# BIN File for Section F #
+#========================#
+
+r squashfs.o
+
+#--- Section Tag Header
+#i stag
+#-bend 0
+#-id 8 
+
+#--- Upgrade Header
+i auh20
+-bend 0
+-r "DGI6E4006001"
+-fm 0x6E40
+-es 0x640000
+-el 0x4900000
+-do 0x640000
+-it 0
+-si 8
+-lp 1
+
+#--- Section F done!!!
+w rootfs.bin
+
+#=============================#
+# Full BIN File (Section F+A) #
+#=============================#
+
+r kernel.bin
+j rootfs.bin
+w IOG87BDG_0T001_NO_UI.bin
+
+#==============================#
+# All BIN File (Section F+A+D) #
+#==============================#
+
+r kernel.bin
+j rootfs.bin
+j ui.bin
+w IOG87BDG_0T001.bin
+
+#================================#
+# All BIN File (Section F+A+B+D) #
+#================================#
+
+#--- quit ---
+q
+

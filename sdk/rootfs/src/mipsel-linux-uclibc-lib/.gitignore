@@ -1,0 +1,7 @@
+/libfl*.so*
+/librt.so*
+/libcrypto.so*
+/libgmp.so*
+/libpam.so*
+/libpcap.so*
+/libssl.so*

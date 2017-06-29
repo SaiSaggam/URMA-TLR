@@ -1,0 +1,13 @@
+**************************
+* Test FW Utility Library
+**************************
+1. Copy the file "adslfw.bin" to rootfs/root.released/root
+2. Copy the file "libamitfw.so" to rootfs/root.released/lib
+3. Copy the file "testFW" to rootfs/root.released/usr/sbin
+4. Build image, and write into device, then reboot
+5. Check the device console, enter the writable directory, like /tmp
+6. Copy "adslfw.bin" from /root into /tmp
+7. Excute "testFW ./adslfw.bin"
+8. You can see the original ADSL FW "ras_PPPoA_Official.dat" in /tmp
+
+PS. The source code of "testFW" is sample.c 

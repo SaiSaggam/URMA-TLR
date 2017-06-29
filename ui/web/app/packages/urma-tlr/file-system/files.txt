@@ -1,0 +1,64 @@
+Remote File Management
+
+To discover files in remote device file system subscribe to the 'gateway_files' collection. This collection
+will return a list of all the current directories and files as well as their present status (uploading or
+ready). Contents of the file entry will look something like this:
+
+{
+    _id: "mAcAPszs9yhFyFTfF"
+    path: "/web/img"
+    name: "drawing.png"
+    type: "file"
+    mimetype: "image/png"
+    encoding: "7bit"
+    size: 0
+    status: "loading"
+    progress: 0
+    fileSpec: "/var/folders/8x/jlm1mxgd4t52dvjvw1p42dx00000gn/T/fsroot/web/img/drawing.png"
+}
+
+
+To rename a file or directory, update its name through the collection.
+To remove a file or directory, remove it from the collection
+To upload a new file, POST it to the device/server /upload endpoint. You must be logged in to perform this task.
+Post the file as a multipart upload as follows:
+Request Headers:
+ POST /upload HTTP/1.1
+ Connection: keep-alive
+ Content-Length: 368335701
+ Accept: application/json, text/javascript, */*; q=0.01
+ X-Requested-With: XMLHttpRequest
+ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.80 Safari/537.36
+ Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryb3pyZeOpHAYeWM5N
+ Accept-Encoding: gzip, deflate
+ Accept-Language: en-US,en;q=0.8
+
+Request Payload:
+ ------WebKitFormBoundaryb3pyZeOpHAYeWM5N
+ Content-Disposition: form-data; name="customPath"
+
+ /web/img
+ ------WebKitFormBoundaryb3pyZeOpHAYeWM5N
+ Content-Disposition: form-data; name="files[]"; filename="android-studio-ide-141.2178183-mac.dmg"
+ Content-Type: application/octet-stream
+
+
+ ------WebKitFormBoundaryb3pyZeOpHAYeWM5N--
+
+When POST request is received by server it performs the following tasks:
+1.examines current session to determine logged in user and validates access rights
+2.verifies that POST request headers and payload look valid. Specifically look for:
+    name: the normal filename and extension
+    size: the size of the file being uploaded
+    formData.path: subdirectory to upload the file to on the device
+3.inserts temporary file in gateway_files collection with status of 'uploading' and percent complete to 0
+4.begins reading file stream in blocks, periodically updating percent complete of associated gateway_file entry
+5.on completion of upload, update gateway_file entry with final size and status of 'ready'
+
+
+when GET request is received by server it performs the following tasks:
+1.examines current session to determine logged in user and validates access rights
+2.verifies that GET request headers look valid
+    name:
+    size:
+    path: subdirectory path to fetch from

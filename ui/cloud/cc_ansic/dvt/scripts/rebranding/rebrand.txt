@@ -1,0 +1,11 @@
+# rebrand.txt
+
+# format:
+# search-term [ exclude-term [ exclude-term ...]
+
+digi		'digi international' digit com.digi.connector com/digi/connector idigi DIGI_REQUIRED_TO_GENERATE_INTERNAL_DOCUMENATION http://www.digi.com/support/
+server		SERVER_BASED_SEARCH 'web server'
+etherios	etherios.co etherios-ca-cert
+dia			diagram intermediate dialed endian immediately dialing wikipedia dialog media
+todo
+fixme

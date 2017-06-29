@@ -1,0 +1,27 @@
+*.out
+
+/Makefile
+/autom4te.cache
+/buildpkg.sh
+/config.h
+/config.log
+/config.status
+/configed
+/openssh.xml
+/opensshd.init
+/survey.sh
+/openbsd-compat/Makefile
+/openbsd-compat/regress/Makefile
+
+# Binaries
+/scp
+/sftp
+/sftp-server
+/ssh
+/ssh-add
+/ssh-agent
+/ssh-keygen
+/ssh-keyscan
+/ssh-keysign
+/ssh-pkcs11-helper
+/sshd

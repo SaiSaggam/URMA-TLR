@@ -1,0 +1,12 @@
+*.log
+config.rci
+connector_api_remote.h
+remote_config.c
+build/
+bin/
+command_tool.jar
+ConfigGenerator.jar
+json-simple-1.1.1.jar
+source.txt
+descriptor*.xml
+/target/

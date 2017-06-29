@@ -1,0 +1,41 @@
+Introduction:
+	This text file just a sample to show how to add an application to this GPL package.
+
+Step: Add amit_test to the GPL package
+	1)Copy the source of your application to open_src, so there will be a directory named amit_test
+	  in ./rootfs/src/open_src
+
+	2)Make sure your using compiler is mips-linux-uclibc in Makefile.
+		CC = mips-linux-uclibc-gcc
+
+	3)Add install script in rootfs/makefile.install, and make it copy to usr_src/bin or usr_src/sbin
+	  Just as example in rootfs/makefile.install
+		.PHONY: INSTALL.copy_amit_test
+		INSTALL.copy_amit_test:
+		    @cp -a $(COMPO_DIR)/amit_test                  $(INSTALL_ROOT)/usr/sbin
+
+	4)Add the directory to rootfs/makefile.config
+		COMPO_LIST += open_src/amit_test.60.mk
+	  It will make amit_test when you make the file system.
+
+	5)Add the directory name amit_test.60.mk to rootfs/open_src with a Makefile
+		include ../../makefile.envars
+
+		COMPO_DIR := $(COMPO_BASE)/open_src/amit_test
+
+		include ../../makefile.compo
+		include ../../makefile.install
+
+		build:
+		    make -C $(COMPO_DIR)
+
+		install: INSTALL.copy_amit_test
+
+		clean:
+		    make clean -C $(COMPO_DIR)
+
+		copying:
+
+	6)Then you can make the FW using "make".
+
+	7)You can check "image/root/usr/sbin/amit_test "if the application in in the FW or not.

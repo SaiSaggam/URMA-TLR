@@ -1,0 +1,52 @@
+#!/bin/sh
+usage()
+{
+    echo "Usage:"
+    echo "      jffs2_tool format"
+    echo "      jffs2_tool sync"
+    echo "      jffs2_tool mount"
+    echo "      jffs2_tool dump"
+}
+mountfs()
+{
+    mount -t jffs2 /dev/mtdblock6 /var/storage
+    cp -rf /var/storage/* /tmp/jffs2/
+    umount /var/storage
+}
+
+formatfs()
+{
+    eraseall -q /dev/mtd6
+    mkdir /tmp/jffs2
+    echo 1 > /tmp/jffs2/donotkill
+    chmod 444 /tmp/jffs2/donotkill
+    mkfs.jffs2 -r /tmp/jffs2 -o /tmp/jffs2.img -e 0x20000 -l --pad=0x500000
+    dd if=/tmp/jffs2.img of=/dev/mtd6 bs=5M
+    rm -f /tmp/jffs2.img
+}
+
+sync()
+{
+    mkfs.jffs2 -r /tmp/jffs2 -o /tmp/jffs2.img -e 0x20000 -l --pad=0x500000
+    eraseall -q /dev/mtd6
+    dd if=/tmp/jffs2.img of=/dev/mtd6 bs=5M
+    rm -f /tmp/jffs2.img
+}
+dump()
+{
+    mtd_debug read /dev/mtd6 0 0x500000 /tmp/mtd6.img
+}
+
+case "$1" in 
+    "mount")
+        mountfs;;
+    "format")
+        formatfs
+        mountfs;;
+    "sync")
+        sync;;
+    "dump")
+        dump;;
+    *)
+        usage;;
+esac

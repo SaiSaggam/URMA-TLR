@@ -1,0 +1,18 @@
+#!/bin/sh
+
+format_err() {
+  echo "Syntax: clear firewall"
+}
+
+if [ $# -ne 4 ]; then
+    format_err
+    exit 1
+else
+    iptables -t filter -Z
+    iptables -t mangle -Z
+    iptables -t nat -Z
+    iptables -t raw -Z
+    logger -p user.info "Firewall counters cleared by $4"
+fi
+
+exit 0

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+if [ -e /tmp/cpu_usage ]; then
+  while true
+  do
+    cat /tmp/cpu_usage
+    sleep 1
+  done
+else
+  echo "No data available"
+fi
+exit 0
+
+
+

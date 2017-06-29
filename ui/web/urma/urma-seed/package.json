@@ -1,0 +1,26 @@
+{
+  "name": "urma-seed",
+  "version": "0.0.1",
+  "description": "Unified Remote Management Architecture (URMA) seed app for a new device UI",
+  "main": "app/entry.js",
+  "scripts": {
+    "install": "node installer.js",
+    "xxpost_install": "cd app && npm install && cd ..",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@stash.digi.com/idigi/URMA-seed.git"
+  },
+  "author": "",
+  "contributers": [
+    "Dave Hutchison <dave.hutchison@digi.com>",
+    "Dana Immertreu <dana.immertreau@digi.com>",
+    "Jeff Ryan <jeff.ryan@digi.com>"
+  ],
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "package-script": "0.0.8"
+  }
+}

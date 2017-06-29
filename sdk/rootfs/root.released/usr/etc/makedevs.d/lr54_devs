@@ -1,0 +1,9 @@
+# <name>	<type>	<mode>	<uid>	<gid>	<major>	<minor>	<start>	<inc>	<count>
+/dev/gpio	c	660	0	0	252	0
+/dev/hwnat0	c	660	0	0	220	0
+/dev/i2cM0	c	660	0	0	218	0
+/dev/rdm0	c	660	0	0	253	0
+/dev/slic0	c	660	0	0	152	0
+/dev/spiS	c	660	0	0	217	0	0	1	2
+/dev/watchdog	c	660	0	0	10	130
+/dev/pts	d	755	0	0

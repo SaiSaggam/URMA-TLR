@@ -1,0 +1,71 @@
+.unauthorized .device-main-container,
+.unauthorized .device-main-container,
+.unauthorized .device-main-container.open {
+  display: block;
+  left: 0;
+  width: 100%;
+}
+.device-main-container {
+  position: relative;
+  z-index: 1;
+  width: 85%;
+  right: auto;
+  left: 15%;
+  &.open {
+    left: 50%;
+    width: 80%;
+    transition:all ease 1s;
+  }
+  @include media($medium) {
+    width: 90%;
+    left: 10%;
+    &.open {
+      left: 25%;
+      width: 75%;
+      transition:all ease 1s;
+    }
+  }
+  @include media($large){
+    width: 95%;
+    left: 5%;
+  }
+}
+
+.unauthorized .config-nav-main,
+.unauthorized .config-nav-main.open {
+  display: none;
+}
+.config-nav-main {
+  @include span-columns(3 of 12, table);
+  width: 15%;
+  height: 100%;
+  position: absolute;
+  z-index: 1;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  &.open {
+    width: 50%;
+    transition:all ease 1s;
+  }
+  @include media($medium){
+    width: 10%;
+    &.open {
+      width: 25%;
+    }
+  }
+  @include media($large){
+    width: 5%;
+    &.open {
+      width: 25%;
+    }
+  }
+}
+.config-nav-main-listitem-first {
+  white-space: nowrap;
+}
+.main-menu-image,
+.main-menu-label-wrapper {
+  display: inline-block;
+}

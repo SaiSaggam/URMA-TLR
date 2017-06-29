@@ -1,0 +1,75 @@
+#!/bin/sh
+#--------------------------------------------------------------------------
+# Module has to check network status if network registration ready or not
+#--------------------------------------------------------------------------  
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+
+get_index "$2" "$3" 
+get_usb_status ${Index}
+get_general_config ${Index} ${Index_3G}
+
+# multi csid start from 1
+idx_3g=`expr $Index_3G + 1`
+MAX_RETRY_TIMES="45"
+#TMPFIL="/tmp/chk_network_Index_3G"
+
+check_register()
+{
+    #logger -t "O3G/SCRIPT" -p 8.7 "Nor Registered to network yet"
+
+    local CHK_REG_CNT="0"
+    local VENDORID="${CSID_S_USB_VENDOR_ID}"
+    local PRODUCTID="${CSID_S_USB_PRODUCT_ID}"
+
+    if [ "${VENDORID}" == "7326"  -a "${PRODUCTID}" == "40448" ] ||     # C5300_EVDO
+       [ "${VENDORID}" == "16700" -a "${PRODUCTID}" == "33196" ] ; then # Telit LN930
+        wrcsman "0x801e190$idx_3g 1"
+    fi
+
+    while [ "${CHK_REG_CNT}" -lt "${MAX_RETRY_TIMES}" ]; do
+
+        # for test
+#        echo "test!!AT++CREG?"
+#        ${ATCMD_PROG} ${CSID_S_USB_MODEM1} 'AT+CREG?' > ${TMPFIL}
+#        cat ${TMPFIL} | grep ",1"
+#        sleep 2
+#        REG_STATUS=$?
+
+        local REG_STATUS="`rdcsman 0x801e190$idx_3g u8`"
+
+        if [ "${REG_STATUS}" == "1" ] ||
+           [ "${REG_STATUS}" == "5" ] ; then    # REGISTERED and ROAMING
+#            rm -f $ ${TMPFIL}
+            break;
+        else
+            sleep 2
+        fi
+        CHK_REG_CNT=`expr $CHK_REG_CNT + 1`
+
+    done;
+
+    if [ "${REG_STATUS}" != "1" ] &&
+       [ "${REG_STATUS}" != "5" ] &&
+       [ "${CHK_REG_CNT}" == "${MAX_RETRY_TIMES}" ] ; then 
+        logger -t "O3G/SCRIPT" -p 8.7 "Nor Registered to network yet reg_status=$REG_STATUS.."
+    fi
+
+    return 0
+}
+
+usage() {
+	 echo "$0 [chkreg] [index_usb] [index_3g]"
+	 exit 1
+}
+ 
+# --------------- main --------------- 
+[ -z "$1" ] && usage;
+
+case "$1" in
+    chkreg)     check_register ;;
+    *)          usage;;
+esac
+
+exit 0 
+

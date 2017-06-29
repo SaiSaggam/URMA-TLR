@@ -1,0 +1,35 @@
+#
+# NTPClient configuration
+#
+
+config 'ntpclient'
+        option 'interval' '600'
+ 
+config 'ntpdrift'
+        option 'freq' '0'
+ 
+config 'ntpserver'
+        option 'hostname' '0.openwrt.pool.ntp.org'
+        option 'port'     '123'
+ 
+config 'ntpserver'
+        option 'hostname' '1.openwrt.pool.ntp.org'
+        option 'port'     '123'
+ 
+config 'ntpserver'
+        option 'hostname' '2.openwrt.pool.ntp.org'
+        option 'port'     '123'
+ 
+config 'ntpserver'
+        option 'hostname' '3.openwrt.pool.ntp.org'
+        option 'port'     '123'
+
+config 'ntpserver'
+        option 'hostname' '132.163.4.103'
+
+config 'ntpserver'
+        option 'hostname' '128.138.140.44'
+
+
+
+

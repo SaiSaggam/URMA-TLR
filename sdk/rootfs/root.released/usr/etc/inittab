@@ -1,0 +1,5 @@
+# < id >:< runlevels >:< action >:< process >
+::sysinit:/bin/mount -a
+::sysinit:/usr/etc/init.d/rcS
+::respawn:-/bin/ash
+

@@ -1,0 +1,11 @@
+failover1 valid:yes
+
+failover9 primary:eth1
+failover9 primary_status:Up
+failover9 secondary:eth4
+failover9 secondary_status:Up
+failover9 current:eth4
+failover9 detection method:probe
+failover9 last ping received:9
+failover9 failing over in:30
+failover9 switch back in:30

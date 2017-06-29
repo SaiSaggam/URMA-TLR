@@ -1,0 +1,385 @@
+<sci_reply version="1.0">
+<send_message>
+<device id="00000000-00000000-0040FFFF-FF0F424C">
+<rci_reply version="1.1">
+<query_descriptor>
+<descriptor element="query_state" desc="Retrieve device state" format="all_states_groups" bin_id="3">
+<format_define name="all_states_groups">
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+<descriptor element="ipsec" desc="IPSec statistics:Display the status of IPsec tunnels" bin_id="0">
+<attr name="index" desc="item number" type="int32" min="1" max="32"/>
+<element name="description" desc="Description for IPsec tunnel" type="string" access="read_only" max="255" bin_id="0"/>
+<element name="admin_status" desc="IPSec tunnel configuration status" type="enum" access="read_only" bin_id="1">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="oper_status" desc="IPSec tunnel operational status" type="enum" access="read_only" bin_id="2">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="up_time" desc="Uptime in seconds" type="uint32" access="read_only" bin_id="3"/>
+<element name="peer_ip" desc="Peer IP address" type="ipv4" access="read_only" bin_id="4"/>
+<element name="local_network" desc="Local network for this IPsec tunnel" type="ipv4" access="read_only" bin_id="5"/>
+<element name="local_netmask" desc="Local network mask for this IPsec tunnel" type="ipv4" access="read_only" bin_id="6"/>
+<element name="remote_network" desc="Remote network for this IPsec tunnel" type="ipv4" access="read_only" bin_id="7"/>
+<element name="remote_netmask" desc="Remote network mask for this tunnel" type="ipv4" access="read_only" bin_id="8"/>
+<element name="key_negotiation" desc="Key negotiation" type="string" access="read_only" max="64" bin_id="9"/>
+<element name="rekeying_in" desc="Rekeying in" type="string" access="read_only" max="64" bin_id="10"/>
+<element name="ah_ciphers" desc="AH Ciphers" type="string" access="read_only" max="64" bin_id="11"/>
+<element name="esp_ciphers" desc="ESP Ciphers" type="string" access="read_only" max="64" bin_id="12"/>
+<element name="renegotiating_in" desc="Renegotiating in" type="string" access="read_only" max="64" bin_id="13"/>
+<element name="outbound_esp_sa" desc="Outbound ESP SA" type="string" access="read_only" max="64" bin_id="14"/>
+<element name="inbound_esp_sa" desc="Inbound ESP SA" type="string" access="read_only" max="64" bin_id="15"/>
+<element name="rx_bytes" desc="Received bytes" type="string" access="read_only" bin_id="16"/>
+<element name="tx_bytes" desc="Transmitted bytes" type="string" access="read_only" bin_id="17"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="ipstats" desc="IP statistics:IP statistics" bin_id="1">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="rx_bytes" desc="Received bytes" type="string" access="read_only" bin_id="0"/>
+<element name="rx_packets" desc="Received packets" type="string" access="read_only" bin_id="1"/>
+<element name="rx_multicast_packets" desc="Received multicast packets" type="string" access="read_only" bin_id="2"/>
+<element name="rx_multicast_bytes" desc="Received multicast bytes" type="string" access="read_only" bin_id="3"/>
+<element name="rx_broadcast_packets" desc="Received broadcast packets" type="string" access="read_only" bin_id="4"/>
+<element name="rx_forward_datagrams" desc="Received forwarded packets" type="string" access="read_only" bin_id="5"/>
+<element name="rx_delivers" desc="Received delivered packets" type="string" access="read_only" bin_id="6"/>
+<element name="rx_reasm_requireds" desc="Received packets requiring reassembly" type="string" access="read_only" bin_id="7"/>
+<element name="rx_reasm_oks" desc="Received packets reassembled OK" type="string" access="read_only" bin_id="8"/>
+<element name="rx_reasm_fails" desc="Received packets reassembly failed" type="string" access="read_only" bin_id="9"/>
+<element name="rx_discards" desc="Received discarded packets" type="string" access="read_only" bin_id="10"/>
+<element name="rx_no_routes" desc="Received packets with no routes" type="string" access="read_only" bin_id="11"/>
+<element name="rx_address_errors" desc="Received packets with address errors" type="string" access="read_only" bin_id="12"/>
+<element name="rx_unknown_protos" desc="Received packets with unknown protocol" type="string" access="read_only" bin_id="13"/>
+<element name="rx_truncated_packets" desc="Received truncated packets" type="string" access="read_only" bin_id="14"/>
+<element name="tx_bytes" desc="Transmitted bytes" type="string" access="read_only" bin_id="15"/>
+<element name="tx_packets" desc="Transmitted packets" type="string" access="read_only" bin_id="16"/>
+<element name="tx_multicast_packets" desc="Transmitted multicast packets" type="string" access="read_only" bin_id="17"/>
+<element name="tx_multicast_bytes" desc="Transmitted multicast bytes" type="string" access="read_only" bin_id="18"/>
+<element name="tx_broadcast_packets" desc="Transmitted broadcast packets" type="string" access="read_only" bin_id="19"/>
+<element name="tx_forward_datagrams" desc="Transmitted forwarded packets" type="string" access="read_only" bin_id="20"/>
+<element name="tx_frag_requireds" desc="Transmitted fragmented packets" type="string" access="read_only" bin_id="21"/>
+<element name="tx_frag_oks" desc="Transmitted fragmented OK packets" type="string" access="read_only" bin_id="22"/>
+<element name="tx_frag_fails" desc="Transmitted fragmention failed packets" type="string" access="read_only" bin_id="23"/>
+<element name="tx_frag_creates" desc="Number of IP fragments" type="string" access="read_only" bin_id="24"/>
+<element name="tx_discards" desc="Transmitted discarded packets" type="string" access="read_only" bin_id="25"/>
+<element name="tx_no_routes" desc="Transmitted IP packets with no routes" type="string" access="read_only" bin_id="26"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="serial" desc="Serial statistics:Serial port status and statistics" bin_id="2">
+<attr name="index" desc="item number" type="int32" min="1" max="4"/>
+<element name="descr" desc="Description" type="string" access="read_only" max="64" bin_id="0"/>
+<element name="admin_status" desc="Serial port configuration status" type="enum" access="read_only" bin_id="1">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="oper_status" desc="Serial port operational status" type="enum" access="read_only" bin_id="2">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="uptime" desc="Uptime" type="uint32" access="read_only" bin_id="3"/>
+<element name="tx_bytes" desc="Bytes transmitted" type="uint32" access="read_only" bin_id="4"/>
+<element name="rx_bytes" desc="Bytes received" type="uint32" access="read_only" bin_id="5"/>
+<element name="overrun" desc="Overrun count" type="uint32" access="read_only" bin_id="6"/>
+<element name="overflow" desc="Buffer overrun count" type="uint32" access="read_only" bin_id="7"/>
+<element name="line_status" desc="Line signal status" type="string" access="read_only" max="64" bin_id="8"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="eth" desc="Ethernet statistics:Ethernet interface status and statistics" bin_id="3">
+<attr name="index" desc="item number" type="int32" min="1" max="4"/>
+<element name="descr" desc="Description" type="string" access="read_only" max="64" bin_id="0"/>
+<element name="admin_status" desc="Ethernet interface configuration status" type="enum" access="read_only" bin_id="1">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="oper_status" desc="Ethernet interface operational status" type="enum" access="read_only" bin_id="2">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="uptime" desc="Uptime in seconds" type="uint32" access="read_only" bin_id="3"/>
+<element name="mac_address" desc="MAC address" type="string" access="read_only" bin_id="4"/>
+<element name="dhcpcli" desc="DHCP client mode" type="enum" access="read_only" bin_id="5">
+<value value="on" desc="On" bin_id="0"/>
+<value value="off" desc="Off" bin_id="1"/>
+</element>
+<element name="ipaddr" desc="Address for this ethernet interface" type="ipv4" access="read_only" bin_id="6"/>
+<element name="netmask" desc="Address mask for this ethernet interface" type="ipv4" access="read_only" bin_id="7"/>
+<element name="dns_primary" desc="Primary DNS server" type="ipv4" access="read_only" bin_id="8"/>
+<element name="dns_secondary" desc="Secondary DNS server" type="ipv4" access="read_only" bin_id="9"/>
+<element name="link_status" desc="Link status" type="string" access="read_only" max="12" bin_id="10"/>
+<element name="link_speed" desc="Link speed" type="uint32" access="read_only" bin_id="11"/>
+<element name="link_duplex" desc="Link duplex" type="string" access="read_only" max="16" bin_id="12"/>
+<element name="rx_unicast_packets" desc="Received unicast packets" type="string" access="read_only" bin_id="13"/>
+<element name="tx_unicast_packets" desc="Transmitted unicastcast packets" type="string" access="read_only" bin_id="14"/>
+<element name="rx_broadcast_packets" desc="Received broadcast packets" type="string" access="read_only" bin_id="15"/>
+<element name="tx_broadcast_packets" desc="Transmitted broadcast packets" type="string" access="read_only" bin_id="16"/>
+<element name="rx_multicast_packets" desc="Received multicast packets" type="string" access="read_only" bin_id="17"/>
+<element name="tx_multicast_packets" desc="Transmitted multicast packets" type="string" access="read_only" bin_id="18"/>
+<element name="rx_crc_errors" desc="Received CRC error packets" type="string" access="read_only" bin_id="19"/>
+<element name="tx_crc_errors" desc="Transmitted CRC error packets" type="string" access="read_only" bin_id="20"/>
+<element name="rx_drop_packets" desc="Received packets dropped" type="string" access="read_only" bin_id="21"/>
+<element name="tx_drop_packets" desc="Transmitted packets dropped" type="string" access="read_only" bin_id="22"/>
+<element name="rx_pause_packets" desc="Received pause packets" type="string" access="read_only" bin_id="23"/>
+<element name="tx_pause_packets" desc="Transmitted pause packets" type="string" access="read_only" bin_id="24"/>
+<element name="rx_filtering_packets" desc="Received packets filtered" type="string" access="read_only" bin_id="25"/>
+<element name="tx_collisionss" desc="Transmitted collision events" type="string" access="read_only" bin_id="26"/>
+<element name="rx_alignment_error" desc="Received packets in alignment error" type="string" access="read_only" bin_id="27"/>
+<element name="rx_undersize_error" desc="Received packets undersize error" type="string" access="read_only" bin_id="28"/>
+<element name="rx_fragment_error" desc="Received packets fragmentation error" type="string" access="read_only" bin_id="29"/>
+<element name="rx_oversize_error" desc="Received packets oversize error" type="string" access="read_only" bin_id="30"/>
+<element name="rx_jabber_error" desc="Received packets jabber error" type="string" access="read_only" bin_id="31"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="route" desc="Routing table:IPv4 routing table" bin_id="4">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="destination" desc="Destination" type="string" access="read_only" bin_id="0"/>
+<element name="gateway" desc="Gateway" type="string" access="read_only" bin_id="1"/>
+<element name="metric" desc="Metric" type="uint32" access="read_only" bin_id="2"/>
+<element name="protocol" desc="Protocol" type="string" access="read_only" bin_id="3"/>
+<element name="idx" desc="Index" type="uint32" access="read_only" bin_id="4"/>
+<element name="interface" desc="Interface" type="string" access="read_only" bin_id="5"/>
+<element name="status" desc="Status" type="string" access="read_only" bin_id="6"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="system" desc="System information:System information" bin_id="5">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="model" desc="The device's model" type="string" access="read_only" max="255" bin_id="0"/>
+<element name="part_number" desc="The device's part number" type="string" access="read_only" max="20" bin_id="1"/>
+<element name="serial_number" desc="The device's serial number" type="string" access="read_only" max="20" bin_id="2"/>
+<element name="hardware_version" desc="The device's hardware version" type="string" access="read_only" max="63" bin_id="3"/>
+<element name="bank" desc="The current firmware flash bank" type="uint32" access="read_only" min="0" max="1" bin_id="4"/>
+<element name="firmware_version" desc="The current firmware version" type="string" access="read_only" max="20" bin_id="5"/>
+<element name="bootloader_version" desc="The current bootloader version" type="string" access="read_only" max="40" bin_id="6"/>
+<element name="config_file" desc="The current configuration file" type="string" access="read_only" max="255" bin_id="7"/>
+<element name="uptime" desc="The time the device has been up" type="string" access="read_only" max="64" bin_id="8"/>
+<element name="system_time" desc="The current time on the device" type="string" access="read_only" max="32" bin_id="9"/>
+<element name="cpu_usage" desc="The current CPU usage" type="uint32" access="read_only" min="0" max="100" bin_id="10"/>
+<element name="cpu_min" desc="The minimum CPU usage" type="uint32" access="read_only" min="0" max="100" bin_id="11"/>
+<element name="cpu_max" desc="The maximum CPU usage" type="uint32" access="read_only" min="0" max="100" bin_id="12"/>
+<element name="cpu_avg" desc="The average CPU usage" type="uint32" access="read_only" min="0" max="100" bin_id="13"/>
+<element name="temperature" desc="The current temperature of the device" type="string" access="read_only" max="20" bin_id="14"/>
+<element name="description" desc="Description for this device" type="string" access="read_only" max="255" bin_id="15"/>
+<element name="location" desc="Location details for this device" type="string" access="read_only" max="255" bin_id="16"/>
+<element name="contact" desc="Contact details for this device" type="string" access="read_only" max="255" bin_id="17"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="log" desc="Event log:Event log" bin_id="6">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="logs" desc="Event log" type="string" access="read_only" max="255" bin_id="0"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="dsl" desc="DSL status:Displays DSL status and statistics" bin_id="7">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="description" desc="DSL interface description" type="string" access="read_only" max="63" bin_id="0"/>
+<element name="admin_status" desc="DSL interface configuration status" type="enum" access="read_only" bin_id="1">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="oper_status" desc="DSL interface operational status" type="enum" access="read_only" bin_id="2">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="uptime" desc="Uptime in seconds" type="uint32" access="read_only" bin_id="3"/>
+<element name="hardware_version" desc="DSL hardware version" type="string" access="read_only" max="127" bin_id="4"/>
+<element name="firmware_version" desc="DSL firmware version" type="string" access="read_only" max="127" bin_id="5"/>
+<element name="system_firmware_id" desc="DSL system firmware ID" type="string" access="read_only" max="127" bin_id="6"/>
+<element name="line_status" desc="DSL line status" type="enum" access="read_only" bin_id="7">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+<value value="waiting_for_initialisation" desc="Waiting for initialization" bin_id="2"/>
+<value value="initialising" desc="Initializing" bin_id="3"/>
+<value value="unknown" desc="Unknown" bin_id="4"/>
+</element>
+<element name="line_uptime" desc="DSL line uptime in seconds" type="uint32" access="read_only" bin_id="8"/>
+<element name="line_mode" desc="DSL line mode" type="enum" access="read_only" bin_id="9">
+<value value="adsl2_plus" desc="ADSL2+" bin_id="0"/>
+<value value="adsl2" desc="ADSL2" bin_id="1"/>
+<value value="gdmt" desc="G.dmt" bin_id="2"/>
+<value value="glite" desc="G.lite" bin_id="3"/>
+<value value="unknown" desc="Unknown" bin_id="4"/>
+</element>
+<element name="encapsulation" desc="Encapsulation" type="enum" access="read_only" bin_id="10">
+<value value="pppoa_vcmux" desc="PPPoA, VC-Mux" bin_id="0"/>
+<value value="pppoa_llc" desc="PPPoA, LLC" bin_id="1"/>
+<value value="pppoe_vcmux" desc="PPPoE, VC-Mux" bin_id="2"/>
+<value value="pppoe_llc" desc="PPPoE, LLC" bin_id="3"/>
+</element>
+<element name="vpi" desc="VPI for the DSL interface" type="uint32" access="read_only" bin_id="11"/>
+<element name="vci" desc="VCI for the DSL interface" type="uint32" access="read_only" bin_id="12"/>
+<element name="mtu" desc="Maximum Transmission Unit" type="uint32" access="read_only" bin_id="13"/>
+<element name="remote_vendor_id" desc="Remote vendor ID" type="string" access="read_only" max="63" bin_id="14"/>
+<element name="ip_address" desc="IP address" type="ipv4" access="read_only" bin_id="15"/>
+<element name="netmask" desc="Address mask" type="ipv4" access="read_only" bin_id="16"/>
+<element name="gateway" desc="Gateway address" type="ipv4" access="read_only" bin_id="17"/>
+<element name="rx_packets" desc="Received packets" type="string" access="read_only" bin_id="18"/>
+<element name="tx_packets" desc="Transmitted packets" type="string" access="read_only" bin_id="19"/>
+<element name="rx_bytes" desc="Received bytes" type="string" access="read_only" bin_id="20"/>
+<element name="tx_bytes" desc="Transmitted bytes" type="string" access="read_only" bin_id="21"/>
+<element name="downstream_speed" desc="Downstream speed in kbps" type="uint32" access="read_only" bin_id="22"/>
+<element name="upstream_speed" desc="Upstream speed in kbps" type="uint32" access="read_only" bin_id="23"/>
+<element name="downstream_channel_type" desc="Downstream channel type" type="enum" access="read_only" bin_id="24">
+<value value="fast" desc="Fast" bin_id="0"/>
+<value value="interleaved" desc="Interleaved" bin_id="1"/>
+<value value="unknown" desc="Unknown" bin_id="2"/>
+</element>
+<element name="upstream_channel_type" desc="Upstream channel type" type="enum" access="read_only" bin_id="25">
+<value value="fast" desc="Fast" bin_id="0"/>
+<value value="interleaved" desc="Interleaved" bin_id="1"/>
+<value value="unknown" desc="Unknown" bin_id="2"/>
+</element>
+<element name="downstream_relative_capacity" desc="Downstream relative capacity percentage" type="uint32" access="read_only" bin_id="26"/>
+<element name="upstream_relative_capacity" desc="Upstream relative capacity percentage" type="uint32" access="read_only" bin_id="27"/>
+<element name="downstream_attentuation" desc="Downstream attenuation in dB" type="string" access="read_only" max="10" bin_id="28"/>
+<element name="upstream_attentuation" desc="Upstream attenuation in dB" type="string" access="read_only" max="10" bin_id="29"/>
+<element name="downstream_noise_margin" desc="Downstream noise margin in dB" type="string" access="read_only" max="10" bin_id="30"/>
+<element name="upstream_noise_margin" desc="Upstream noise margin in dB" type="string" access="read_only" max="10" bin_id="31"/>
+<element name="downstream_output_power" desc="Downstream output power in dBm" type="string" access="read_only" max="10" bin_id="32"/>
+<element name="upstream_output_power" desc="Upstream output power in dBm" type="string" access="read_only" max="10" bin_id="33"/>
+<element name="downstream_fec_errors" desc="Downstream FEC errors" type="uint32" access="read_only" bin_id="34"/>
+<element name="upstream_fec_errors" desc="Upstream FEC errors" type="uint32" access="read_only" bin_id="35"/>
+<element name="downstream_crc_errors" desc="Downstream CRC errors" type="uint32" access="read_only" bin_id="36"/>
+<element name="upstream_crc_errors" desc="Upstream CRC errors" type="uint32" access="read_only" bin_id="37"/>
+<element name="downstream_hec_errors" desc="Downstream HEC errors" type="uint32" access="read_only" bin_id="38"/>
+<element name="upstream_hec_errors" desc="Upstream HEC errors" type="uint32" access="read_only" bin_id="39"/>
+<element name="errored_secs_15min" desc="Number of errored seconds in 15 minutes" type="uint32" access="read_only" bin_id="40"/>
+<element name="errored_secs_24hr" desc="Number of errored seconds in 24 hours" type="uint32" access="read_only" bin_id="41"/>
+<element name="errored_secs_lineup" desc="Number of errored seconds after line up" type="uint32" access="read_only" bin_id="42"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="cellular" desc="Cellular status:Displays cellular status and statistics." bin_id="8">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="description" desc="Description" type="string" access="read_only" max="63" bin_id="0"/>
+<element name="module" desc="Modem module" type="string" access="read_only" max="127" bin_id="1"/>
+<element name="firmware_version" desc="Modem firmware version" type="string" access="read_only" max="127" bin_id="2"/>
+<element name="hardware_version" desc="Modem hardware version" type="string" access="read_only" max="63" bin_id="3"/>
+<element name="imei" desc="IMEI" type="string" access="read_only" max="32" bin_id="4"/>
+<element name="sim_status" desc="Active SIM being used" type="string" access="read_only" max="16" bin_id="5"/>
+<element name="signal_strength" desc="Signal strength" type="string" access="read_only" max="63" bin_id="6"/>
+<element name="signal_quality" desc="Signal quality" type="string" access="read_only" max="63" bin_id="7"/>
+<element name="registration_status" desc="Registration status" type="string" access="read_only" max="63" bin_id="8"/>
+<element name="network_provider" desc="Network provider" type="string" access="read_only" max="63" bin_id="9"/>
+<element name="temperature" desc="Temperature" type="int32" access="read_only" bin_id="10"/>
+<element name="connection_type" desc="Connection type" type="string" access="read_only" max="63" bin_id="11"/>
+<element name="radio_band" desc="Radio band" type="string" access="read_only" max="63" bin_id="12"/>
+<element name="channel" desc="Channel" type="string" access="read_only" max="63" bin_id="13"/>
+<element name="pdp_context" desc="PDP Context in use" type="string" access="read_only" max="63" bin_id="14"/>
+<element name="ipaddr" desc="address for cellular interface" type="ipv4" access="read_only" bin_id="15"/>
+<element name="netmask" desc="address mask for cellular interface" type="ipv4" access="read_only" bin_id="16"/>
+<element name="gateway" desc="gateway address for cellular interface" type="ipv4" access="read_only" bin_id="17"/>
+<element name="dns_servers" desc="dns servers for cellular interface" type="ipv4" access="read_only" bin_id="18"/>
+<element name="rx_packets" desc="Received packets" type="string" access="read_only" bin_id="19"/>
+<element name="tx_packets" desc="Transmitted packets" type="string" access="read_only" bin_id="20"/>
+<element name="rx_bytes" desc="Received bytes" type="string" access="read_only" bin_id="21"/>
+<element name="tx_bytes" desc="Transmitted bytes" type="string" access="read_only" bin_id="22"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="failover" desc="failover status:failover status and state" bin_id="9">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="description" desc="Failover status and state" type="string" access="read_only" max="63" bin_id="0"/>
+<element name="status" desc="Failover status" type="enum" access="read_only" bin_id="1">
+<value value="up" desc="Valid" bin_id="0"/>
+<value value="down" desc="Inactive" bin_id="1"/>
+</element>
+<element name="primary_interface" desc="Primary interface" type="string" access="read_only" max="32" bin_id="2"/>
+<element name="primary_interface_status" desc="Primary interface status" type="enum" access="read_only" bin_id="3">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="secondary_interface" desc="Secondary interface" type="string" access="read_only" max="32" bin_id="4"/>
+<element name="secondary_interface_status" desc="Secondary interface status" type="enum" access="read_only" bin_id="5">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="using_interface" desc="Using interface" type="string" access="read_only" max="63" bin_id="6"/>
+<element name="detection_method" desc="Detection method" type="string" access="read_only" max="63" bin_id="7"/>
+<element name="last_ping" desc="Last probe received" type="string" access="read_only" max="63" bin_id="8"/>
+<element name="failing_over" desc="Failing over" type="string" access="read_only" max="63" bin_id="9"/>
+<element name="switching_back" desc="Switching back" type="string" access="read_only" max="63" bin_id="10"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="config" desc="Current configuration:Display the current configuration" bin_id="10">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="config" desc="Current configuration" type="string" access="read_only" max="255" bin_id="0"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="firewall" desc="Show firewall configuration:Show firewall configuration" bin_id="11">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="config" desc="Firewall configuration" type="string" access="read_only" max="255" bin_id="0"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="bridge" desc="Bridge status and statistics:Displays bridge interface status and statistics." bin_id="12">
+<attr name="index" desc="item number" type="int32" min="1" max="10"/>
+<element name="admin_status" desc="Bridge interface configuration status" type="enum" access="read_only" bin_id="0">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="oper_status" desc="Bridge interface operational status" type="enum" access="read_only" bin_id="1">
+<value value="up" desc="Up" bin_id="0"/>
+<value value="down" desc="Down" bin_id="1"/>
+</element>
+<element name="description" desc="Description of the bridge interface" type="string" access="read_only" max="255" bin_id="2"/>
+<element name="interfaces" desc="Interfaces connected by the bridge" type="string" access="read_only" max="255" bin_id="3"/>
+<element name="mtu" desc="Maximum Transmission Unit" type="uint32" access="read_only" bin_id="4"/>
+<element name="ip_address" desc="IP address" type="ipv4" access="read_only" bin_id="5"/>
+<element name="mask" desc="Subnet mask" type="ipv4" access="read_only" bin_id="6"/>
+<element name="rx_bytes" desc="Received bytes" type="string" access="read_only" bin_id="7"/>
+<element name="rx_packets" desc="Received packets" type="string" access="read_only" bin_id="8"/>
+<element name="tx_bytes" desc="Transmitted bytes" type="string" access="read_only" bin_id="9"/>
+<element name="tx_packets" desc="Transmitted packets" type="string" access="read_only" bin_id="10"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+<descriptor element="manufacture" desc="Manufacturing Data:Manufacturing Data" bin_id="13">
+<attr name="index" desc="item number" type="int32" min="1" max="1"/>
+<element name="description" desc="Manufacturing Data" type="string" access="read_only" max="63" bin_id="0"/>
+<element name="model" desc="Model of Transport Linux Router" type="string" access="read_only" max="63" bin_id="1"/>
+<element name="serial_number" desc="Serial number" type="string" access="read_only" max="63" bin_id="2"/>
+<element name="firmware_version" desc="Firmware version" type="string" access="read_only" max="63" bin_id="3"/>
+<element name="firmware_checksum" desc="Firmware checksum" type="string" access="read_only" max="63" bin_id="4"/>
+<element name="r_data" desc="ROM id" type="string" access="read_only" max="63" bin_id="5"/>
+<element name="lan1_mac" desc="LAN1 MAC address" type="string" access="read_only" bin_id="6"/>
+<element name="lan2_mac" desc="LAN1 MAC address" type="string" access="read_only" bin_id="7"/>
+<element name="lan3_mac" desc="LAN1 MAC address" type="string" access="read_only" bin_id="8"/>
+<element name="lan4_mac" desc="LAN1 MAC address" type="string" access="read_only" bin_id="9"/>
+<element name="cellular_imei" desc="Cellular IMEI" type="string" access="read_only" max="63" bin_id="10"/>
+<element name="cellular_firmware" desc="Cellular firmware version" type="string" access="read_only" max="63" bin_id="11"/>
+<element name="cellular_hardware" desc="Cellular hardware version" type="string" access="read_only" max="63" bin_id="12"/>
+<element name="dsl_firmware" desc="DSL firmware version" type="string" access="read_only" max="63" bin_id="13"/>
+<element name="usb_firmware" desc="USB/Serial firmware version" type="string" access="read_only" max="63" bin_id="14"/>
+<error_descriptor id="3" desc="Load fail"/>
+<error_descriptor id="4" desc="Save fail"/>
+<error_descriptor id="5" desc="Insufficient memory"/>
+</descriptor>
+</format_define>
+</descriptor>
+</query_descriptor>
+</rci_reply>
+</device>
+</send_message>
+</sci_reply>

@@ -1,0 +1,2 @@
+all-but-not-chkrev: build install
+check-then-clean: clean

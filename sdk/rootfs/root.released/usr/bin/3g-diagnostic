@@ -1,0 +1,130 @@
+#!/bin/sh
+
+[ -f /usr/bin/3g-scriptlib ] && . /usr/bin/3g-scriptlib
+[ ! -f /usr/bin/3g-scriptlib ] && [ -f /tmp/3g-scriptlib ] && . /tmp/3g-scriptlib
+ 
+# Paths to programs
+. /usr/bin/scriptlib
+
+# Get index
+Index_3G=$2
+
+# multi csid start from 1
+idx_3g=`expr $Index_3G + 1`
+
+get_state()
+{
+    #Connectino info for CSID_C_3G_MULTIWAN
+    CSID_S_3G_MULTIWAN_NETWORK_NAME="`rdcsman 0x801e100$idx_3g str`"
+    CSID_S_3G_MULTIWAN_MCC="`rdcsman 0x801e2b4$idx_3g u32`"
+    CSID_S_3G_MULTIWAN_MCC2="`rdcsman 0x801e2b4$idx_3g u16`"
+    CSID_S_3G_MULTIWAN_MNC="`rdcsman 0x801e2b5$idx_3g u32`"
+    CSID_S_3G_MULTIWAN_MNC2="`rdcsman 0x801e2b5$idx_3g u16`"
+    CSID_S_3G_MULTIWAN_LAC="`rdcsman 0x801e2b6$idx_3g u32`"
+    CSID_S_3G_MULTIWAN_CELLID_DEC="`rdcsman 0x801e2ba$idx_3g u32`"
+    CSID_S_3G_MULTIWAN_NETWORK_TYPE="`rdcsman 0x801e3e0$idx_3g str`"
+    CSID_S_3G_MULTIWAN_PREFER_SERVICE_TYPE="`rdcsman 0x801e2b2$idx_3g str`"
+    CSID_S_3G_MULTIWAN_PS_STATUS="`rdcsman 0x801e2b3$idx_3g u8`"
+    CSID_S_3G_MULTIWAN_REG_STATUS="`rdcsman 0x801e190$idx_3g u8`"
+    CSID_S_3G_MULTIWAN_SIGNAL_STRENGTH="`rdcsman 0x801e0e0$idx_3g u16`"
+    CSID_S_3G_MULTIWAN_SIGNAL_QUALITY="`rdcsman 0x801e0f0$idx_3g u16`"
+    CSID_S_3G_MULTIWAN_IMSI="`rdcsman 0x801e530$idx_3g str`"
+    CSID_S_3G_MULTIWAN_SMSC="`rdcsman 0x801e2b7$idx_3g str`"
+	 
+	CSID_S_3G_MULTIWAN_SIM_STATUS="`rdcsman 0x801e3c0$idx_3g u32`"
+    CSID_S_3G_MULTIWAN_PCTL_PIN_RETRY_TIMES="`rdcsman 0x801e350$idx_3g u32`"
+    CSID_S_3G_MULTIWAN_PCTL_PUK_RETRY_TIMES="`rdcsman 0x801e360$idx_3g u32`"
+    CSID_S_3G_MULTIWAN_PCTL_PIN_RETRY_TIMES2="`rdcsman 0x801e350$idx_3g u8`"
+    CSID_S_3G_MULTIWAN_PCTL_PUK_RETRY_TIMES2="`rdcsman 0x801e360$idx_3g u8`"
+
+    CSID_S_3G_MULTIWAN_IMEI="`rdcsman 0x801e2b8$idx_3g str`"
+    CSID_S_3G_MULTIWAN_CARD_VERSION="`rdcsman 0x801e2b9$idx_3g str`"
+    CSID_S_3G_MULTIWAN_CARD_INFO="`rdcsman 0x801e0d0$idx_3g str`"
+}
+
+clean_csid()
+{
+    wrcsman "0x801e100$idx_3g 0x00 && \
+             0x801e2b4$idx_3g 0x00 && \
+             0x801e2b5$idx_3g 0x00 && \
+             0x801e2b6$idx_3g 0x00 && \
+			 0x801e2ba$idx_3g 0x00 && \
+             0x801e3e0$idx_3g 0x00 && \
+			 0x801e2b2$idx_3g 0x00 && \
+			 0x801e2b3$idx_3g 0x00 && \
+             0x801e190$idx_3g 0x00 && \
+             0x801e0f0$idx_3g 0x00 && \
+             0x801e530$idx_3g 0x00 && \ 
+             0x801e2b7$idx_3g 0x00" 
+
+    wrcsman "0x801e3c0$idx_3g 0x00 && \
+             0x801e350$idx_3g 0x00 && \
+             0x801e360$idx_3g 0x00 && \
+             0x801e2b8$idx_3g 0x00 && \
+             0x801e2b9$idx_3g 0x00 && \
+             0x801e0d0$idx_3g 0x00"
+}
+
+write_csid()
+{
+    get_state
+
+    wrcsman "0x801e2b4$idx_3g $CSID_S_3G_MULTIWAN_MCC2 && \
+             0x801e2b5$idx_3g $CSID_S_3G_MULTIWAN_MNC2 && \
+             0x801e350$idx_3g $CSID_S_3G_MULTIWAN_PCTL_PIN_RETRY_TIMES2 && \
+             0x801e360$idx_3g $CSID_S_3G_MULTIWAN_PCTL_PUK_RETRY_TIMES2"
+}
+
+show_state()
+{
+    get_state
+
+    echo "---------------------------"
+	echo "3G_index[$idx_3g]"
+    echo "---------------------------"
+    echo "OPERATOR          : $CSID_S_3G_MULTIWAN_NETWORK_NAME"
+    echo "MCC               : $CSID_S_3G_MULTIWAN_MCC"
+    echo "MNC               : $CSID_S_3G_MULTIWAN_MNC"  
+    echo "LAC               : $CSID_S_3G_MULTIWAN_LAC"
+    echo "CELLID            : $CSID_S_3G_MULTIWAN_CELLID_DEC"
+    echo "Service Type      : $CSID_S_3G_MULTIWAN_NETWORK_TYPE"
+    echo "Service Prefer Mode : $CSID_S_3G_MULTIWAN_PREFER_SERVICE_TYPE"
+    echo "PS Attach State   : $CSID_S_3G_MULTIWAN_PS_STATUS"
+    echo "CS Attach State   : $CSID_S_3G_MULTIWAN_REG_STATUS"
+    echo "Signal Strength   : $CSID_S_3G_MULTIWAN_SIGNAL_STRENGTH" 
+    echo "Signal quality    : $CSID_S_3G_MULTIWAN_SIGNAL_QUALITY"
+    echo "IMSI : $CSID_S_3G_MULTIWAN_IMSI"
+    echo "SMSC : $CSID_S_3G_MULTIWAN_SMSC"
+    echo "---------------------------"
+    echo "PIN Code Lock : $CSID_S_3G_MULTIWAN_SIM_STATUS"
+    echo "PIN Code Retry Times : $CSID_S_3G_MULTIWAN_PCTL_PIN_RETRY_TIMES"
+    echo "PUK Code Retry Times : $CSID_S_3G_MULTIWAN_PCTL_PUK_RETRY_TIMES"
+    echo "---------------------------" 
+    echo "IMEI              : $CSID_S_3G_MULTIWAN_IMEI"
+    echo "FW Version        :"
+    echo "    $CSID_S_3G_MULTIWAN_CARD_VERSION"
+    echo "Module Name       : $CSID_S_3G_MULTIWAN_CARD_INFO"
+    echo "---------------------------"
+    echo "MCC               : $CSID_S_3G_MULTIWAN_MCC2"
+    echo "MNC               : $CSID_S_3G_MULTIWAN_MNC2"
+    echo "PIN Code Retry Times : $CSID_S_3G_MULTIWAN_PCTL_PIN_RETRY_TIMES2"
+    echo "PUK Code Retry Times : $CSID_S_3G_MULTIWAN_PCTL_PUK_RETRY_TIMES2"
+}
+
+usage() {
+    echo "$0 [status] [index_3g]"
+    exit 1
+}
+
+# +++++++++++++++ main ++++++++++++++++++++++ 
+[ -z "$2" ] && usage;
+
+case "$1" in
+	status)		show_state ;;
+    clean)      clean_csid ;;
+    write)      write_csid ;;
+	*)              usage;;
+esac
+
+exit 0 
+

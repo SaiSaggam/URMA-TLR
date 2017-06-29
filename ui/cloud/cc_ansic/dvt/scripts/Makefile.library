@@ -1,0 +1,109 @@
+# ***************************************************************************
+# Copyright (c) 2011, 2012 Digi International Inc.,
+# All rights not expressly granted are reserved.
+# 
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at http://mozilla.org/MPL/2.0/.
+# 
+# Digi International Inc. 11001 Bren Road East, Minnetonka, MN 55343
+#
+# ***************************************************************************
+#
+CC      = $(CROSS_COMPILE)gcc
+LD      = $(CROSS_COMPILE)gcc
+AR      = $(CROSS_COMPILE)ar
+
+LDFLAGS = -Wl,-soname,$(LIBRARY) -shared $^ -o
+
+LIB_SRC_DIR=../../../private
+PUBLIC_HDR_DIR=../../../public/include
+RCI_HDR_DIR=.
+OBJDIR=$(LIB_SRC_DIR)
+
+ifeq ($(DEBUG),true)
+DFLAGS += -DDEBUG -g
+else
+DFLAGS += -DNDEBUG -O2
+endif
+
+# CFLAG Definition
+CFLAGS += $(DFLAGS)
+CFLAGS += -Winit-self -Wbad-function-cast -Wpointer-arith
+CFLAGS += -Wmissing-parameter-type -Wstrict-prototypes -Wformat-security 
+CFLAGS += -Wformat-y2k -Wold-style-definition -Wcast-align -Wformat-nonliteral 
+CFLAGS += -Wpadded -Wredundant-decls -Wvariadic-macros
+CFLAGS += -Wall -Werror -Wextra -pedantic
+CFLAGS += -Wno-error=padded -Wno-unused-function -Wno-missing-field-initializers
+
+ifeq ($(DFLAGS),-m32)
+CFLAGS += -Wno-error=format
+CFLAGS += -Wno-error=long-long
+endif
+
+# Use ANSIC 89
+CFLAGS +=-std=c89
+CFLAGS += -DCONNECTOR_HAS_STDINT_HEADER
+
+# Include POSIX and GNU features.
+CFLAGS += -D_POSIX_C_SOURCE=200112L -D_GNU_SOURCE 
+# Include Public Header Files.
+CFLAGS += -iquote. -iquote$(PUBLIC_HDR_DIR)/custom -iquote$(PUBLIC_HDR_DIR) -iquote$(RCI_HDR_DIR)
+# Include Platform Header Files.
+CFLAGS += -iquote$(PLATFORM_DIR)
+ifeq ($(DEBUG),true)
+CFLAGS += -g -O0
+else
+# Optimize for Size
+CFLAGS += -Os
+endif
+
+vpath $(LIB_SRC_DIR)/%.c
+vpath $(LIB_SRC_DIR)/%.h
+
+# Default LIBDIR is the currect directory
+ifeq ($(LIBDIR),)
+	LIBDIR = ./
+endif
+
+ifeq ($(LDFLAGS),)
+LDFLAGS = -shared
+endif
+
+# By default build a static library
+ifneq ($(SHARED_LIBRARY), true)
+LIB =$(LIBDIR)/libconnector.a
+else
+LIB =$(LIBDIR)/libconnector.so
+endif
+
+all: $(LIB)
+
+OBJS = $(OBJDIR)/connector_api.o
+
+$(OBJS): $(LIB_SRC_DIR)/*.c $(LIB_SRC_DIR)/*.h $(PUBLIC_HDR_DIR)/*.h $(RCI_HDR_DIR)/*.h
+
+$(LIB): $(OBJS)
+
+ifeq ($(SHARED_LIBRARY), true)
+	$(LD) $(LDFLAGS) $^ -o $@
+else
+	$(AR) $(ARFLAGS) $@ $^
+endif
+
+MAKE= make DEBUG="$(DEBUG)" DFLAGS="$(DFLAGS)" LIB="$(LIBDIR)"
+
+linux:
+	echo "building" $(SAMPLE_DIR)/linux;\
+	TARGETDIR=`pwd` ; cd $(SAMPLE_DIR)/linux;\
+	$(MAKE) -f Makefile all;\
+	cd $${TARGETDIR};
+
+.PHONY: clean
+clean:
+	-rm -f $(OBJS) $(LIB)
+#	$(MAKE) -f Makefile clean;
+#	TARGETDIR=`pwd` ; cd $(SAMPLE_DIR)/linux;\
+#	$(MAKE) -f Makefile clean;\
+#	cd $${TARGETDIR};\
+

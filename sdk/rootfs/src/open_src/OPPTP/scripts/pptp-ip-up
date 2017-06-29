@@ -1,0 +1,105 @@
+#!/bin/sh
+
+logger -t "pptp-ip-up" "$*"
+
+. /usr/bin/scriptlib
+
+route delete default
+
+if [ $5 -eq 99 ]; then
+	MULTIWAN=
+else
+	MULTIWAN=$5
+fi
+
+if [ -z $MULTIWAN ]; then
+	STATUS=`rdcsman 0x80010007 u32`
+	IP="`rdcsman 0x80010002 ipv4`"
+	GW="`rdcsman 0x80010004 ipv4`"
+else
+	TMP=`printf "%x" $((MULTIWAN+1))`
+	STATUS=`rdcsman 0x8001016$MULTIWAN u32`
+	IP="`rdcsman 0x8001011$MULTIWAN ipv4`"
+	GW="`rdcsman 0x8001013$MULTIWAN ipv4`"
+fi
+
+if [ $STATUS -eq 2 ] && [ $IP == $3 ] && [ $GW == $4 ]; then
+	logger -t "pptp-ip-up" "LCP renegotiation"
+	wrcsman "0x80130002 1"
+fi
+
+PPP_IF=$1
+sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+IF_DNS1="`rdcsman 0x00053100 ipv4`"
+IF_DNS2="`rdcsman 0x00053200 ipv4`"
+if [ "$IF_DNS1" == "0.0.0.0" ] && [ "$IF_DNS2" == "0.0.0.0" ] ; then
+	sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+fi
+sl_get_uptime CNTTIME
+
+if [ "$IF_IP" == "10.64.64.64" ]; then
+	if [ -z $MULTIWAN ]; then
+		wrcsman "0x80050100 0x00 && \
+			 0x80050200 0x00 && \
+			 0x80050300 0x00 && \
+			 0x80050400 0x00 && \
+			 0x80050500 0x00 && \
+			 0x80050600 0x00 && \
+			 0x80050700 0x05 && \
+			 0x80010002 0x00 && \
+			 0x80010003 0x00 && \
+			 0x80010004 0x00 && \
+			 0x80010005 0x00 && \
+			 0x80010006 0x00 && \
+			 0x80010007 0x05"
+	else
+		wrcsman "0x8005010$TMP 0x00 && \
+			 0x8005020$TMP 0x00 && \
+			 0x8005030$TMP 0x00 && \
+			 0x8005040$TMP 0x00 && \
+			 0x8005050$TMP 0x00 && \
+			 0x8005060$TMP 0x00 && \
+			 0x8005070$TMP 0x05 && \
+			 0x8001011$MULTIWAN 0x00 && \
+			 0x8001012$MULTIWAN 0x00 && \
+			 0x8001013$MULTIWAN 0x00 && \
+			 0x8001014$MULTIWAN 0x00 && \
+			 0x8001015$MULTIWAN 0x00 && \
+			 0x8001016$MULTIWAN 0x05"
+	fi
+else
+	if [ -z $MULTIWAN ]; then
+		wrcsman "0x80050100 $CNTTIME && \
+			 0x80050200 {$IF_IP} && \
+			 0x80050300 {$IF_NM} && \
+			 0x80050400 {$IF_GW} && \
+			 0x80050500 {$IF_DNS1} && \
+			 0x80050600 {$IF_DNS2} && \
+			 0x80050C00 \"$PPP_IF && \
+			 0x80050700 0x02 && \
+			 0x80010002 {$IF_IP} && \
+			 0x80010003 {$IF_NM} && \
+			 0x80010004 {$IF_GW} && \
+			 0x80010005 {$IF_DNS1} && \
+			 0x80010006 {$IF_DNS2} && \
+			 0x8001000B \"$PPP_IF && \
+			 0x80010007 0x02"
+	else
+		wrcsman "0x8005010$TMP $CNTTIME && \
+			 0x8005020$TMP {$IF_IP} && \
+			 0x8005030$TMP {$IF_NM} && \
+			 0x8005040$TMP {$IF_GW} && \
+			 0x8005050$TMP {$IF_DNS1} && \
+			 0x8005060$TMP {$IF_DNS2} && \
+			 0x80050C0$TMP \"$PPP_IF && \
+			 0x8005070$TMP 0x02 && \
+			 0x8001011$MULTIWAN {$IF_IP} && \
+			 0x8001012$MULTIWAN {$IF_NM} && \
+			 0x8001013$MULTIWAN {$IF_GW} && \
+			 0x8001014$MULTIWAN {$IF_DNS1} && \
+			 0x8001015$MULTIWAN {$IF_DNS2} && \
+			 0x8001019$MULTIWAN \"$PPP_IF && \
+			 0x8001016$MULTIWAN 0x02"
+	fi
+fi
+exit 0

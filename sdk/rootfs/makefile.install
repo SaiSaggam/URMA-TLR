@@ -1,0 +1,653 @@
+# vi: set sw=4 ts=4:
+
+PRIV_TOOLS := $(TOPDIR)/tools/priv
+OPEN_TOOLS := $(TOPDIR)/tools/open
+
+#
+
+.PHONY: INSTALL.init_root
+INSTALL.init_root:
+	rm -fr   $(INSTALL_ROOT)
+ifdef FULL_COPY
+	mkdir -p $(INSTALL_ROOT)/bin
+#	mkdir -p $(INSTALL_ROOT)/etc
+	mkdir -p $(INSTALL_ROOT)/lib
+	mkdir -p $(INSTALL_ROOT)/proc
+	mkdir -p $(INSTALL_ROOT)/sys
+	mkdir -p $(INSTALL_ROOT)/sbin
+	mkdir -p $(INSTALL_ROOT)/ram
+	mkdir -p $(INSTALL_ROOT)/usr/bin
+	mkdir -p $(INSTALL_ROOT)/usr/sbin
+	mkdir -p $(INSTALL_ROOT)/usr/etc
+	mkdir -p $(INSTALL_ROOT)/usr/etc/init.d
+	mkdir -p $(INSTALL_ROOT)/usr/uo
+	mkdir -p $(INSTALL_ROOT)/usr/www
+	mkdir -p $(INSTALL_ROOT)/usr/lib
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/tmp/csman
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/l2tp
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/ppp/plugins
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/l7-protocols
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/xl2tpd
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/var/log
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/var/run
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/var/run/xl2tpd
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/var/xml
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/var/dnrd
+	ln -fs ram/etc $(INSTALL_ROOT)/etc
+	ln -fs ram/var $(INSTALL_ROOT)/var
+	ln -fs ram/tmp $(INSTALL_ROOT)/tmp
+
+	# let /dev/log be writable (for syslogd)
+	mkdir -p $(INSTALL_ROOT)/dev
+	ln -fs /var/log/socket $(INSTALL_ROOT)/dev/log
+else
+	cp -a $(TOPDIR)/rootfs/root.released $(INSTALL_ROOT)
+endif
+
+.PHONY: INSTALL.copy_glue
+INSTALL.copy_glue:
+ifdef FULL_COPY
+	@cp -a etc/inittab								$(INSTALL_ROOT)/usr/etc/inittab
+	@install -p -m 777 etc/init.d/rcS				$(INSTALL_ROOT)/usr/etc/init.d
+	@install -p -m 777 etc/init.d/S02amitsetup.sh	$(INSTALL_ROOT)/usr/etc/init.d
+	@install -p -m 777 etc/init.d/S30execconfda0.sh	$(INSTALL_ROOT)/usr/etc/init.d
+	@cp -a etc/fstab								$(INSTALL_ROOT)/usr/etc/fstab
+	@cp -a etc/profile								$(INSTALL_ROOT)/usr/etc/profile
+	@cp -a etc/services								$(INSTALL_ROOT)/usr/mv2ram/etc/services
+	@cp -a etc/passwd                               $(INSTALL_ROOT)/usr/mv2ram/etc/passwd
+	@cp -a etc/group								$(INSTALL_ROOT)/usr/mv2ram/etc/group
+	@cp -a usr/bin/telnetd-action					$(INSTALL_ROOT)/usr/bin/telnetd-action
+	@cp -a etc/issue/net                            $(INSTALL_ROOT)/usr/mv2ram/etc/issue.net
+
+	@mkdir -p										$(INSTALL_ROOT)/root
+	@MASCOT=`svn info | grep "Repository Root"`; MASCOT=$${MASCOT##*/}; \
+		echo "$$MASCOT" > $(INSTALL_ROOT)/usr/mv2ram/etc/hostname
+	@mkdir -p										$(INSTALL_ROOT)/usr/mv2ram/tmp/csman
+	@mv pre4.dat									$(INSTALL_ROOT)/usr/mv2ram/tmp/csman
+	@ln -fs /usr/www/pre7.dat						$(INSTALL_ROOT)/usr/mv2ram/tmp/csman/pre7.dat
+	@ln -fs /usr/www/reset.dat						$(INSTALL_ROOT)/usr/mv2ram/tmp/csman/reset.dat	
+endif
+
+
+INSTALL.WWWDIR := $(INSTALL_ROOT)/usr/www
+
+#
+
+.PHONY: INSTALL.copy_CSMan
+INSTALL.copy_CSMan:
+	cp -a $(COMPO_DIR)/uds/server/csmanuds			$(INSTALL_ROOT)/usr/sbin
+	cp -a $(COMPO_DIR)/uds/agent/libcsman-uds.so	$(INSTALL_ROOT)/lib/libcsman.so
+#ifneq (${RD_LEVEL},0)
+	cp -a $(COMPO_DIR)/tools/csmtool				$(INSTALL_ROOT)/usr/bin
+#endif
+
+.PHONY: INSTALL.copy_Uyghur
+INSTALL.copy_Uyghur:
+	cp -a $(COMPO_DIR)/uvm/uvm						$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_Whttpd
+INSTALL.copy_Whttpd:
+	cp -a $(COMPO_DIR)/httpd.exe					$(INSTALL_ROOT)/usr/sbin/httpd
+	cp -a $(COMPO_DIR)/killproc                     $(INSTALL_ROOT)/usr/bin/
+	cp -a $(COMPO_DIR)/httpd.conf					$(INSTALL_ROOT)/usr/mv2ram/etc/httpd.conf
+
+.PHONY: INSTALL.copy_SyncDate
+INSTALL.copy_SyncDate:
+	@cp -a $(COMPO_DIR)/syncdate					$(INSTALL_ROOT)/usr/sbin/
+	@cp -a $(COMPO_DIR)/sync-action					$(INSTALL_ROOT)/usr/sbin/
+	@cp -a syncdate.sh								$(INSTALL_ROOT)/usr/bin/
+
+.PHONY: INSTALL.copy_CornerBusybox
+INSTALL.copy_CornerBusybox:
+	cp -a $(COMPO_DIR)/busybox						$(INSTALL_ROOT)/usr/mv2ram/tmp/
+	cp -a rdsh										$(INSTALL_ROOT)/
+
+### WumingWu ###
+
+.PHONY: INSTALL.copy_ODHCP
+INSTALL.copy_ODHCP:
+	cp -a $(COMPO_DIR)/dhcpdiscovery                    $(INSTALL_ROOT)/usr/sbin
+
+.PHONY: INSTALL.copy_ODHCP20175
+INSTALL.copy_ODHCP20175:
+	cp -a $(COMPO_DIR)/src/udhcpd						$(INSTALL_ROOT)/usr/sbin
+	cp -a $(COMPO_DIR)/src/udhcpc						$(INSTALL_ROOT)/usr/sbin
+	cp -a $(COMPO_DIR)/src/dumpleases					$(INSTALL_ROOT)/usr/sbin
+	cp -a $(COMPO_DIR)/src/dhcp_list					$(INSTALL_ROOT)/usr/sbin
+ifdef FULL_COPY
+	cp -a $(COMPO_DIR)/src/samples/udhcpd.conf.uo		$(INSTALL_ROOT)/usr/uo
+endif
+	cp -a $(COMPO_DIR)/src/samples/default.script 		$(INSTALL_ROOT)/usr/bin
+	cp -a $(COMPO_DIR)/src/samples/udhcpc-action		$(INSTALL_ROOT)/usr/bin	
+	cp -a $(COMPO_DIR)/src/samples/udhcpc-connect		$(INSTALL_ROOT)/usr/bin	
+	cp -a $(COMPO_DIR)/src/samples/udhcpc-connect-sierra		$(INSTALL_ROOT)/usr/bin	
+	cp -a $(COMPO_DIR)/src/samples/udhcpd-action		$(INSTALL_ROOT)/usr/bin
+
+
+.PHONY: INSTALL.copy_OBridgeUtil
+INSTALL.copy_OBridgeUtil:
+	@cp -a $(COMPO_DIR)/brctl/brctl					$(INSTALL_ROOT)/usr/sbin
+
+.PHONY: INSTALL.copy_OIPTables
+INSTALL.copy_OIPTables:
+	@cp -a $(COMPO_DIR)/src/.libs/iptables				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/.libs/libxtables.so* 		$(INSTALL_ROOT)/lib
+	@mkdir -p $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_DNAT.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_MASQUERADE.so $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_icmp.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_SNAT.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_LOG.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_MARK.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_standard.so 	$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_udp.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_tcp.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_mac.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_state.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_iprange.so 	$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_limit.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_hashlimit.so 	$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_esp.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_TCPMSS.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_multiport.so 	$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_layer7.so      $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_SPAP.so 		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_REJECT.so		$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_webstr.so     $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libipt_domain.so     $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_time.so        $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_TOS.so        	$(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_DSCP.so        $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/src/extensions/libxt_length.so      $(INSTALL_ROOT)/lib/iptables
+	@cp -a $(COMPO_DIR)/l7-protocols/protocols/msnmessenger.pat	 $(INSTALL_ROOT)/usr/mv2ram/etc/l7-protocols
+	@cp -a $(COMPO_DIR)/l7-protocols/protocols/imap.pat		$(INSTALL_ROOT)/usr/mv2ram/etc/l7-protocols
+	@cp -a $(COMPO_DIR)/l7-protocols/protocols/bittorrent.pat $(INSTALL_ROOT)/usr/mv2ram/etc/l7-protocols
+	@cp -a $(COMPO_DIR)/l7-protocols/protocols/ftp.pat		$(INSTALL_ROOT)/usr/mv2ram/etc/l7-protocols
+	@cp -a $(COMPO_DIR)/l7-protocols/protocols/http.pat		$(INSTALL_ROOT)/usr/mv2ram/etc/l7-protocols
+	@cp -a $(COMPO_DIR)/l7-protocols/protocols/edonkey.pat	$(INSTALL_ROOT)/usr/mv2ram/etc/l7-protocols
+
+.PHONY: INSTALL.copy_Commander
+INSTALL.copy_Commander:
+	@cp -a $(COMPO_DIR)/commander					$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/csmankits					$(INSTALL_ROOT)/usr/bin
+	@ln -fs csmankits								$(INSTALL_ROOT)/usr/bin/rdcsman
+	@ln -fs csmankits								$(INSTALL_ROOT)/usr/bin/wrcsman
+	@ln -fs csmankits                               $(INSTALL_ROOT)/usr/bin/rmcsman
+	@cp -a $(COMPO_DIR)/fixip-action				$(INSTALL_ROOT)/usr/bin	
+	@cp -a $(COMPO_DIR)/mac-control					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/rt_util/switch				$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/rt_util/reg					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/tools/etherdump				$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/tools/get_boot_ver			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/tools/ichecksum				$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/getlink						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/ping-action					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/change_dhcpd_ip_pool		$(INSTALL_ROOT)/usr/bin
+	
+.PHONY: INSTALL.copy_OPPP
+INSTALL.copy_OPPP:
+	@cp -a $(COMPO_DIR)/pppd/pppd					$(INSTALL_ROOT)/usr/sbin
+	@mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/ppp
+	@cp -a $(COMPO_DIR)/etc.ppp/options				$(INSTALL_ROOT)/usr/mv2ram/etc/ppp
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/etc.ppp/pap-secrets.uo		$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/etc.ppp/chap-secrets.uo		$(INSTALL_ROOT)/usr/uo
+endif
+	@cp -a $(COMPO_DIR)/scripts/ip-up				$(INSTALL_ROOT)/usr/mv2ram/etc/ppp
+	@cp -a $(COMPO_DIR)/scripts/ip-down				$(INSTALL_ROOT)/usr/mv2ram/etc/ppp
+	#@cp -a $(COMPO_DIR)/pppd/plugins/rp-pppoe/rp-pppoe.so $(INSTALL_ROOT)/usr/mv2ram/etc/ppp/plugins
+	
+.PHONY: INSTALL.copy_OPPPoE
+INSTALL.copy_OPPPoE:
+	#@cp -a $(COMPO_DIR)/src/pppoe					$(INSTALL_ROOT)/usr/sbin
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/configs/pppoe.conf.uo		$(INSTALL_ROOT)/usr/uo
+endif
+	@cp -a $(COMPO_DIR)/scripts/pppoe-start			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pppoe-connect		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pppoe-stop			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pppoe-action		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pppoe-status		$(INSTALL_ROOT)/usr/bin
+	@mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/ppp/plugins
+	@cp -a $(COMPO_DIR)/src/rp-pppoe.so				$(INSTALL_ROOT)/usr/mv2ram/etc/ppp/plugins
+
+	
+.PHONY: INSTALL.copy_OPPTP
+INSTALL.copy_OPPTP:
+	@cp -a $(COMPO_DIR)/pptp					$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/get_csid_addr           $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/pptp-ondemand           $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/port-scan               $(INSTALL_ROOT)/usr/bin
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/options.pptp.uo			$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/pptp.conf.uo			$(INSTALL_ROOT)/usr/uo
+endif
+	@cp -a $(COMPO_DIR)/scripts/pptp-start		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptp-stop		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptp-action		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptp-connect	$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptpc-customer	$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptpc-header	$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptpc-start     $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptpc-stop      $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptpc-action    $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptpc-ondemand  $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/pptpc-customer  $(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_OL2TP
+INSTALL.copy_OL2TP:
+	@cp -af $(COMPO_DIR)/l2tpd						$(INSTALL_ROOT)/usr/sbin
+	@cp -af $(COMPO_DIR)/handlers/l2tp-control 		$(INSTALL_ROOT)/usr/sbin
+	@cp -af $(COMPO_DIR)/handlers/sync-pppd.so		$(INSTALL_ROOT)/lib
+	@cp -af $(COMPO_DIR)/handlers/cmd.so			$(INSTALL_ROOT)/lib
+ifdef FULL_COPY
+	@cp -af $(COMPO_DIR)/l2tp.conf.uo				$(INSTALL_ROOT)/usr/uo
+endif
+	@cp -af $(COMPO_DIR)/l2tp-ondemand				$(INSTALL_ROOT)/usr/bin
+	@cp -af $(COMPO_DIR)/scripts/l2tp-start      	$(INSTALL_ROOT)/usr/bin
+	@cp -af $(COMPO_DIR)/scripts/l2tp-stop       	$(INSTALL_ROOT)/usr/bin
+	@cp -af $(COMPO_DIR)/scripts/l2tp-action     	$(INSTALL_ROOT)/usr/bin
+	@cp -af $(COMPO_DIR)/scripts/l2tp.sh			$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_ScriptLib
+INSTALL.copy_ScriptLib:
+	@cp -af $(COMPO_DIR)/scriptlib					$(INSTALL_ROOT)/usr/bin/
+
+.PHONY: INSTALL.copy_AmitUpgBuf
+INSTALL.copy_AmitUpgBuf:
+	@cp -af $(COMPO_DIR)/libupgbuf.so				$(INSTALL_ROOT)/lib				
+
+.PHONY: INSTALL.copy_WS-FWUPG
+INSTALL.copy_WS-FWUPG:
+
+.PHONY: INSTALL.copy_WS-DAS
+INSTALL.copy_WS-DAS:
+
+.PHONY: INSTALL.copy_WS-BAKSET
+INSTALL.copy_WS-BAKSET:
+
+.PHONY: INSTALL.copy_WS-ESP
+INSTALL.copy_WS-ESP:
+
+.PHONY: INSTALL.copy_RALINKRT2860AP
+INSTALL.copy_RALINKRT2860AP:
+	@mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/Wireless/RT2860AP
+	@mkdir -p $(INSTALL_ROOT)/modules/kernel/net/ieee80211/
+	#@cp -a $(COMPO_DIR)/os/linux/rt2860ap.ko		$(INSTALL_ROOT)/modules/kernel/net/ieee80211/
+	@cp -a $(COMPO_DIR)/RT2860AP.dat.uo				$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/Amit/wps-action				$(INSTALL_ROOT)/usr/bin
+	
+.PHONY: INSTALL.copy_RALINKRT2860STA
+INSTALL.copy_RALINKRT2860STA:
+	@mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/Wireless/RT2860STA
+	@cp -a $(COMPO_DIR)/RT2860STA.dat.uo                $(INSTALL_ROOT)/usr/uo
+	
+.PHONY: INSTALL.copy_RALINK8021X
+INSTALL.copy_RALINK8021X:
+	@cp $(COMPO_DIR)/rt2860apd						$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/Amit/ieee8021x-action		$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_WSCUPNP
+INSTALL.copy_WSCUPNP:
+	@cp -a $(COMPO_DIR)/src/wscd                    $(INSTALL_ROOT)/usr/sbin
+	@mkdir -p                                       $(INSTALL_ROOT)/usr/mv2ram/etc/xml
+	@cp -a $(COMPO_DIR)/src/xml/*.xml               $(INSTALL_ROOT)/usr/mv2ram/etc/xml
+
+
+
+### JackChiang ###
+
+
+.PHONY: INSTALL.copy_OSendmailc
+INSTALL.copy_OSendmailc:
+	@cp -a $(COMPO_DIR)/sendmail				$(INSTALL_ROOT)/usr/sbin
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/sendmail.conf.uo			$(INSTALL_ROOT)/usr/uo
+endif
+	@cp -a $(COMPO_DIR)/sendmail-action			$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_ODDNSc
+INSTALL.copy_ODDNSc:
+	@cp -a $(COMPO_DIR)/ddns				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/ddns.conf.uo			$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/ddns-action				$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_OSNMP
+INSTALL.copy_OSNMP:
+	@cp -a $(COMPO_DIR)/amit_ucd-snmp-4.1.2/agent/snmpd	$(INSTALL_ROOT)/usr/sbin
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/snmpd.conf.uo			$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/snmpd.sh.uo                         $(INSTALL_ROOT)/usr/uo
+endif
+	@cp -a $(COMPO_DIR)/snmpd-action			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/snmpd-wrcsman			$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_OSPAP
+INSTALL.copy_OSPAP:
+	@cp -a $(COMPO_DIR)/kernel/ipt_SPAP.ko		$(INSTALL_ROOT)/lib
+	@cp -a $(COMPO_DIR)/src/spapd				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/spapd-action			$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_OMultisession
+INSTALL.copy_OMultisession:
+	@cp -a $(COMPO_DIR)/kernel/ipt_RBYDOM.ko		$(INSTALL_ROOT)/lib
+	@cp -a $(COMPO_DIR)/src/rbydomd				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/rbyip.sh.uo				$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/mpppoe-init.uo			$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/ip-up.mpppoe.uo			$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/mpppoe.conf.uo			$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/script/rbydom/rbydomd-action 	$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/script/rbyip/rbyip-action 		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/script/mpppoe/mpppoe-action 	$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/script/mpppoe/mpppoe-start 	        $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/script/mpppoe/mpppoe-connect	$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/script/mpppoe/mpppoe-status		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/script/mpppoe/mpppoe-stop		$(INSTALL_ROOT)/usr/bin
+	
+.PHONY: INSTALL.copy_OMailtool
+INSTALL.copy_OMailtool:
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/var/spool/mail
+	@cp -a $(COMPO_DIR)/mailtool 				$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_OSDMZ
+INSTALL.copy_OSDMZ:
+	@cp -a $(COMPO_DIR)/sdmz-action			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/sdmz.sh.uo			$(INSTALL_ROOT)/usr/uo
+
+
+### JasonJiang ###
+
+.PHONY: INSTALL.copy_AmitUPnP
+INSTALL.copy_AmitUPnP:
+	@cp -a $(COMPO_DIR)/AmitUPnP				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/upnp-sh					$(INSTALL_ROOT)/usr/bin
+	#@cp -a $(COMPO_DIR)/xml/desc.xml			$(INSTALL_ROOT)/usr/mv2ram/var/xml
+	@cp -a $(COMPO_DIR)/xml/serv1.xml			$(INSTALL_ROOT)/usr/mv2ram/var/xml
+	@cp -a $(COMPO_DIR)/xml/serv2.xml			$(INSTALL_ROOT)/usr/mv2ram/var/xml
+	@cp -a $(COMPO_DIR)/xml/serv3.xml			$(INSTALL_ROOT)/usr/mv2ram/var/xml
+
+.PHONY: INSTALL.copy_OZebraRouting
+INSTALL.copy_OZebraRouting:
+	@cp -a $(COMPO_DIR)/ripd/ripd				$(INSTALL_ROOT)/usr/sbin
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/ripd.conf.uo			$(INSTALL_ROOT)/usr/uo
+endif
+	@cp -a $(COMPO_DIR)/ripd-sh					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/zebra/zebra             $(INSTALL_ROOT)/usr/sbin
+	#@cp -a $(COMPO_DIR)/zebra.init              $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/zebra.conf              $(INSTALL_ROOT)/usr/mv2ram/etc
+	
+.PHONY: INSTALL.copy_AmitDMFilter
+INSTALL.copy_AmitDMFilter:
+	@cp -a $(COMPO_DIR)/ipt_domain.ko           $(INSTALL_ROOT)/lib
+
+.PHONY: INSTALL.copy_AmitURLBlock
+INSTALL.copy_AmitURLBlock:
+	@echo "install copy_AmitURLBlock"
+	@cp -a $(COMPO_DIR)/ipt_webstr.ko           $(INSTALL_ROOT)/lib
+	@cp -a $(COMPO_DIR)/redirect/conn_redirect   $(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_AmitNATServ
+INSTALL.copy_AmitNATServ:
+	@cp -a $(COMPO_DIR)/nat-draft.uyg.uo        $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/qos.uyg.uo              $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/dos-defender.uyg.uo     $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/adjust-kernel.uyg.uo    $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/rate-control.uyg.uo    $(INSTALL_ROOT)/usr/uo
+#	@cp -a $(COMPO_DIR)/basic-qos.uyg.uo        $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/port-forwarding.uyg.uo  $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/virtual-computer.uyg.uo $(INSTALL_ROOT)/usr/uo 
+	@cp -a $(COMPO_DIR)/mac-control.uyg.uo      $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/pkt-filter.uyg.uo       $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/domain-filter.uyg.uo    $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/url-block.uyg.uo        $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/nat						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/qos						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/dos                     $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/settime                 $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/take_time				$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/get_policy              $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/ip2hex					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/sche_rule               $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/patch-o-matic-ng/linux.2.6.21/xt_time.ko      $(INSTALL_ROOT)/lib
+
+.PHONY: INSTALL.copy_OTC
+INSTALL.copy_OTC:
+	@cp -a $(COMPO_DIR)/tc/tc                  $(INSTALL_ROOT)/usr/sbin
+
+### GeorgeWang ###
+
+.PHONY: INSTALL.copy_ORouted
+INSTALL.copy_ORouted:
+	@cp -a $(COMPO_DIR)/routed/routed           $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/ripd-sh					$(INSTALL_ROOT)/usr/bin
+
+
+### CliffWang ###
+.PHONY: INSTALL.copy_OWirelessTool
+INSTALL.copy_OWirelessTool:
+	@cp -a $(COMPO_DIR)/iwconfig $(INSTALL_ROOT)/usr/sbin	
+	@cp -a $(COMPO_DIR)/iwspy $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/iwpriv $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/iwevent $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/ifrename $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/iwevent $(INSTALL_ROOT)/usr/sbin
+
+.PHONY: INSTALL.copy_ODNRD
+INSTALL.copy_ODNRD:
+	@cp -a $(COMPO_DIR)/src/dnrd $(INSTALL_ROOT)/usr/sbin
+
+.PHONY: INSTALL.copy_OPPTPServ
+INSTALL.copy_OPPTPServ:
+	@cp -a $(COMPO_DIR)/src/pptpd    $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/pptpctrl $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/plugins/pptpd-logcsid.so $(INSTALL_ROOT)/usr/lib
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/uo/pptpd.conf.uo    $(INSTALL_ROOT)/usr/uo/pptpd.conf.uo
+	@cp -a $(COMPO_DIR)/uo/options.pptpd.uo $(INSTALL_ROOT)/usr/uo/options.pptpd.uo
+endif
+	@cp -a $(COMPO_DIR)/scripts/pptpd.init  $(INSTALL_ROOT)/usr/bin
+	@chmod +x $(INSTALL_ROOT)/usr/bin/pptpd.init
+
+.PHONY: INSTALL.copy_OL2TPServ
+INSTALL.copy_OL2TPServ:
+	@cp -a $(COMPO_DIR)/xl2tpd                 $(INSTALL_ROOT)/usr/sbin
+ifdef FULL_COPY
+	@cp -a $(COMPO_DIR)/doc/options.xl2tpd.uo  $(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/doc/xl2tpd.conf.uo     $(INSTALL_ROOT)/usr/uo
+endif
+	@cp -a $(COMPO_DIR)/scripts/init.suse      $(INSTALL_ROOT)/usr/bin/xl2tpd.init
+	@chmod +x $(INSTALL_ROOT)/usr/bin/xl2tpd.init
+	#@cp -a $(COMPO_DIR)/doc/l2tpd.conf.uo      $(INSTALL_ROOT)/usr/uo
+	#@cp -a $(COMPO_DIR)/doc/l2tp-secrets.uo    $(INSTALL_ROOT)/usr/uo
+
+### StanleyChu ###
+.PHONY: INSTALL.copy_OCardmgr
+INSTALL.copy_OCardmgr:
+	@cp -a $(COMPO_DIR)/pcmcia-cs-3.2.8/cardmgr/cardmgr $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/pcmcia-cs-3.2.8/cardmgr/cardctl $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/setserial-2.17/setserial        $(INSTALL_ROOT)/usr/sbin
+	@mkdir -p                                           $(INSTALL_ROOT)/usr/mv2ram/etc/pcmcia
+	@tar c -C $(COMPO_DIR)/pcmcia --exclude .svn . | tar x -C $(INSTALL_ROOT)/usr/mv2ram/etc/pcmcia
+
+.PHONY: INSTALL.copy_O3G
+INSTALL.copy_O3G:
+	@cp -a $(COMPO_DIR)/3g_chat.uo								$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/3g.conf.uo								$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/iburst.conf.uo							$(INSTALL_ROOT)/usr/uo
+	@cp -a $(COMPO_DIR)/scripts/3g-action						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-connect						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-start						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-stop							$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-status						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-autobak						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-hso-connect					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-hso-start					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-hso-stop						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-hso-status					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/iburst-action					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/iburst-connect					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/iburst-start					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/iburst-stop						$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/iburst-status					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/sierra-action 					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/dhcp.script 					$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/scripts/3g-sierra-ondemand				$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/src/hotplug/hotplug						$(INSTALL_ROOT)/sbin
+	@cp -a $(COMPO_DIR)/src/modem_switch/modem_switch			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/src/autobak/autobak						$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/sendATcmd/send_ATcmd			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/src/tools/termtool/termtool				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/lib_3g/lib_3g.so				$(INSTALL_ROOT)/lib/lib_3g.so
+	@cp -a $(COMPO_DIR)/src/tools/usb_modemswitch/eject			$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/usb_modemswitch/modem			$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/get_3g_status/get_3g_status	$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/modem_list/modem_list			$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/auto_apn/auto_apn				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/ex_ussd/ex_ussd				$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/keep_alive/keepalive			$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/show_3g_info/show_3ginfo		$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(TOPDIR)/rootfs/src/open_src/OPPP/chat/chat			$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/src/tools/sms_server/sms_server			$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/sms_server/rdsms  			$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/pin_control/pcontrol          $(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/src/tools/3g_notifyd/3g_notifyd			$(INSTALL_ROOT)/usr/sbin/get_3g_status
+	@cp -a $(COMPO_DIR)/src/tools/new_sms_server/new_sms_server $(INSTALL_ROOT)/usr/sbin/sms_server
+	@cp -a $(COMPO_DIR)/src/tools/new_sms_server/new_rdsms 		$(INSTALL_ROOT)/usr/sbin/rdsms
+	@cp -a $(COMPO_DIR)/src/tools/new_pin_control/new_pcontrol 	$(INSTALL_ROOT)/usr/sbin/pcontrol
+
+.PHONY: INSTALL.copy_RT2561AP
+INSTALL.copy_RT2561AP:
+#	@mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/Wireless/RT61AP
+#	@cp -a $(COMPO_DIR)/RT61/RT61AP.dat				$(INSTALL_ROOT)/usr/mv2ram/etc/Wireless/RT61AP
+#	@cp -a $(COMPO_DIR)/RT61/RT2561S.bin			$(INSTALL_ROOT)/usr/mv2ram/etc/Wireless/RT61AP
+#	@cp -a $(COMPO_DIR)/RT61/rt61ap.ko				$(INSTALL_ROOT)/modules/kernel/net/ieee80211/
+	
+.PHONY: INSTALL.copy_mp-daemon
+INSTALL.copy_mp-daemon:
+	@cp -a $(COMPO_DIR)/flash							$(INSTALL_ROOT)/usr/bin/
+	@cp -a $(COMPO_DIR)/UDPserver						$(INSTALL_ROOT)/usr/bin/
+
+.PHONY: INSTALL.copy_RAWLAN
+INSTALL.copy_RAWLAN:
+	#@cp -a $(COMPO_DIR)/auth/src/auth					$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/auth/src/dlisten/iwcontrol		$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/discover/disc_server			$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/IAPP/iapp						$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/lltdd/native-linux/lld2d		$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/miniigd/miniigd					$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/mini_upnp/mini_upnpd			$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/mini_upnp/upnp-sh				$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/mini_upnp/mini_upnp.so			$(INSTALL_ROOT)/lib/
+	#@mkdir -p											$(INSTALL_ROOT)/usr/mv2ram/etc/linuxigd
+	#@cp -a $(COMPO_DIR)/mini_upnp/picsdesc.*	       	$(INSTALL_ROOT)/usr/mv2ram/etc/linuxigd
+	#@mkdir -p											$(INSTALL_ROOT)/usr/wps
+	#@cp -a $(COMPO_DIR)/mini_upnp/simplecfg*.xml       	$(INSTALL_ROOT)/usr/mv2ram/etc
+	#@cp -a $(COMPO_DIR)/wsc/src/wscd					$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/upnpd							$(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/wlan.sh							$(INSTALL_ROOT)/usr/bin
+	#@cp -a $(COMPO_DIR)/wlanapp.sh						$(INSTALL_ROOT)/usr/bin
+	#@cp -a $(COMPO_DIR)/wps-action                		$(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/wcli_list						$(INSTALL_ROOT)/usr/bin/
+	@cp -a $(COMPO_DIR)/wcli_list.sh					$(INSTALL_ROOT)/usr/bin/
+	@chmod 755 $(INSTALL_ROOT)/usr/bin/wcli_list.sh
+	#@cp -a $(COMPO_DIR)/wlancli		                    $(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/wlancli-action                  $(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/scanap                          $(INSTALL_ROOT)/usr/bin/
+	#@cp -a $(COMPO_DIR)/apcli-scanap                    $(INSTALL_ROOT)/usr/bin/
+	@cp -a $(COMPO_DIR)/ated.sh							$(INSTALL_ROOT)/usr/bin/
+	@chmod 755 $(INSTALL_ROOT)/usr/bin/ated.sh
+
+.PHONY: INSTALL.copy_FlashBurnTest
+INSTALL.copy_FlashBurnTest:
+	@cp -a $(COMPO_DIR)/flashtest         				$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_IGMPProxy
+INSTALL.copy_IGMPProxy:
+	@cp -a $(COMPO_DIR)/igmpproxy						$(INSTALL_ROOT)/usr/sbin
+	@cp -a $(COMPO_DIR)/igmp-action						$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_WanDiscover
+INSTALL.copy_WanDiscover:
+	@cp -a $(COMPO_DIR)/wan_discover        			$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_OAGPServer
+INSTALL.copy_OAGPServer:
+	@cp -a $(COMPO_DIR)/AGPServer						$(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_OAGPClient
+INSTALL.copy_OAGPClient:
+
+.PHONY: INSTALL.copy_GetPsec
+INSTALL.copy_GetPsec:
+	@cp -a $(COMPO_DIR)/getpsec 						$(INSTALL_ROOT)/usr/bin/
+	@cp -a $(COMPO_DIR)/libpsec.so						$(INSTALL_ROOT)/lib/libpsec.so
+	#@ln -s /ram/lib/libpsec.so 							$(INSTALL_ROOT)/lib/libpsec.so
+
+.PHONY: INSTALL.copy_OOpenswan
+INSTALL.copy_OOpenswan:
+	@cp -p $(COMPO_DIR)/scripts/usr/sbin/ipsec				$(INSTALL_ROOT)/usr/sbin/
+	@mkdir -p $(INSTALL_ROOT)/usr/lib
+	@cp -a $(COMPO_DIR)/root/usr/local/lib/ipsec			$(INSTALL_ROOT)/usr/lib/
+	@mkdir -p $(INSTALL_ROOT)/usr/libexec
+	@cp -a $(COMPO_DIR)/root/usr/local/libexec/ipsec		$(INSTALL_ROOT)/usr/libexec/
+	@rm $(INSTALL_ROOT)/usr/libexec/ipsec/verify
+	@mkdir -p $(INSTALL_ROOT)/usr/ipsec/etc
+	@cp -a $(COMPO_DIR)/root/etc/ipsec.d					$(INSTALL_ROOT)/usr/ipsec/etc/
+	@cp -p $(COMPO_DIR)/scripts/etc/ipsec.d/ipsec			$(INSTALL_ROOT)/usr/ipsec/etc/ipsec.d
+	@cp -p $(COMPO_DIR)/scripts/etc/ipsec.conf				$(INSTALL_ROOT)/usr/ipsec/etc/
+	@cp -p $(COMPO_DIR)/scripts/etc/ipsec.secrets			$(INSTALL_ROOT)/usr/ipsec/etc/
+
+.PHONY: INSTALL.copy_LibGMP
+INSTALL.copy_LibGMP:
+	@cp -p $(COMPO_DIR)/src/.libs/libgmp.so					$(INSTALL_ROOT)/lib/
+
+	
+.PHONY: INSTALL.copy_RalinkAppGPIO
+INSTALL.copy_RalinkAppGPIO:
+	@cp -p $(COMPO_DIR)/gpio								$(INSTALL_ROOT)/usr/bin
+	
+	
+.PHONY: INSTALL.copy_RalinkATEd
+INSTALL.copy_RalinkATEd:
+	@cp -p $(COMPO_DIR)/ated                                $(INSTALL_ROOT)/usr/bin
+
+.PHONY: INSTALL.copy_RalinkMiiMgr
+INSTALL.copy_RalinkMiiMgr:
+	@cp -p $(COMPO_DIR)/mii_mgr								$(INSTALL_ROOT)/usr/bin
+
+
+.PHONY: INSTALL.copy_OpenAgent
+INSTALL.copy_OpenAgent:
+	echo 'make dir'
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/conf
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/conf/download/
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/conf/upload
+	mkdir -p $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/log
+#	cp src/src/agent ../../bin/
+#	cp -a src/src/CLI/tr069         ../../bin/
+#	cp -a src/conf/Dllso_example/libdev.so  ./../../../rom_disk/bak.lib/
+	@cp -a $(COMPO_DIR)/src/conf/agent.conf         $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/conf
+	@cp -a $(COMPO_DIR)/src/conf/fr.conf            $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/conf
+	@cp -a $(COMPO_DIR)/src/conf/stun.conf          $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/conf
+	@cp -a $(COMPO_DIR)/src/conf/param.xml          $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/conf
+#	@cp -a $(COMPO_DIR)/src/src/agent               $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/agent
+	@cp -a $(COMPO_DIR)/src/src/agent               $(INSTALL_ROOT)/sbin/agent
+	@cp -a $(COMPO_DIR)/src/conf/Dllso_CTG561AM/libdev.so $(INSTALL_ROOT)/lib/libdev.so
+#	@cp -a $(COMPO_DIR)/src/conf/Dllso_CDW530/libdev.so $(INSTALL_ROOT)/usr/mv2ram/etc/OpenAgent/libdev.so
+#	@ln -s /etc/OpenAgnet/libdev.so					$(INSTALL_ROOT)/lib/libdev.so
+
+.PHONY: INSTALL.copy_JSIP
+INSTALL.copy_JSIP:
+	@cp -a $(COMPO_DIR)/3giad                       $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/slic_driver/3giad-test      $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/slic_driver/slic_diag       $(INSTALL_ROOT)/usr/bin
+	@cp -a $(COMPO_DIR)/slic_driver/libslic.so      $(INSTALL_ROOT)/lib
+	@cp -a $(COMPO_DIR)/slic_driver/slic.ko         $(INSTALL_ROOT)/lib
+
+.PHONY: INSTALL.copy_ODHCPv6
+INSTALL.copy_ODHCPv6:
+
+
+	

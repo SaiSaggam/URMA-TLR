@@ -1,0 +1,105 @@
+#20150421 Fish modified for New L2TP ondemand
+#!/bin/sh
+
+#if [ -z "$1" ] || [ -z "$2" ]; then
+if [ -z "$1" ]; then
+   echo "you need specified arguements, start/restart/stop/show/help"
+   exit 1
+fi
+
+ACTION="$1"
+#TUN_IDX="$2"
+#ONDEMAND_PID="/var/run/l2tpc-ondemand-$TUN_IDX.pid"
+L2TP_ONDEMAND_PID="/var/run/L2TP-ondemand.pid"
+if [ -f "/tmp/l2tpc-header" ]; then
+   . /tmp/l2tpc-header
+elif [ -f "/usr/bin/l2tpc-header" ]; then
+   . /usr/bin/l2tpc-header
+fi
+
+start_ondemand()
+{
+#   get_l2tpc_tunnel_config $TUN_IDX
+
+#   ROUTEING="$C_L2TP_CLI_ROUTE"
+#   if [ "$ROUTEING" == "" ]; then
+#      ROUTEING="0.0.0.0/0"
+#   fi
+
+#   if [ -z "`ps | grep "l2tp-ondemand -sub $ROUTEING -tun $TUN_IDX" | grep -v grep`" ]; then
+#      echo "l2tp-ondemand -sub $ROUTEING -tun $TUN_IDX"
+#      l2tp-ondemand -sub $ROUTEING -tun $TUN_IDX &
+#   fi
+    if [ -f "$L2TP_ONDEMAND_PID" ]; then
+      echo "l2tp_ondemand is running, need to restart it!!"
+      #kill -3 `cat $L2TP_ONDEMAND_PID` > /dev/null 2>&1
+	  #echo "Delete $L2TP_ONDEMAND_PID"
+      #rm $L2TP_ONDEMAND_PID
+	  stop_ondemand
+	fi
+	echo "ondemand_l2tp start"
+	ondemand_l2tp start &
+}
+
+stop_ondemand()
+{
+#   if [ -f "$ONDEMAND_PID" ]; then
+#      kill `cat $ONDEMAND_PID` > /dev/null 2>&1
+#   fi
+   echo "ondemand_l2tp stop"
+   if [ -f "$L2TP_ONDEMAND_PID" ]; then
+      echo "Kill l2tp_ondemand process"
+      kill -3 `cat $L2TP_ONDEMAND_PID` > /dev/null 2>&1
+	  echo "Delete $L2TP_ONDEMAND_PID"
+      rm $L2TP_ONDEMAND_PID
+   fi
+
+#   pslist="`ps | grep l2tp-ondemand | grep "tun $TUN_IDX" `"
+#   if [ -z "$pslist" ]; then
+#       return
+#   fi
+#
+#   for i in $pslist
+#   do
+#       pid=`echo $i`
+#       break
+#   done
+#   kill -9 $pid >/dev/null 2>&1
+}
+
+help_command()
+{
+    echo "start -> Start l2tp client ondemand"
+    echo "stop ->Stop l2tp client ondemand"
+    echo "restart -> Restart l2tp client ondemand"
+    echo "show -> Show l2tp client ondemand info"
+    echo "help ->Show all action command"
+}
+
+show_info()
+{
+   if [ -f "$L2TP_ONDEMAND_PID" ]; then
+      pid=`cat $L2TP_ONDEMAND_PID`
+      echo "L2TP_ONDEMAND_PID path : $L2TP_ONDEMAND_PID"
+      echo "l2tp ondemand process id: $pid"
+   else
+      echo "l2tp ondemand is not running !"
+   fi
+}
+
+main()
+{
+   case "$ACTION" in
+      restart) stop_ondemand; start_ondemand;;
+      start) start_ondemand ;;
+      stop) stop_ondemand ;;
+	  show) show_info ;;
+	  help) help_command ;;
+      *) exit 1 ;;
+   esac
+}
+
+#
+# Main
+#
+main

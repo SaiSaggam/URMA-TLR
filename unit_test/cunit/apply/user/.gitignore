@@ -1,0 +1,4 @@
+*.o
+/utest
+/apply_user_test
+/config

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# This command is called as user shell for each user, except 'root'
+# It is overwritten from upper layer
+
+/bin/ash "$@"

@@ -1,0 +1,166 @@
+#!/bin/sh
+. /usr/bin/scriptlib
+
+PPPoE_CLR="/var/run/pppoe_dual_access.clr"
+WAN=`rdcsman 0x8000F231 str`
+CUR_DUAL_ACCESS=`rdcsman 0x00043000 u8`
+PPPOE_RUSSIAN_PID="/var/run/pppoe_russian.pid"
+RESOLV_CONF="/etc/resolv.conf"
+dhcp_action()
+{
+#	udhcpc-action stop
+	
+	#udhcpc-action start  && sleep 1 && route del default $WAN &
+	PPPOE_CNT_TYPE=`rdcsman  0x00040900  u8`
+	PPPOE_CNT_STATUS=`rdcsman  0x80040700 u8`
+	
+	#if [ "$PPPOE_CNT_TYPE" = "1" ];then
+	#	if [ "$PPPOE_CNT_STATUS" != "2" ];then
+	#		exit 0;
+	#	fi
+	#fi
+	
+	[ -e $PPPoE_CLR ] && sh $PPPoE_CLR
+	udhcpc-action start  && sleep 1 &
+	echo "udhcpc-action stop" > $PPPoE_CLR  
+	
+	#iptables -t nat -A POSTROUTING -o $WAN -s $(rdcsman 0x00010004 ipv4)/$(rdcsman 0x00010005 ipv4) -j MASQUERADE
+	#echo "iptables -t nat -D POSTROUTING -o $WAN -s $(rdcsman 0x00010004 ipv4)/$(rdcsman 0x00010005 ipv4) -j MASQUERADE" >> $PPPoE_CLR
+	
+	wrcsman  "0x80130002 1"
+}
+check_resolve()
+{
+	mas=$(iptables -t nat -nvL  POSTROUTING | grep MASQUERADE | grep eth2.2)
+	if [ "$mas" = "" ] ;then
+		iptables -t nat -A POSTROUTING -o $WAN -s $(rdcsman 0x00010004 ipv4)/$(rdcsman 0x00010005 ipv4) -j MASQUERADE
+		echo "iptables -t nat -D POSTROUTING -o $WAN -s $(rdcsman 0x00010004 ipv4)/$(rdcsman 0x00010005 ipv4) -j MASQUERADE" >> $PPPoE_CLR
+	fi
+	
+	PPPOE_WAN_DNS1="`rdcsman  0x80010005  ipv4`"
+	PPPOE_WAN_DNS2="`rdcsman  0x80010006  ipv4`"
+	if [ "$PPPOE_WAN_DNS1" = "0.0.0.0" ] ;then
+		wrcsman "0x80010005 {$(rdcsman  0x80040500 ipv4)}"
+	fi	
+	if [ "$PPPOE_WAN_DNS2" = "0.0.0.0" ] ;then
+		wrcsman "0x80010006 {$(rdcsman  0x80040600 ipv4)}"
+	fi
+	
+	dnrd=$(ps | grep dnrd | grep -v grep)
+	if [ "$dnrd" = "" ];then
+		wrcsman "0x800a0001 1"
+	fi
+	if [ "$CUR_DUAL_ACCESS" = "1" ];then #dynamic ip
+		IF_DNS1="`rdcsman  0x80035005 ipv4`"
+		IF_DNS2="`rdcsman  0x80035006 ipv4`"
+	else
+		IF_DNS1="`rdcsman  0x00043400  ipv4`"
+		IF_DNS2="`rdcsman  0x00043500  ipv4`"
+		#wrcsman "0x80010005 {$IF_DNS1}"
+		#wrcsman "0x80010006 {$IF_DNS2}"
+	fi
+	
+	if [ "$IF_DNS1" != "0.0.0.0" ] ;then
+		check=`cat $RESOLV_CONF | grep $IF_DNS1`
+		if [ "$check" = "" ];then
+			sl_append_dns_file "$RESOLV_CONF" $IF_DNS1
+		fi
+	fi	
+	if [ "$IF_DNS2" != "0.0.0.0" ] ;then
+		check=`cat $RESOLV_CONF | grep $IF_DNS2`
+		if [ "$check" = "" ];then
+			sl_append_dns_file "$RESOLV_CONF" $IF_DNS2
+		fi
+	fi
+}
+
+loop()
+{
+	while [ 1 ];do
+		PRE_DUAL_ACCESS=$CUR_DUAL_ACCESS
+		CUR_DUAL_ACCESS=`rdcsman 0x00043000 u8`
+		WANTYPE=`rdcsman 0x00010003 u32`
+		IDLE_TIME=`rdcsman  0x80010045 u8`
+		if [ "$WANTYPE" = "64" ];then
+			if [ "$IDLE_TIME" = "-1" ];then
+				iptables -D INPUT -i eth2.2 -j DROP
+			fi
+			if [ "$CUR_DUAL_ACCESS" = "1" ];then #dynamic ip
+				check_resolve
+				if [ "$PRE_DUAL_ACCESS" = "2" ];then
+					stop;
+				fi
+				DHCP_IP=`rdcsman  0x80035002 ipv4`
+				#check udhcpc action 
+				if [ "$DHCP_IP" = "0.0.0.0" ];then
+					#UDHCP_RUNNING=`ps | grep -v grep | grep udhcpc-action`
+					UDHCP_RUNNING=`ps | grep -v grep | grep udhcpc.pid`
+					DHCP_CNT=`rdcsman  0x80035007 u8`
+					if [ "$UDHCP_RUNNING" = "" ];then 
+						dhcp_action
+					fi
+					if [ "$DHCP_CNT" = "0" ];then  
+						dhcp_action
+					fi
+				elif [ "$DHCP_IP" != "0.0.0.0" ];then
+					STATIC_IP=`ifconfig $WAN | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}'`
+					if [ "$STATIC_IP" = "" ];then
+						dhcp_action
+					fi
+				fi
+				#for default route -- not need ,20120828
+				#CONNECT_MODE=`rdcsman  0x00040900 u8`
+				#CONNECT_STATUS=`rdcsman  0x80040700 u8`
+				#if [ "$CONNECT_STATUS" = "0" ] ;then #disconnect
+				#	if [ "$CONNECT_MODE" = "2" ];then
+				#		route add default gw $(rdcsman 0x80035004 ipv4) $WAN 2>/dev/null
+				#	fi
+				#else
+				#	route del default $WAN
+				#	route add default gw $(rdcsman 0x80040400 ipv4) $(rdcsman 0x80040C00 str) 2>/dev/null
+				#fi
+			elif [ "$CUR_DUAL_ACCESS" = "2" ];then #static ip
+				check_resolve
+				if [ "$PRE_DUAL_ACCESS" = "1" ];then
+					stop;
+				fi
+				STATIC_IP=`ifconfig $WAN | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}'`
+				if [ "$STATIC_IP" = "" ];then
+					IF_IP=`rdcsman 0x00043100 ipv4`
+					IF_NM=`rdcsman 0x00043200 ipv4`
+					IF_GW=`rdcsman 0x00043300 ipv4`
+					
+					ifconfig $WAN $IF_IP netmask $IF_NM
+					echo "ifconfig $WAN 0.0.0.0" > $PPPoE_CLR
+					#iptables -t nat -A POSTROUTING -o $WAN -s $(rdcsman 0x00010004 ipv4)/$(rdcsman 0x00010005 ipv4) -j MASQUERADE
+					#echo "iptables -t nat -D POSTROUTING -o $WAN -s $(rdcsman 0x00010004 ipv4)/$(rdcsman 0x00010005 ipv4) -j MASQUERADE" >> $PPPoE_CLR
+					wrcsman  "0x80130002 1"
+				fi
+			else
+				stop
+				exit 1;
+			fi
+		else
+			stop
+			exit 1;
+		fi
+		sleep 3
+	done
+}
+stop()
+{
+	pid=$(ps | grep -v grep | grep pppoe_russian)
+	if [ "$pid" != "" ];then
+		[ -e $PPPoE_CLR ] && sh $PPPoE_CLR
+		killall -9 pppoe_russian
+		rm -rf $PPPOE_RUSSIAN_PID
+	fi
+}
+sleep 1
+RUN=`ps | grep -v grep |grep -c pppoe_russian`
+if [ $RUN -le 2 ] ;then
+		ps | grep pppoe_russian | grep -n 1 | grep -v grep | grep "1:" | awk '{printf $2}' > $PPPOE_RUSSIAN_PID
+		loop
+else
+	exit 1;
+fi	

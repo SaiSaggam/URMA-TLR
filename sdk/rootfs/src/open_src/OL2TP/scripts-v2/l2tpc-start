@@ -1,0 +1,668 @@
+#!/bin/sh
+
+if [ -z "$1" ]; then
+   echo "you need specified arguements"
+   exit 1
+fi
+
+if [ -f "/tmp/l2tpc-customer" ]; then
+   . /tmp/l2tpc-customer
+elif [ -f "/usr/bin/l2tpc-customer" ]; then
+   . /usr/bin/l2tpc-customer
+fi
+
+TUN_IDX="$1"
+L2TP_LINKNAME="l2tpc-$TUN_IDX"
+L2TP_CONFIG_FILE="/etc/l2tp/$L2TP_LINKNAME.conf"
+L2TP_RESULT_FILE="/var/run/l2tpc-result-$TUN_IDX"
+L2TP_SOCKET_FILE="/var/run/l2tpctrl-client-$TUN_IDX"
+PIDFILE_L2TP="/var/run/rp-l2tp-client-$TUN_IDX.pid"
+PIDFILE_PPPD="/var/run/ppp-$L2TP_LINKNAME.pid"
+RESET_FILE="/var/run/l2tpc-reset-$TUN_IDX"
+OVER_IPSEC_RUN_FILE="/var/run/l2tpc-over-ipsec-$TUN_IDX"
+#PAP_FILE="/etc/ppp/pap-secrets"
+#CHAP_FILE="/etc/ppp/chap-secrets"
+DONT_UPDATE_WANTYPE="/var/run/dont_update_wantype"
+#L2TP_RELOAD_FLAG="/var/run/l2tpc-reconf"
+PPP_PID=""
+PPP_IF=""
+RIPD_FLAG="1"
+LOCAL_WAN_STATUS_CONNECT="2"
+AUTOBAK_STATUS_3G_CONNECT="2"
+FAILOVER_STATUS_CONNECT="1"
+DHCP_SRV_LIST="0 1 2"
+
+# Write L2TP connection infomation (pid, interface name, ip ...) to CSID
+log_l2tp_info()
+{
+   #echo `ifconfig $PPP_IF  | grep P-t-P | cut -d ':' -f2 | cut -d ' ' -f1`
+   PPP_VIRTUAL_IP="`ifconfig $PPP_IF  | grep P-t-P | cut -d ':' -f2 | cut -d ' ' -f1`"
+   #echo `ifconfig $PPP_IF  | grep P-t-P | cut -d ':' -f3 | cut -d ' ' -f1`
+   PPP_REMOTE_IP="`ifconfig $PPP_IF  | grep P-t-P | cut -d ':' -f3 | cut -d ' ' -f1`"
+
+   write_l2tpc_cnt_info "$PPP_PID" "$PPP_IF" "$PPP_VIRTUAL_IP" "$PPP_REMOTE_IP" $TUN_IDX
+   write_l2tpc_cnt_status "$CONNECT" $TUN_IDX
+   write_routing_restart_flag "$RIPD_FLAG" $TUN_IDX
+
+   get_routing_restart_flag
+
+   chk_ripd="$S_ROUTING_RESTART_FLAG"
+   echo 1 > /var/log/ripd_flag
+
+   return 1
+}
+
+# Setup Route if need
+setup_route()
+{
+   get_l2tpc_tunnel_config $TUN_IDX
+
+   ROUTEING="$C_L2TP_CLI_ROUTE"
+   if [ "$ROUTEING" == "" ]; then
+      return
+   fi
+
+   route_fail="0"
+   default_gw=""
+   if [ "$ROUTEING" == "0.0.0.0/0" ]; then
+      route_fail="1"
+
+      get_failover_config
+      enable_3g_autobak="$C_3G_AUTOBAK_ENABLE"
+      if [ -n "$enable_3g_autobak" ] && [ "$enable_3g_autobak" != "0" ]; then
+         get_failover_cnt_status
+         ofdm_gw="$S_FLASHOFDM_IF_GW"
+         if [ "$ofdm_gw" != "0.0.0.0" ]; then
+            route_fail="0"
+            default_gw="$ofdm_gw"
+         fi
+
+         get_3g_cnt_info
+         _3g_gw="$S_3G_IF_GW"
+         if [ -z "$_3g_gw" ] || [ "$_3g_gw" == "0.0.0.0" ]; then
+            for i in $WAN_LIST
+            do
+               get_3g_cnt_info $i
+               _3g_gw="$S_3G_IF_GW"
+               [ -n "$_3g_gw" ] && [ "$_3g_gw" != "0.0.0.0" ] && break
+            done
+         fi
+
+         if [ "$_3g_gw" != "0.0.0.0" ]; then
+            route_fail="0"
+            default_gw="$_3g_gw"
+         fi
+      fi
+
+      # IF Not in failover
+      if [ "$default_gw" == "" ]; then
+         get_local_cnt_info
+         default_gw="$S_LOCAL_WAN_GW"
+         if [ -z "$default_gw" ] || [ "$default_gw" == "0.0.0.0" ]; then
+            for i in $WAN_LIST
+            do
+               get_local_cnt_info $i
+               default_gw="$S_LOCAL_WAN_GW"
+               [ -n "$default_gw" ] && [ "$default_gw" != "0.0.0.0" ] && break
+            done
+         fi
+         if [ "$default_gw" != "0.0.0.0" ]; then
+            route_fail="0"
+         fi
+      fi
+
+      echo "route add -host $L2TP_LNSSERVER gw $default_gw"
+      route add -host $L2TP_LNSSERVER gw $default_gw
+      echo "route delete -host $L2TP_LNSSERVER gw $default_gw >/dev/null 2>&1" >> $RESET_FILE
+   fi
+
+   if [ "$route_fail" == "0" ]; then
+      echo "route add -net $ROUTEING dev $PPP_IF"
+      route add -net $ROUTEING dev $PPP_IF
+      echo "route delete -net $ROUTEING dev $PPP_IF >/dev/null 2>&1" >> $RESET_FILE
+   else
+      echo "ROUTING ERROR: can't route to L2TP Server"
+   fi
+}
+
+# Setup NAT if need
+setup_nat()
+{
+   get_l2tpc_tunnel_config $TUN_IDX
+   is_nat="$C_L2TP_CLI_NAT"
+   if [ -n "$is_nat" ] && [ "$is_nat" != "0" ]; then
+      get_lan_range lan_ip lan_mask
+      echo "iptables -t nat -A POSTROUTING -s $lan_ip/$lan_mask -o $PPP_IF -j MASQUERADE"
+      iptables -t nat -A POSTROUTING -s $lan_ip/$lan_mask -o $PPP_IF -j MASQUERADE
+      echo "iptables -t nat -D POSTROUTING -s $lan_ip/$lan_mask -o $PPP_IF -j MASQUERADE >/dev/null 2>&1" >> $RESET_FILE
+      for i in $DHCP_SRV_LIST
+      do
+          csid=`printf "0x0093001%01X" $i`
+          vlan_enable=`rdcsman $csid u32`
+          if [ "$vlan_enable" == "1" ]; then
+		     csid=`printf " 0x009300d%01X" $i`
+		     vlan_ip=`rdcsman $csid ipv4`
+		     csid=`printf " 0x0093012%01X" $i`
+		     vlan_netmask=`rdcsman $csid ipv4`
+		     if [ "$vlan_ip" != "0.0.0.0" ] || [ "$vlan_netmask" != "0.0.0.0" ]; then
+                echo "iptables -t nat -A POSTROUTING -s $vlan_ip/$vlan_netmask -o $PPP_IF -j MASQUERADE"
+                iptables -t nat -A POSTROUTING -s $vlan_ip/$vlan_netmask -o $PPP_IF -j MASQUERADE
+                echo "iptables -t nat -D POSTROUTING -s $vlan_ip/$vlan_netmask -o $PPP_IF -j MASQUERADE >/dev/null 2>&1 " >> $RESET_FILE
+             fi
+          fi
+      done
+   fi
+}
+
+# Generate L2TP Client's secret file in /etc/ppp/...
+#gen_secret_file()
+#{
+#   addr=`get_csid_addr $CSID_C_L2TP_CLI_USER $TUN_IDX`
+#   account="`rdcsman $addr str`"
+#
+#   addr=`get_csid_addr $CSID_C_L2TP_CLI_PASSWORD $TUN_IDX`
+#   passwd="`rdcsman $addr str`"
+#   echo "$account * $passwd *" > $PAP_FILE.l2tpc-$TUN_IDX
+#   echo "$account * $passwd *" > $CHAP_FILE.l2tpc-$TUN_IDX
+#
+#   # Make sure L2TP Client's account/password wouldn't conflict with other PPP Services
+#   [ -f $PAP_FILE  ] && mv $PAP_FILE $PAP_FILE.orig
+#   [ -f $CHAP_FILE ] && mv $CHAP_FILE $CHAP_FILE.orig
+#   mv $PAP_FILE.l2tpc-$TUN_IDX $PAP_FILE
+#   mv $CHAP_FILE.l2tpc-$TUN_IDX $CHAP_FILE
+#}
+
+# Restore from L2TP Client's secret to original secret file
+#restore_secret_file()
+#{
+#   [ -f $PAP_FILE.orig  ] && mv $PAP_FILE.orig $PAP_FILE
+#   [ -f $CHAP_FILE.orig ] && mv $CHAP_FILE.orig $CHAP_FILE
+#}
+
+reset_connect()
+{
+   rm -f $L2TP_RESULT_FILE
+   rm -f $DONT_UPDATE_WANTYPE
+   write_l2tpc_pid_info "0" $TUN_IDX
+   #restore_secret_file
+}
+
+check_network_status()
+{
+   ap_mode="$C_LOCAL_AP_CNT_TYPE"
+   if [ -z "$ap_mode" ] || [ "$ap_mode" == "0" ]; then
+   
+     S_LOCAL_AP_STATUS="`rdcsman 0x80010055 u32`"
+     ap_status="$S_LOCAL_AP_STATUS"
+   
+     if [ -n "$ap_status" ] || [ "$ap_status" == "2" ]; then
+       return;
+     fi
+   
+   else
+     return;
+   fi
+   get_local_cnt_status
+   wan_status="$S_LOCAL_WAN_STATUS"
+   if [ -z "$wan_status" ] || [ "$wan_status" == "0" ]; then
+      for i in $WAN_LIST
+      do
+         get_local_cnt_status $i
+         wan_status="$S_LOCAL_WAN_STATUS"
+         [ -n "$wan_status" ] && [ "$wan_status" != "0" ] && break
+      done
+   fi
+
+   if [ "$wan_status" == "$LOCAL_WAN_STATUS_CONNECT" ]; then
+      return;
+   fi
+   echo "Main WAN isn't connected !!"
+
+   get_failover_config
+   autobak_enable="$C_3G_AUTOBAK_ENABLE"
+   get_failover_cnt_status
+   autobak_status="$S_3G_AUTOBAK_STATUS"
+   if [ -n "$autobak_enable" ] && [ "$autobak_enable" != "0" ] &&
+      [ "$autobak_status" == "$AUTOBAK_STATUS_3G_CONNECT" ]; then
+      return;
+   fi
+   echo "3G Autobak isn't connected !!"
+
+   loadsharing_enable="$C_FAILOVER_LOADSHARING_ENABLE"
+   if [ -n "$loadsharing_enable" ] && [ "$loadsharing_enable" != "0" ]; then
+      get_failover_cnt_status
+      loadsharing_status="$S_FAILOVER_STATUS"
+      if [ -n "$loadsharing_status" ] && [ "$loadsharing_status" == "$LOADSHARING_STATUS_CONNECT" ]; then
+         return;
+      fi
+      echo "LoadSharing isn't connected !"
+   else
+      get_failover_cnt_status
+      failover_status="$S_FAILOVER_STATUS"
+      if [ -n "$failover_status" ] && [ "$failover_status" == "$FAILOVER_STATUS_CONNECT" ]; then
+         return;
+      fi
+      echo "Failover isn't connected !"
+   fi
+
+   # Reset PID
+   write_l2tpc_pid_info "0" $TUN_IDX
+
+   logger -t "l2tpc" "L2TP Client #$TUN_IDX waited for WAN connecting... !"
+   echo "L2TP Client #$TUN_IDX don't action since WAN isn't connected !"
+   exit 1
+}
+
+#chg_txqlen()
+#{
+#   # wan_type:
+#   #  16 -> LOCAL_WANTYPE_3G        0x10
+#   #  17 -> LOCAL_WANTYPE_IBURST    0x11
+#   #  21 -> LOCAL_WANTYPE_FLASHOFDM 0x15
+#   #  22 -> LOCAL_WANTYPE_S3G       0x16
+#   #  64 -> LOCAL_WANTYPE_PPPOE     0x40
+#   #  144 -> LOCAL_WANTYPE_DIALUP   0x90
+#   addr=`get_csid_addr $CSID_C_LOCAL_WANTYPE 0`
+#   wan_type="`rdcsman $addr u32`"
+#   if [ $wan_type -eq 16 ] || [ $wan_type -eq 17 ] ||
+#      [ $wan_type -eq 21 ] || [ $wan_type -eq 22 ] ||
+#      [ $wan_type -eq 64 ] || [ $wan_type -eq 144 ]; then
+#      addr=`get_csid_addr $CSID_S_LOCAL_WAN_IF_NAME 0`
+#      wan_if="`rdcsman $addr str`"
+#      tmp="`expr substr $wan_if 1 3`"
+#
+#      if [ "$tmp" == "ppp" ]; then
+#         echo "set ifconfig $wan_if txqueuelen to 3"
+#         ifconfig $wan_if txqueuelen 3 > /dev/null 2>&1
+#      else
+#         echo "Trick: set ifconfig ppp0 txqueuelen to 3"
+#         ifconfig ppp0 txqueuelen 3 > /dev/null 2>&1
+#      fi
+#   fi
+#}
+
+get_host_ip()
+{
+   local time="0"
+   local timeout="5"
+   local domain_name="$1"
+   if [ "$domain_name" == "" ]; then
+      echo "No IP/Domain of L2TP Client ID $TUN_IDX !"
+      logger -t "l2tpc" "No Peer IP/Domain of L2TP Client ID $TUN_IDX "
+      reset_connect
+      exit 1
+   fi
+
+   L2TP_LNSSERVER="`getHostIP $domain_name &`"
+   local gethip_pid="$!"
+   while [ true ]; do
+      if [ -n "$L2TP_LNSSERVER" ]; then
+         write_l2tpc_peerip_info "$L2TP_LNSSERVER" $TUN_IDX
+         C_L2TP_CLI_PEERIP="$L2TP_LNSSERVER"
+         break
+      fi
+
+      sleep 1
+      time=$(($time+1))
+      [ $time -gt $timeout ] && break
+   done
+
+   if [ -z "$L2TP_LNSSERVER" ] ; then
+      echo "Cannot resolved IP, Please Check Host's Domain Name"
+      logger -t "l2tpc" "Please Check Peer IP/Domain of L2TP Client ID $TUN_IDX Again!"
+      kill $gethip_pid > /dev/null 2>&1
+      reset_connect
+      exit 1
+   fi
+}
+
+waitfor_ppp_negotiaction()
+{
+   local idx="0"
+   while [ true ]; do
+      # Check the L2TP connection
+      if [ ! -f "$PIDFILE_PPPD" ] ; then
+         echo "Can't find $PIDFILE_PPPD. May PPP negotiation failed !! Check PPP option, plz !"
+         logger -t "l2tpc" "Can't find $PIDFILE_PPPD. May PPP negotiation failed !! Check PPP option, plz !"
+         reset_connect
+         exit 1
+      fi
+
+      if [ ! -f "$DONT_UPDATE_WANTYPE" ]; then
+         echo "PPP negotiation complete !!"
+         break
+      fi
+
+      if [ -f "$L2TP_RESULT_FILE" ] && [ -z "`cat $L2TP_RESULT_FILE | grep OK`" ]; then
+         echo "Connecting failed !! May PPP negotiation failed !! Check PPP option, plz !"
+         logger -t "l2tpc" "Connecting failed !!. May PPP negotiation failed !! Check PPP option, plz !"
+         reset_connect
+         exit 1
+      fi
+
+      if [ $idx -ge 30 ]; then
+         echo "L2TP Connecting ... timeout !!"
+         logger -t "l2tpc" "L2TP Connecting ... timeout !!"
+         break
+      fi
+
+      idx=$((idx+1))
+      sleep 1
+      echo "L2TP Connecting ... $idx sec"
+   done
+
+   sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+   if [ "$?" != "0" ] ; then
+      echo "Can't find PPPD/L2TP process"
+      reset_connect
+      exit 1
+   fi
+
+   # Show the cnt status
+   logger -t "l2tpc" "Link is up and running on interface $PPP_IF (PID: $PPP_PID)"
+   echo "L2TP's status : Link is up and running on interface $PPP_IF"
+   echo "IF=$PPP_IF  PID=$PPP_PID"
+}
+
+#reload_l2tpd()
+#{
+#   # Make l2tpd reload the /etc/l2tp/l2tp.conf
+#   touch $L2TP_RELOAD_FLAG
+#
+#   # kill pre-l2tpd when error
+#   if [ -r "$L2TP_RESULT_FILE" ]; then
+#      result=`cat $L2TP_RESULT_FILE | cut -d ' ' -f1`
+#      if [ ! -z $result ] && [ $result == "ERR" ]; then
+#         killall l2tpd
+#      fi
+#   fi
+#
+#   if [ -z "`ps | grep l2tpd | grep -v xl2tpd |grep -v grep`" ]; then
+#      l2tpd -d 65535 -p $PIDFILE_L2TP
+#   fi
+#}
+
+check_l2tpc_over_ipsec_status()
+{
+   local ipsec_idx="$1"
+   idx="`printf "%02X" $ipsec_idx`"
+   ipsec_status="`rdcsman 0x807001${idx} u32`"
+   if [ "$ipsec_status" != "1" ]; then
+      logger -t "l2tpc" "L2TPC over IPsec, but IPsec tunnel $ipsec_idx is $ipsec_status not ready"
+      exit 1
+   fi
+   logger -t "l2tpc" "L2TPC over IPsec, IPsec tunnel is ready"
+}
+
+main()
+{
+   # Test if the tunnel had created
+   get_l2tpc_cnt_info $TUN_IDX
+   cnt_pid="$S_L2TP_CLI_PEER_PID"
+   if [ -n "$cnt_pid" ] && [ $cnt_pid -gt 0 ] && [ $cnt_pid -lt 65535 ]; then
+      echo "Tunnel $TUN_IDX is already running (PID:$cnt_pid)"
+      exit 1
+   else
+      write_l2tpc_pid_info "-1" $TUN_IDX
+   fi
+
+   check_network_status;
+
+   # Change Tx Quele length for 3G (no longer need)
+   # chg_txqlen
+
+   get_l2tpc_config
+   get_l2tpc_tunnel_config $TUN_IDX
+
+   # Get the address of L2TP_LNSSERVER
+   get_host_ip "$C_L2TP_CLI_PEERIP_STR"
+   echo "L2TP_LNSSERVER=$L2TP_LNSSERVER"
+   if [ -z "$L2TP_LNSSERVER" ]; then
+      reset_connect
+
+      echo "Unknown L2TP Server address !!"
+      logger -t "l2tpc" "Unknown L2TP Server address !!"
+      exit 1
+   fi
+
+   # Clear last ppp auth fail temp file
+   rm -rf /var/run/ppp_auth* $L2TP_RESULT_FILE
+   if [ -f "$RESET_FILE" ]; then
+      (. $RESET_FILE)
+      rm -f $RESET_FILE
+   fi
+
+   # Write config to /etc/...
+   #gen_secret_file
+   gen_l2tpc_options $TUN_IDX
+   
+   #Add default route for L2TP
+   local tun_wan="$C_L2TP_CLI_WAN"
+   if [ "$tun_wan" = "1" ]; then
+     wan_idx="`rdcsman 0x00010600 u8`"
+	 #idx="`printf "%X" $wan_idx`"
+     if [ "$wan_idx" = "99" ]; then
+       wan_GW="`rdcsman 0x80010004 ipv4`"
+       wan_IF="`rdcsman 0x8001000b str`"
+       peer_IP="$C_L2TP_CLI_PEERIP"
+	   if [ "$wan_IF" = "" ];then
+	      logger -t "l2tpc" "Unknown WAN interface"
+          exit 1
+	   else
+          ip_1="`rdcsman 0x80010002 u32`"
+		  netmask="`rdcsman 0x80010003 u32`"
+		  idx="`printf "%02X" $TUN_IDX`"
+		  ip_2="`rdcsman 0x000613${idx} u32`"
+		  if [ "$(($ip_1&$netmask))" = "$(($ip_2&$netmask))" ]; then
+		     #subnet is same ,not need gateway
+			 route add $peer_IP dev $wan_IF
+             echo "route del $peer_IP dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+          else
+		     #subnet is different ,need gateway
+			 route add $peer_IP gw $wan_GW dev $wan_IF
+             echo "route del $peer_IP gw $wan_GW dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+		  fi
+          
+       fi
+	 elif [ $wan_idx -gt 0 ] && [ $tun_wan -le 16 ]; then
+       let "idx=$wan_idx - 1"
+       idx="`printf "%X" $idx`"
+       wan_GW="`rdcsman 0x8001013${idx} ipv4`"
+       wan_IF="`rdcsman 0x8001019${idx} str`"
+       peer_IP="$C_L2TP_CLI_PEERIP"
+       if [ "$wan_IF" = "" ];then
+          logger -t "l2tpc" "Unknown WAN interface"
+          exit 1
+       else
+          let "idx=$wan_idx - 1"
+          idx="`printf "%X" $idx`"
+          ip_1="`rdcsman 0x8001011${idx} u32`"
+		  netmask="`rdcsman 0x8001012${idx} u32`"
+		  idx="`printf "%02X" $TUN_IDX`"
+		  ip_2="`rdcsman 0x000613${idx} u32`"
+		  if [ "$(($ip_1&$netmask))" = "$(($ip_2&$netmask))" ]; then
+		     #subnet is same ,not need gateway
+			 route add $peer_IP dev $wan_IF
+             echo "route del $peer_IP dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+          else
+		     #subnet is different ,need gateway
+			 route add $peer_IP gw $wan_GW dev $wan_IF
+             echo "route del $peer_IP gw $wan_GW dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+		  fi
+       fi 
+     elif [ "$wan_idx" = "0" ]; then
+          logger -t "l2tpc" "WAN1 is disable"
+          exit 1
+     fi
+   elif [ "$tun_wan" = "2" ]; then
+     wan_idx="`rdcsman 0x00010601 u8`"
+     #idx="`printf "%X" $wan_idx`"
+     if [ "$wan_idx" = "99" ]; then
+       wan_GW="`rdcsman 0x80010004 ipv4`"
+       wan_IF="`rdcsman 0x8001000b str`"
+       peer_IP="$C_L2TP_CLI_PEERIP"
+       if [ "$wan_IF" = "" ];then
+          logger -t "l2tpc" "Unknown WAN interface"
+          exit 1
+       else   
+          ip_1="`rdcsman 0x80010002 u32`"
+		  netmask="`rdcsman 0x80010003 u32`"
+		  idx="`printf "%02X" $TUN_IDX`"
+		  ip_2="`rdcsman 0x000613${idx} u32`"
+		  if [ "$(($ip_1&$netmask))" = "$(($ip_2&$netmask))" ]; then
+		     #subnet is same ,not need gateway
+			 route add $peer_IP dev $wan_IF
+             echo "route del $peer_IP dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+          else
+		     #subnet is different ,need gateway
+			 route add $peer_IP gw $wan_GW dev $wan_IF
+             echo "route del $peer_IP gw $wan_GW dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+		  fi
+       fi
+     elif [ $wan_idx -gt 0 ] && [ $tun_wan -le 16 ]; then
+       let "idx=$wan_idx - 1"
+       idx="`printf "%X" $idx`"
+       wan_GW="`rdcsman 0x8001013${idx} ipv4`"
+       wan_IF="`rdcsman 0x8001019${idx} str`"
+       peer_IP="$C_L2TP_CLI_PEERIP"
+       if [ "$wan_IF" = "" ];then
+          logger -t "l2tpc" "Unknown WAN interface"
+          exit 1
+       else   
+          let "idx=$wan_idx - 1"
+          idx="`printf "%X" $idx`"
+          ip_1="`rdcsman 0x8001011${idx} u32`"
+		  netmask="`rdcsman 0x8001012${idx} u32`"
+		  idx="`printf "%02X" $TUN_IDX`"
+		  ip_2="`rdcsman 0x000613${idx} u32`"
+		  if [ "$(($ip_1&$netmask))" = "$(($ip_2&$netmask))" ]; then
+		     #subnet is same ,not need gateway
+			 route add $peer_IP dev $wan_IF
+             echo "route del $peer_IP dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+          else
+		     #subnet is different ,need gateway
+			 route add $peer_IP gw $wan_GW dev $wan_IF
+             echo "route del $peer_IP gw $wan_GW dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+		  fi
+       fi
+     elif [ "$wan_idx" = "0" ]; then
+          logger -t "l2tpc" "WAN2 is disable"
+          exit 1
+     fi  
+   elif [ "$tun_wan" = "3" ]; then
+     wan_idx="`rdcsman 0x00010602 u8`"
+     #idx="`printf "%X" $wan_idx`"
+     if [ "$wan_idx" = "99" ]; then
+       wan_GW="`rdcsman 0x80010004 ipv4`"
+       wan_IF="`rdcsman 0x8001000b str`"
+       peer_IP="$C_L2TP_CLI_PEERIP"
+       if [ "$wan_IF" = "" ];then
+          logger -t "l2tpc" "Unknown WAN interface"
+          exit 1
+       else   
+          ip_1="`rdcsman 0x80010002 u32`"
+		  netmask="`rdcsman 0x80010003 u32`"
+		  idx="`printf "%02X" $TUN_IDX`"
+		  ip_2="`rdcsman 0x000613${idx} u32`"
+		  if [ "$(($ip_1&$netmask))" = "$(($ip_2&$netmask))" ]; then
+		     #subnet is same ,not need gateway
+			 route add $peer_IP dev $wan_IF
+             echo "route del $peer_IP dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+          else
+		     #subnet is different ,need gateway
+			 route add $peer_IP gw $wan_GW dev $wan_IF
+             echo "route del $peer_IP gw $wan_GW dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+		  fi
+       fi
+     elif [ $wan_idx -gt 0 ] && [ $tun_wan -le 16 ]; then
+       let "idx=$wan_idx - 1"
+       idx="`printf "%X" $idx`"
+       wan_GW="`rdcsman 0x8001013${idx} ipv4`"
+       wan_IF="`rdcsman 0x8001019${idx} str`"
+       peer_IP="$C_L2TP_CLI_PEERIP"
+       if [ "$wan_IF" = "" ];then
+          logger -t "l2tpc" "Unknown WAN interface"
+          exit 1
+       else   
+          let "idx=$wan_idx - 1"
+          idx="`printf "%X" $idx`"
+          ip_1="`rdcsman 0x8001011${idx} u32`"
+		  netmask="`rdcsman 0x8001012${idx} u32`"
+		  idx="`printf "%02X" $TUN_IDX`"
+		  ip_2="`rdcsman 0x000613${idx} u32`"
+		  if [ "$(($ip_1&$netmask))" = "$(($ip_2&$netmask))" ]; then
+		     #subnet is same ,not need gateway
+			 route add $peer_IP dev $wan_IF
+             echo "route del $peer_IP dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+          else
+		     #subnet is different ,need gateway
+			 route add $peer_IP gw $wan_GW dev $wan_IF
+             echo "route del $peer_IP gw $wan_GW dev $wan_IF >/dev/null 2>&1 " >> $RESET_FILE
+		  fi
+       fi
+     elif [ "$wan_idx" = "0" ]; then
+          logger -t "l2tpc" "WAN3 is disable"
+          exit 1
+     fi  
+   fi
+   l2tp_cli_over_ipsec_en="$C_L2TP_CLI_OVER_IPSEC_ENABLE"
+   if [ "$l2tp_cli_over_ipsec_en" = "1" ]; then
+      #start ipsec tunnel
+      if [ -f /var/run/pluto/pluto.ctl ]; then
+         #ipsec config is exit, don't need restart IPsec
+		 logger -t "l2tpc" "L2TPC over IPsec, IPsec has start"
+         ipsec whack --listen
+         gen_ipsecconf
+         let "ipsec_tun_idx=$TUN_IDX + 1"
+         ipsec-action reload $ipsec_tun_idx
+      else
+         #ipsec config is not exit, need to start IPsec
+		 logger -t "l2tpc" "L2TPC over IPsec, IPsec has not start"
+         #gen_ipsecconf
+         wrcsman "0x80700005 255"
+         wrcsman "0x80700002 1"
+       fi
+      #l2tpc over ipsec is enable, need to check ipsec status
+      echo "1" > $OVER_IPSEC_RUN_FILE
+      let "ipsec_tun_idx=$TUN_IDX + 1"
+      logger -t "l2tpc" "L2TPC over IPsec, Check ipsec tunnel $ipsec_tun_idx status"
+      check_l2tpc_over_ipsec_status $ipsec_tun_idx
+   fi
+   # init or reload l2tpd with the update config
+   #reload_l2tpd
+   if [ -r "$PIDFILE_L2TP" ] ; then
+      echo "Stop L2TP Client Daemon (l2tp-control -s $L2TP_SOCKET_FILE \"exit\")"
+      l2tp-control -s $L2TP_SOCKET_FILE "exit" &
+      sleep 1
+   fi
+   echo "Start L2TP Client Daemon (l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TP_CONFIG_FILE)"
+   l2tpd -d 65535 -p $PIDFILE_L2TP -c $L2TP_CONFIG_FILE &
+   sleep 1
+
+   # Start Connect & Log L2TP Session ID to /var/run/
+   logger -t "l2tpc" "L2TP Client start to connect to \"$L2TP_LNSSERVER\" "
+   touch $DONT_UPDATE_WANTYPE
+   echo "L2TP Client start to connect! ( l2tp-control -s $L2TP_SOCKET_FILE \"start-session $L2TP_LNSSERVER\" )"
+   l2tp-control -s $L2TP_SOCKET_FILE "start-session $L2TP_LNSSERVER" > $L2TP_RESULT_FILE &
+   sleep 9
+
+   # Waiting Time for negotiaction
+   waitfor_ppp_negotiaction
+
+   # Restore original PPP secrets
+   #restore_secret_file
+
+   # Some configuration after the L2TP connection established
+   log_l2tp_info
+   setup_route
+   setup_nat
+
+   # Set larger MTU to avoid fragment packets
+   ifconfig $PPP_IF mtu 1500
+}
+
+#
+#  Main ()
+#
+main
+

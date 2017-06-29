@@ -1,0 +1,11 @@
+@import "{wolves:neat}/neat-helpers";
+
+// Change the grid settings
+$column: 90px;
+$gutter: 30px;
+$grid-columns: 6;
+$max-width: 1300px;
+
+// Define your breakpoints
+$medium: new-breakpoint(min-width 500px 8);
+$large: new-breakpoint(min-width 1000px 12);

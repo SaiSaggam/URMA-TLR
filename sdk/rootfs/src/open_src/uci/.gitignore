@@ -1,0 +1,9 @@
+*.o
+*.a
+*.so
+*.dylib
+install_manifest.txt
+
+uci
+test/save
+/build

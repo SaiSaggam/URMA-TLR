@@ -1,0 +1,387 @@
+#!/bin/sh
+
+if [ -f "/tmp/pptpc-header" ]; then
+   . /tmp/pptpc-header
+elif [ -f "/usr/bin/pptpc-header" ]; then
+   . /usr/bin/pptpc-header
+fi
+
+PPTPC_QOS_ECHO="/var/run/pptpc.qos"
+TC_UPLOAD_FLAG="/var/run/tc.upload"
+PPTP_CNT_TYPE_ONDEMAND="0"
+PPTP_CNT_TYPE_AUTORECONNECT="1"
+PPTP_CNT_TYPE_MANUAL="2"
+LOCAL_WAN_STATUS_CONNECT="2"
+AUTOBAK_STATUS_3G_CONNECT="2"
+FAILOVER_STATUS_CONNECT="1"
+DISCONNECT="0"
+CONNECTING="1"
+CONNECT="2"
+DISCONNECTING="3"
+
+usage()
+{
+   echo "Usage:"
+   echo "pptpc-acton start   -> start PPTP client and autoconnect"
+   echo "pptpc-acton stop    -> stop all current PPTP connections, except WAN type PPTP connection"
+   echo "pptpc-acton restart -> restart PPTP client"
+   echo "pptpc-acton update  -> update PPTP clients' connection status for UI"
+   echo "pptpc-acton status  -> show PPTP clients' connection status from CSID"
+   echo "pptpc-acton show-config -> show PPTP clients' configuration from CSID"
+   exit 1
+}
+
+on_3g_failover()
+{
+   tun_idx="$1"
+
+   get_failover_config
+   enable_3g_autobak="$C_3G_AUTOBAK_ENABLE"
+
+   if [ -z "$enable_3g_autobak" ] || [ "$enable_3g_autobak" == "0" ]; then
+      return
+   fi
+
+   get_failover_cnt_status
+
+   status="$S_3G_AUTOBAK_STATUS"
+
+   get_pptpc_cnt_info $tun_idx
+   iface="$S_PPTP_CLI_PEER_IFNAME"
+   if [ -n "$status" ] && [ $status -ne $AUTOBAK_STATUS_3G_CONNECT ]; then
+      if [ ! -z "$iface" ]; then
+         echo "Stop PPTP tunnel $tun_idx since 3G failover has stopped ... "
+         write_pptpc_cnt_status "$DISCONNECTING" $tun_idx
+         pptpc-stop $tun_idx
+      fi
+      return
+   fi
+
+   iface="$S_PPTP_CLI_PEER_IFNAME"
+   if [ -z "$iface" ]; then
+      echo "Start PPTP tunnel $tun_idx start automatically since 3G failover has started ... "
+      pptpc-start $tun_idx
+      return
+   fi
+
+   iface_exist="`ifconfig $iface 2>/dev/null | grep inet | cut -d ':' -f3 | cut -d ' ' -f1`"
+   if [ ! -z "$iface_exist" ]; then
+      return
+   fi
+   echo "PPTP tunnel $tun_idx restart automatically (on 3G failover) ... "
+   write_pptpc_cnt_status "$DISCONNECTING" $tun_idx
+   pptpc-stop $tun_idx
+   pptpc-start $tun_idx
+}
+
+update_status()
+{
+   get_pptpc_config
+
+   pptpc_qos_enable="$C_PPTP_CLI_QOS_ENABLE"
+   if [ -n "$pptpc_qos_enable" ] && [ "$pptpc_qos_enable" != "0" ]; then
+      start_qos
+   else
+      stop_qos
+   fi	
+
+   for i in $TUN_LIST
+   do
+     #get_pptpc_tunnel_config $i
+      get_pptpc_cnt_info $i
+
+      cnt_pid="$S_PPTP_CLI_PEER_PID"
+
+     #tun_enable="$C_PPTP_CLI_USER_ENABLE"
+	  local IDX="$i"
+      local TUN_IDX="`printf %02X $((IDX))`"
+      tun_enable="`rdcsman 0x000511$TUN_IDX u32`"
+      if [ -z "$tun_enable" ] || [ "$tun_enable" == "0" ]; then
+         if [ -n "$cnt_pid" ] && [ $cnt_pid -gt 0 ] && [ $cnt_pid -lt 65535 ]; then
+            write_pptpc_cnt_status "$DISCONNECTING" $i
+            pptpc-stop $i
+         else
+            # Reset all IP Tables & Routing
+            RESET_FILE="/var/run/pptpc-reset-$i"
+            XFRM_ADD_FILE="/var/run/pptpc-xfrm-add-$i"
+            XFRM_DEL_FILE="/var/run/pptpc-xfrm-del-$i"
+            if [ -f "$RESET_FILE" ]; then
+               (. $RESET_FILE)
+               rm -f $RESET_FILE
+            fi
+            if [ -f "$XFRM_DEL_FILE" ]; then
+               (. $XFRM_DEL_FILE)
+               rm -f $XFRM_DEL_FILE
+               if [ -f "$XFRM_ADD_FILE" ]; then
+                  rm -f $XFRM_ADD_FILE
+               fi
+            fi
+         fi
+         continue
+      fi
+
+     #cnt_type="$C_PPTP_CLI_CONNECT_TYPE"
+	  local IDX="$i"
+      local TUN_IDX="`printf %02X $((IDX))`"
+      cnt_type="`rdcsman 0x000517$TUN_IDX u32`"
+      if [ -n "$cnt_type" ] && [ "$cnt_type" == "$PPTP_CNT_TYPE_ONFAILOVER" ]; then
+         on_3g_failover $i
+         continue
+      fi
+
+      iface="$S_PPTP_CLI_PEER_IFNAME"
+      if [ -z "$iface" ]; then
+         if [ "$cnt_type" == "$PPTP_CNT_TYPE_AUTORECONNECT" ]; then
+            echo "PPTP tunnel $i restart automatically ... "
+            pptpc-start $i
+         #elif [ -z "$cnt_type" ] || [ "$cnt_type" == "$PPTP_CNT_TYPE_ONDEMAND" ]; then
+            #echo "PPTP tunnel $i restarts on-demand... "
+            #pptpc-ondemand start $i
+         fi
+         continue
+      fi
+
+      iface_exist="`ifconfig $iface 2>/dev/null | grep inet | cut -d ':' -f3 | cut -d ' ' -f1`"
+      if [ ! -z "$iface_exist" ]; then
+         continue
+      fi
+
+      echo "PPTP tunnel $i is disconnect !"
+      write_pptpc_cnt_status "$DISCONNECTING" $i
+      pptpc-stop $i   # NOTE: dial-on-demand connection will restart here
+
+      if [ -n "$cnt_type" ] && [ "$cnt_type" == "$PPTP_CNT_TYPE_AUTORECONNECT" ]; then
+         echo "PPTP tunnel $i restart automatically ... "
+         pptpc-start $i
+      fi
+   done
+}
+
+show_cnt_status()
+{
+   for i in $TUN_LIST
+   do
+      get_pptpc_tunnel_config $i
+
+      tun_name="$C_PPTP_CLI_TUNLNAME"
+      if [ -z "$tun_name" ]; then
+         continue
+      fi
+
+      get_pptpc_cnt_info $i
+
+      echo "PPTP Tunnel $i"
+      echo "IFace: $S_PPTP_CLI_PEER_IFNAME"
+      echo "PID: $S_PPTP_CLI_PEER_PID"
+      echo "Virtual IP: $S_PPTP_CLI_PEER_VIRTUAL_IP"
+      echo "Remote IP: $S_PPTP_CLI_PEER_REMOTE_IP"
+      #echo "Real IP: $S_PPTP_CLI_PEER_REAL_IP"
+      #echo "Connect ID: $S_PPTP_CLI_PEER_CONNT_ID"
+      #echo "Connect Type: $S_PPTP_CLI_PEER_CONNT_TYPE"
+
+      get_pptpc_cnt_status $i
+
+      echo "Connect Status: $S_PPTP_CLI_PEER_CONNT_STAT"
+      echo ""
+   done
+}
+
+show_config()
+{
+   get_pptpc_config
+
+   pptp_enable="$C_PPTP_CLI_ENABLE"
+   if [ -n "$pptp_enable" ] && [ "$pptp_enable" != "0" ]; then
+      echo "PPTP Client is enable"
+   else
+      echo "PPTP Client is disenable"
+   fi
+
+   for i in $TUN_LIST
+   do
+      get_pptpc_tunnel_config $i
+
+      tun_name="$C_PPTP_CLI_TUNLNAME"
+      if [ -z "$tun_name" ]; then
+         continue
+      fi
+
+      user_enable="$C_PPTP_CLI_USER_ENABLE"
+      echo "Tunnel #$i ($tun_name) user_enable: $user_enable"
+
+      #peer_ip="$C_PPTP_CLI_PEERIP"
+      peer_ip="$C_PPTP_CLI_PEERIP_STR"
+      account="$C_PPTP_CLI_USER"
+      passwd="$C_PPTP_CLI_PASSWORD"
+      echo "peer_ip: $peer_ip account: $account passwd: $passwd "
+
+      route="$C_PPTP_CLI_ROUTE"
+      cnt_type="$C_PPTP_CLI_CONNECT_TYPE"
+      mppe="$C_PPTP_CLI_MPPE"
+      nat="$C_PPTP_CLI_NAT"
+      is_active="$C_PPTP_CLI_ACTIVE"
+      echo "route: $route, cnt_type: $cnt_type, is_mppe: $mppe, is_nat: $nat, is_active $is_active"
+      echo ""
+   done
+   exit 1
+}
+
+start_cnt()
+{
+   # HW NAT may affect VPN throughput
+   [ "`lsmod | grep hw_nat`" != "" ] && rmmod hw_nat
+
+   local ondemand_up="0"
+   for i in $TUN_LIST
+   do
+      get_pptpc_tunnel_config $i
+
+      write_pptpc_pid_info 0 $i
+      write_pptpc_cnt_status "$DISCONNECT" $i
+
+      tun_enable="$C_PPTP_CLI_USER_ENABLE"
+      if [ -z "$tun_enable" ] || [ "$tun_enable" == "0" ]; then
+         continue
+      fi
+
+      get_pptpc_cnt_info $i
+
+      cnt_pid="$S_PPTP_CLI_PEER_PID"
+      cnt_type="$C_PPTP_CLI_CONNECT_TYPE"
+
+      if [ -z "$cnt_pid" ] || [ "$cnt_pid" == "0" ]; then
+         if [ "$cnt_type" == "$PPTP_CNT_TYPE_AUTORECONNECT" ]; then
+            echo "PPTP tunnel $i starts automatically ... "
+            pptpc-start $i
+         elif [ -z "$cnt_type" ] || [ "$cnt_type" == "$PPTP_CNT_TYPE_ONDEMAND" ]; then
+            #echo "PPTP tunnel $i starts on-demand... "
+            #pptpc-ondemand start $i
+            ondemand_up="1"
+         fi
+      fi
+   done
+   if [ -z "$ondemand_up" ] || [ "$ondemand_up" == "1" ]; then
+       echo "Ondemand flag = $ondemand_up , PPTP client starts on-demand... "
+       pptpc-ondemand start
+   fi
+}
+
+stop_cnt()
+{
+   echo "PPTP client stop on-demand... "
+   pptpc-ondemand stop
+   for i in $TUN_LIST
+   do
+      get_pptpc_cnt_info $i
+
+      cnt_pid="$S_PPTP_CLI_PEER_PID"
+      if [ -n "$cnt_pid" ] && [ $cnt_pid -gt 0 ] && [ $cnt_pid -lt 65535 ]; then
+         echo "PPTP tunnel $i disconnect !"
+         write_pptpc_cnt_status "$DISCONNECTING" $i
+         pptpc-stop $i
+         write_pptpc_cnt_status "$DISCONNECT" $i
+      #else
+         #cnt_type="$C_PPTP_CLI_CONNECT_TYPE"
+         #if [ -z "$cnt_type" ] || [ "$cnt_type" == "$PPTP_CNT_TYPE_ONDEMAND" ]; then
+            #echo "PPTP tunnel $i stop on-demand... "
+            #pptpc-ondemand stop $i
+         #fi
+      fi
+   done
+   #killall pptp-ondemand > /dev/null 2>&1
+}
+
+start_qos()
+{
+   get_local_cnt_info
+   wan_if="$S_LOCAL_WAN_IF_NAME"
+   if [ -z "$wan_if" ]; then
+      for i in $WAN_LIST
+      do
+         get_local_cnt_info $i
+         wan_if="$S_LOCAL_WAN_IF_NAME"
+         [ -n "$wan_if" ] && break
+      done
+   fi
+
+   [ -z "$wan_if" ] && return
+   [ -f "$PPTPC_QOS_ECHO" ] && return
+   touch $PPTPC_QOS_ECHO
+
+   if [ ! -f "$TC_UPLOAD_FLAG" ]; then
+      logger -t "pptpc" "Create Queue discipline for PPTP Client !"
+      echo "Create Queue discipline for PPTP Client !"
+      echo 1 > $TC_UPLOAD_FLAG
+
+      local est_max_bw="10Mbps"
+      local reserved_bw="32Kbps"
+
+      tc qdisc add dev $wan_if root handle 10: htb
+      tc class add dev $wan_if parent 10:0 classid 10:1  htb rate $est_max_bw ceil $est_max_bw
+      tc class add dev $wan_if parent 10:1 classid 10:10 htb rate $reserved_bw ceil $est_max_bw prio 1
+      tc qdisc add dev $wan_if parent 10:10 handle 20: pfifo
+      tc filter add dev $wan_if protocol ip parent 10:0 prio 1 handle 10 fw classid 10:10
+   else
+      logger -t "pptpc" "Queue discipline already existed ! Just map Echo Request/Response to its higher priority queue !"
+      echo "Queue discipline already existed ! Just map Echo Request/Response to its higher priority queue !"
+
+      local idx="`cat $TC_UPLOAD_FLAG`"
+      echo $((idx+1)) > $TC_UPLOAD_FLAG
+   fi
+
+   local prio="10"
+   iptables -t mangle -N pptpc_qos
+   iptables -t mangle -A POSTROUTING -j pptpc_qos
+   iptables -t mangle -A pptpc_qos -p tcp --dport 1723 -j MARK --set-mark $prio
+   iptables -t mangle -A pptpc_qos -p 47 -m length --length :64 -j MARK --set-mark $prio
+}
+
+stop_qos()
+{
+   [ ! -f "$PPTPC_QOS_ECHO" ] && return
+   rm -f $PPTPC_QOS_ECHO
+
+   get_local_cnt_info
+   wan_if="$S_LOCAL_WAN_IF_NAME"
+   if [ -z "$wan_if" ]; then
+      for i in $WAN_LIST
+      do
+         get_local_cnt_info $i
+         wan_if="$S_LOCAL_WAN_IF_NAME"
+         [ -n "$wan_if" ] && break
+      done
+   fi
+
+   if [ ! -f "$TC_UPLOAD_FLAG" ]; then
+      tc qdisc del dev $wan_if root > /dev/null 2>&1
+   else
+      local idx="`cat $TC_UPLOAD_FLAG`"
+      if [ $idx -eq 0 ] || [ $idx -eq 1 ]; then
+         tc qdisc del dev $wan_if root > /dev/null 2>&1
+         rm -f $TC_UPLOAD_FLAG
+      else
+         echo $((idx-1)) > $TC_UPLOAD_FLAG
+         echo "Someone uses the priority qeueues, don't remove it !"
+      fi
+   fi
+
+   iptables -t mangle -D POSTROUTING -j pptpc_qos > /dev/null 2>&1
+   iptables -t mangle -F pptpc_qos                > /dev/null 2>&1
+   iptables -t mangle -X pptpc_qos                > /dev/null 2>&1
+}
+
+###################### Main ##############################
+main()
+{
+   case "$1" in
+      restart) stop_cnt; stop_qos; start_cnt; start_qos ;;
+      start) start_cnt; start_qos ;;
+      stop) stop_cnt; stop_qos ;;
+      status) show_cnt_status ;;
+      show-config) show_config ;;
+      update) update_status ;;
+      *) usage;
+   esac
+}
+
+main $1

@@ -1,0 +1,429 @@
+#!/bin/sh
+
+# Check if exist multiwan index
+if [ -n $1 ]; then
+	MULTIWAN=$1
+else
+	MULTIWAN=
+fi
+
+CONFIG="/etc/ppp/pptp.conf"
+export CONFIG
+. $CONFIG
+. /usr/bin/scriptlib
+#. /usr/bin/pptpc-customer
+
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+RESOLV_CONF="/etc/resolv.conf"
+
+if [ -z $MULTIWAN ]; then
+	PIDFILE_PPPD="/var/run/ppp-pptp.pid"
+	CNT_FORCE=`rdcsman 0x8001000E u32`
+	CNTTYPE=`rdcsman 0x00050900 u32`
+else
+	PIDFILE_PPPD="/var/run/ppp-pptp$MULTIWAN.pid"
+#	TMP=$((MULTIWAN+1))
+	TMP=`printf "%x" $((MULTIWAN+1))`
+	CNT_FORCE=`rdcsman 0x800101C$MULTIWAN u32`
+	CNTTYPE=`rdcsman 0x0005090$TMP u32`
+fi
+
+pptp_status () {
+#	if [ -r $PIDFILE_PPPD ] ; then
+#		sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+#		if [ $? -eq 0 ] ; then
+#			if [ -z $PPP_IF ] ; then
+#				exit 1
+#			fi
+
+			# Check the connection status is CONNECTED
+			if [ -z $MULTIWAN ]; then
+				CNTSTATUS=`rdcsman 0x80050700 u32`
+			else
+				CNTSTATUS=`rdcsman 0x8005070$TMP u32`
+			fi
+
+			[ $CNTSTATUS -ne 2 ] && echo "CNTSTATUS=$CNTSTATUS" && return 1
+		#	echo "$0: IF=$PPP_IF  PID=$PPP_PID"
+		#	echo "pptp-status: Link is up and running on interface $PPP_IF"
+			return 0
+#		fi
+#	fi
+#	return 1
+}
+
+writeCSIDvalues () {
+#	sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+
+#	if [ -f /var/run/ppp_auth_fail ] ; then
+#		echo "$0: Authentication fail!"
+#		if [ -z $MULTIWAN ] ; then
+#			wrcsman "0x80010007 0x06 && \
+#				 0x80050700 0x06"
+#		else
+#			wrcsman "0x8001016$MULTIWAN 0x06 && \
+#				 0x8005070$TMP 0x06"
+#		fi
+		# Clean up PIDFILE(s)
+#		rm -f "$PIDFILE_START"
+#		return 0
+#	fi
+
+#	if [ -z $PPP_IF ] ; then
+#		exit 1
+#	fi
+
+#	if [ $? = 0 ] ; then
+	sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+	sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+	sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+	sl_get_uptime CNTTIME
+
+	if [ "$IF_IP" == "10.64.64.64" ]; then
+		if [ -z $MULTIWAN ]; then
+			wrcsman "0x80050100 0x00 && \
+				 0x80050200 0x00 && \
+				 0x80050300 0x00 && \
+				 0x80050400 0x00 && \
+				 0x80050500 0x00 && \
+				 0x80050600 0x00 && \
+				 0x80050700 0x05 && \
+				 0x80010002 0x00 && \
+				 0x80010003 0x00 && \
+				 0x80010004 0x00 && \
+				 0x80010005 0x00 && \
+				 0x80010006 0x00 && \
+				 0x80010007 0x05"
+		else
+			wrcsman "0x8005010$TMP 0x00 && \
+				 0x8005020$TMP 0x00 && \
+				 0x8005030$TMP 0x00 && \
+				 0x8005040$TMP 0x00 && \
+				 0x8005050$TMP 0x00 && \
+				 0x8005060$TMP 0x00 && \
+				 0x8005070$TMP 0x05 && \
+				 0x8001011$MULTIWAN 0x00 && \
+				 0x8001012$MULTIWAN 0x00 && \
+				 0x8001013$MULTIWAN 0x00 && \
+				 0x8001014$MULTIWAN 0x00 && \
+				 0x8001015$MULTIWAN 0x00 && \
+				 0x8001016$MULTIWAN 0x05"
+		fi
+	else
+		if [ -z $MULTIWAN ]; then
+			wrcsman "0x80050100 $CNTTIME && \
+				 0x80050200 {$IF_IP} && \
+				 0x80050300 {$IF_NM} && \
+				 0x80050400 {$IF_GW} && \
+				 0x80050500 {$IF_DNS1} && \
+				 0x80050600 {$IF_DNS2} && \
+				 0x80050C00 \"$PPP_IF && \
+				 0x80050700 0x02 && \
+				 0x80010002 {$IF_IP} && \
+				 0x80010003 {$IF_NM} && \
+				 0x80010004 {$IF_GW} && \
+				 0x80010005 {$IF_DNS1} && \
+				 0x80010006 {$IF_DNS2} && \
+				 0x8001000B \"$PPP_IF && \
+				 0x80010007 0x02"
+		else
+			wrcsman "0x8005010$TMP $CNTTIME && \
+				 0x8005020$TMP {$IF_IP} && \
+				 0x8005030$TMP {$IF_NM} && \
+				 0x8005040$TMP {$IF_GW} && \
+				 0x8005050$TMP {$IF_DNS1} && \
+				 0x8005060$TMP {$IF_DNS2} && \
+				 0x80050C0$TMP \"$PPP_IF && \
+				 0x8005070$TMP 0x02 && \
+				 0x8001011$MULTIWAN {$IF_IP} && \
+				 0x8001012$MULTIWAN {$IF_NM} && \
+				 0x8001013$MULTIWAN {$IF_GW} && \
+				 0x8001014$MULTIWAN {$IF_DNS1} && \
+				 0x8001015$MULTIWAN {$IF_DNS2} && \
+				 0x8001019$MULTIWAN \"$PPP_IF && \
+				 0x8001016$MULTIWAN 0x02"
+		fi
+	fi
+
+	return 0
+}
+
+#clear last ppp passwd auth fail temp file
+rm -rf /var/run/ppp_auth*
+
+# Check for pidfile
+if [ -r $PIDFILE_CONNECT ]; then
+	PID=`cat $PIDFILE_CONNECT`
+	# Check if still running
+	kill -0 $PID > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		echo "$0: There already seems to be a PPTP connection up (PID $PID)" >& 2
+		exit 0
+	fi
+	rm -f "$PIDFILE_CONNECT" "$PIDFILE_START"
+fi
+
+# Check Server
+if [ $PPTP_PNSSERVER == "" ]; then
+	logger -t "pptp" "No PPTP server address !"
+	exit 1
+fi
+
+if [ $PPTP_PHASE1_TYPE == "DYNAMIC" ]; then
+
+	if [ -z $MULTIWAN ]; then
+		udhcpc-action stop
+		udhcpc-action start
+	#	RET=$?
+	#	if [ $RET -eq 1 ]; then
+		if [ $? -eq 1 ]; then
+			echo "Can't get IP/GW form DHCP Server !"
+			logger -t "pptp" "Can't get IP/GW form DHCP Server !"
+			exit 1
+		fi
+		IF_IP=`rdcsman 0x80035002 ipv4`
+		IF_NM=`rdcsman 0x80035003 ipv4`
+		IF_GW=`rdcsman 0x80035004 ipv4`
+		IF_DNS1=`rdcsman 0x80035005 ipv4`
+		IF_DNS2=`rdcsman 0x80035006 ipv4`
+	else
+		udhcpc-action stop $MULTIWAN
+		udhcpc-action start $MULTIWAN
+	#	RET=$?
+	#	[ $RET -eq 1 ] && exit 1
+		[ $? -eq 1 ] && exit 1
+		IF_IP=`rdcsman 0x8003511$MULTIWAN ipv4`
+		IF_NM=`rdcsman 0x8003512$MULTIWAN ipv4`
+		IF_GW=`rdcsman 0x8003513$MULTIWAN ipv4`
+		IF_DNS1=`rdcsman 0x8003514$MULTIWAN ipv4`
+		IF_DNS2=`rdcsman 0x8003515$MULTIWAN ipv4`
+	fi
+
+elif [ $PPTP_PHASE1_TYPE == "STATIC" ]; then
+
+	if [ -z $MULTIWAN ]; then
+		IF_IP=`rdcsman 0x00050300 ipv4`
+		IF_NM=`rdcsman 0x00050400 ipv4`
+		IF_GW=`rdcsman 0x00050500 ipv4`
+		IF_DNS1=`rdcsman 0x00050700 ipv4`
+		IF_DNS2=`rdcsman 0x00050800 ipv4`
+	else
+		IF_IP=`rdcsman 0x0005030$TMP ipv4`
+		IF_NM=`rdcsman 0x0005040$TMP ipv4`
+		IF_GW=`rdcsman 0x0005050$TMP ipv4`
+		IF_DNS1=`rdcsman 0x0005070$TMP ipv4`
+		IF_DNS2=`rdcsman 0x0005080$TMP ipv4`
+	fi
+
+	ifconfig $ETH $IF_IP netmask $IF_NM
+#	rm -f $RESOLV_CONF
+
+fi
+
+if [ "$IF_DNS1" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ]; then
+	sl_append_dns_file "$RESOLV_CONF" $IF_DNS1
+	route add -host $IF_DNS1 gw $IF_GW dev $ETH
+fi
+
+if [ "$IF_DNS2" != "0.0.0.0" ] && [ "$IF_GW" != "0.0.0.0" ]; then
+	sl_append_dns_file "$RESOLV_CONF" $IF_DNS2
+	route add -host $IF_DNS2 gw $IF_GW dev $ETH
+fi
+
+if [ -e "/usr/bin/getHostIP" ]; then
+   PPTP_PNSSERVER="`getHostIP $PPTP_PNSSERVER`"
+   [ "$PPTP_PNSSERVER" == "" ] && exit 1
+fi
+
+ip1_1=$((`echo $IF_IP| cut -d "." -f1` & `echo $IF_NM| cut -d "." -f1`))
+ip1_2=$((`echo $IF_IP| cut -d "." -f2` & `echo $IF_NM| cut -d "." -f2`))
+ip1_3=$((`echo $IF_IP| cut -d "." -f3` & `echo $IF_NM| cut -d "." -f3`))
+ip1_4=$((`echo $IF_IP| cut -d "." -f4` & `echo $IF_NM| cut -d "." -f4`))
+
+ip2_1=$((`echo $PPTP_PNSSERVER| cut -d "." -f1` & `echo $IF_NM| cut -d "." -f1`))
+ip2_2=$((`echo $PPTP_PNSSERVER| cut -d "." -f2` & `echo $IF_NM| cut -d "." -f2`))
+ip2_3=$((`echo $PPTP_PNSSERVER| cut -d "." -f3` & `echo $IF_NM| cut -d "." -f3`))
+ip2_4=$((`echo $PPTP_PNSSERVER| cut -d "." -f4` & `echo $IF_NM| cut -d "." -f4`))
+
+if [ "$ip1_1" != "$ip2_1" ] || [ "$ip1_2" != "$ip2_2" ] ||
+   [ "$ip1_3" != "$ip2_3" ] || [ "$ip1_4" != "$ip2_4" ]; then
+	logger -t "pptp" "Server is in the different subnet, set routing for the server."
+	route add -host $PPTP_PNSSERVER gw $IF_GW dev $ETH
+fi
+
+#echo "Find the default route"
+#sl_get_IP_NM_GW_in_ifconfig $ETH IF_IP IF_NM IF_GW
+#route del default # Do it at ip-up
+#route delete default
+#[ -n "$IF_DNS1" ] && route add $IF_DNS1 gw $IF_GW dev $ETH
+#[ -n "$IF_DNS2" ] && route add $IF_DNS2 gw $IF_GW dev $ETH
+#route add -host $PPTP_PNSSERVER gw $IF_GW dev $ETH
+
+echo $$ > $PIDFILE_START
+
+if [ -z $MULTIWAN ]; then
+	pptp-connect $PPTP_PNSSERVER > /dev/null 2>&1 &
+else
+	pptp-connect $PPTP_PNSSERVER $MULTIWAN > /dev/null 2>&1 &
+fi
+
+#CONNECT_PID=$!
+
+sleep 3
+TIME=0
+TIMEOUT=30
+while [ true ]; do
+
+#	if [ -f /var/run/ppp_auth_fail ]; then
+#		echo "$0: Authentication fail!"
+#		if [ -z $MULTIWAN ]; then
+#			wrcsman "0x80010007 0x06 && \
+#				 0x80050700 0x06"
+#		else
+#			wrcsman "0x8001016$MULTIWAN 0x06 && \
+#				 0x8005070$TMP 0x06"
+#		fi
+#		rm -f "$PIDFILE_START"
+#		exit 0
+#	fi
+
+	if [ -r $PIDFILE_PPPD ]; then
+		sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+		if [ "$PPP_IF" != "" ]; then
+			sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+			if [ "$IF_IP" != "" ]; then
+				# pppX interface is created
+				break
+			else
+				echo "No PPTP interface ip"
+			fi
+		else
+			echo "No PPTP interface"
+		fi
+	else
+		echo "No PPTP pid"
+		if [ -f /var/run/ppp_auth_fail ]; then
+			echo "$0: Authentication fail!"
+			if [ $CNTTYPE -eq 2 ]; then
+
+				if [ -z $MULTIWAN ]; then
+					wrcsman "0x80010007 0x06 && \
+						 0x80050700 0x06"
+				else
+					wrcsman "0x8001016$MULTIWAN 0x06 && \
+						 0x8005070$TMP 0x06"
+				fi
+			fi
+			rm -f "$PIDFILE_START"
+			exit 0
+		fi
+	fi
+
+	TIME=$((TIME+1))
+	if [ $TIME -gt $TIMEOUT ]; then
+		echo "Timeout for waiting PPTP connection !!"
+		rm -f "$PIDFILE_START"
+		exit 1
+	fi
+	sleep 1
+done
+
+#writeCSIDvalues
+
+if [ $CNT_FORCE -eq 0 -a $CNTTYPE -eq 0 ]; then
+	rm -f "$PIDFILE_START"
+	exit 0
+fi
+
+#if [ $CNT_FORCE -eq 1 ]; then
+#	echo "PPTP force connect!"
+#else
+	#CNTTYPE=`rdcsman 0x00050900 u32`
+#	if [ $CNTTYPE -eq 0 ]; then 
+        #sleep 2 #Important! it must be waited	
+
+        #if [ -f /var/run/ppp_auth_fail ] ; then
+        #    echo "$0: Authentication fail!"
+         #   wrcsman "0x80010007 0x06 &&\
+          #           0x80050700 0x06"
+
+            # Clean up PIDFILE(s)
+            #rm -f "$PIDFILE_START" 
+            #exit 0
+        #fi
+
+        #sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+        #if [ $? = 0 ] ; then
+#		if [ $? -ne 0 ]; then
+            #sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+
+            # Don't monitor connection if dial-on-demand
+            #if [ "$IF_IP" = "10.64.64.64" ] ; then
+            #    route add default gw ${IF_GW}
+            #    wrcsman "0x80050200 0x00 && \
+            #             0x80050300 0x00 && \
+            #             0x80050400 0x00 && \
+            #             0x80050700 0x05 && \
+            #             0x80010002 0x00 && \
+            #             0x80010003 0x00 && \
+            #             0x80010004 0x00 && \
+            #             0x80010007 0x05"
+            #else
+            #    wrcsman "0x80050200 {$IF_IP} && \
+            #             0x80050300 {$IF_NM} && \
+            #             0x80050400 {$IF_GW} && \
+            #             0x80050700 0x02 && \
+            #             0x80010002 {$IF_IP} && \
+            #             0x80010003 {$IF_NM} && \
+            #             0x80010004 {$IF_GW} && \
+            #             0x80010007 0x02"
+            #fi
+            #exit 0
+#	    		exit 1
+#	    	fi
+        #exit 1
+#	fi
+#fi
+
+# Monitor connection
+#TIME=0
+#TIMEOUT=10
+#while [ true ] ; do
+	#pptp_status > /dev/null 2>&1
+	pptp_status
+
+	if [ $? -eq 0 ]; then
+		echo "$0: Connected!"
+                ifconfig $PPP_IF txqueuelen 1000
+		# Must wait till executing ip-up completely...
+	#	sleep 1
+		rm -f "$PIDFILE_START"
+		exit 0
+	fi
+
+#	if [ -f /var/run/ppp_auth_fail ]; then
+#		echo "$0: Authentication fail!"
+#		if [ -z $MULTIWAN ]; then
+#			wrcsman "0x80010007 0x06 && \
+#				 0x80050700 0x06"
+#		else
+#			wrcsman "0x8001016$MULTIWAN 0x06 && \
+#				 0x8005070$TMP 0x06"
+#		fi
+		# Clean up PIDFILE(s)
+#		rm -f "$PIDFILE_START"
+#		exit 0
+#	fi
+
+#	sleep 1
+#	TIME=$(($TIME+1))
+#	if [ $TIME -gt $TIMEOUT ]; then
+#		break
+#	fi
+#done
+
+# Clean up PIDFILE(s)
+rm -f "$PIDFILE_START" 
+exit 1
+

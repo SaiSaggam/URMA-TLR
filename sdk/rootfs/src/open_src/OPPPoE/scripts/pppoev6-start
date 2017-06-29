@@ -1,0 +1,341 @@
+#!/bin/sh
+. /usr/bin/scriptlib
+
+# Check if exist multiwan index
+if [ -n $1 ] ; then
+    MULTIWAN=$1
+else
+    MULTIWAN=
+fi
+
+CONFIG=/etc/ppp/pppoev6.conf
+export CONFIG
+. $CONFIG
+
+
+PIDFILE="/var/run/pppoev6.pidfile"
+PIDFILE_START="$PIDFILE.start"
+PIDFILE_CONNECT="$PIDFILE.connect"
+BIND_INTERFACE=`rdcsman 0x00900008 u32`
+
+if [ -z $MULTIWAN ] ; then
+    PIDFILE_PPPD="/var/run/ppp-pppoev6.pid" 
+    CNT_TYPE=`rdcsman 0x00900306 u32`
+else
+    PIDFILE_PPPD="/var/run/ppp-pppoev6_$MULTIWAN.pid" 
+    TMP=$((MULTIWAN+1))
+    CNT_TYPE=`rdcsman 0x00900306 u32`
+fi
+
+BIND_V4V6=$(rdcsman 0x00900004 u32)
+
+writeCSIDvalues () {
+    if [ $BIND_V4V6 -eq 1 ]; then
+        sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+        sl_get_DNS_in_resolv_conf IF_DNS1 IF_DNS2
+        sl_get_uptime CNTTIME
+        if [ -z $MULTIWAN ] ; then
+            if [ "$IF_IP" = "10.64.64.64" ] ; then
+                #Got a fake IP, interface is disconnect
+                wrcsman "0x80040200 00 && \
+                         0x80040300 00 && \
+                         0x80040400 00 && \
+                         0x80040500 00 && \
+                         0x80040600 00 && \
+                         0x80010002 00 && \
+                         0x80010003 00 && \
+                         0x80010004 00 && \
+                         0x80010005 00 && \
+                         0x80010006 00 "
+
+                if [ $CNT_TYPE -eq 0 ] ; then
+                    #wait for traffic
+                    wrcsman "0x80040700 0x05 && \
+                             0x80010007 0x05"
+                else
+                    #manual or autoreconnect, but wan is unconnected.
+                    wrcsman "0x80040700 0x00 && \
+                             0x80010007 0x00"
+                fi
+            elif [ "$IF_IP" = "" ] ; then
+                #Got no IP, interface is disconnect
+                wrcsman "0x80040200 00 && \
+                         0x80040300 00 && \
+                         0x80040400 00 && \
+                         0x80040500 00 && \
+                         0x80040600 00 && \
+                         0x80010002 00 && \
+                         0x80010003 00 && \
+                         0x80010004 00 && \
+                         0x80010005 00 && \
+                         0x80010006 00 "
+
+                #disconnecting
+                wrcsman "0x80040700 0x03 && \
+                         0x80010007 0x03"
+            else
+                #Got a real IP address
+                if [ $BIND_INTERFACE -eq 0 ] ; then
+                wrcsman "0x80040100 $CNTTIME && \
+                         0x80040200 {$IF_IP} && \
+                         0x80040300 {$IF_NM} && \
+                         0x80040400 {$IF_GW} && \
+                         0x80040500 {$IF_DNS1} && \
+                         0x80040600 {$IF_DNS2} && \
+                         0x80040C00 \"$PPP_IF && \
+                         0x80040700 0x02 && \
+                         0x80010002 {$IF_IP} && \
+                         0x80010003 {$IF_NM} && \
+                         0x80010004 {$IF_GW} && \
+                         0x80010005 {$IF_DNS1} && \
+                         0x80010006 {$IF_DNS2} && \
+                         0x8001000B \"$PPP_IF && \
+                         0x80010007 0x02" #LocalWAN
+
+                elif [ $BIND_INTERFACE -eq 1 ] ; then
+                wrcsman "0x80040101 $CNTTIME && \
+                         0x80040201 {$IF_IP} && \
+                         0x80040301 {$IF_NM} && \
+                         0x80040401 {$IF_GW} && \
+                         0x80040501 {$IF_DNS1} && \
+                         0x80040601 {$IF_DNS2} && \
+                         0x80040C00 \"$PPP_IF && \
+                         0x80040701 0x02 && \
+                         0x80010110 {$IF_IP} && \
+                         0x80010120 {$IF_NM} && \
+                         0x80010130 {$IF_GW} && \
+                         0x80010140 {$IF_DNS1} && \
+                         0x80010150 {$IF_DNS2} && \
+                         0x80010190 \"$PPP_IF && \
+                         0x80010160 0x02" #the Multiwan Ethernet
+                fi
+
+                sl_append_dns_file "$IF_DNS1"  "$IF_DNS2"
+            fi
+        else
+            if [ "$IF_IP" = "10.64.64.64" ] ; then
+                #Got a fake IP, interface is disconnect
+                wrcsman "0x8004020$TMP 00 && \
+                        0x8004030$TMP 00 && \
+                        0x8004040$TMP 00 && \
+                        0x8004050$TMP 00 && \
+                        0x8004060$TMP 00 && \
+                        0x8001011$MULTIWAN 00 && \
+                        0x8001012$MULTIWAN 00 && \
+                        0x8001013$MULTIWAN 00 && \
+                        0x8001014$MULTIWAN 00 && \
+                        0x8001015$MULTIWAN 00 "
+
+                if [ $CNT_TYPE -eq 0 ] ; then
+                    #wait for traffic
+                    wrcsman "0x8004070$TMP 0x05 && \
+                        0x8001016$MULTIWAN 0x05"
+                else
+                    #manual or autoreconnect, but wan is unconnected.
+                    wrcsman "0x8004070$TMP 0x00 && \
+                        0x8001016$MULTIWAN 0x00"
+                fi
+            elif [ "$IF_IP" = "" ] ; then
+                #Got no IP, interface is disconnect
+                wrcsman "0x8004020$TMP 00 && \
+                        0x8004030$TMP 00 && \
+                        0x8004040$TMP 00 && \
+                        0x8004050$TMP 00 && \
+                        0x8004060$TMP 00 && \
+                        0x8001011$MULTIWAN 00 && \
+                        0x8001012$MULTIWAN 00 && \
+                        0x8001013$MULTIWAN 00 && \
+                        0x8001014$MULTIWAN 00 && \
+                        0x8001015$MULTIWAN 00 "
+
+                #disconnecting   
+                wrcsman "0x8004070$TMP      0x03 && \
+                         0x8001016$MULTIWAN 0x03"
+            else
+                #Got a real IP address
+                wrcsman "0x8004010$TMP $CNTTIME && \
+                        0x8004020$TMP {$IF_IP} && \
+                        0x8004030$TMP {$IF_NM} && \
+                        0x8004040$TMP {$IF_GW} && \
+                        0x8004050$TMP {$IF_DNS1} && \
+                        0x8004060$TMP {$IF_DNS2} && \
+                        0x8004070$TMP 0x02 && \
+                        0x8001011$MULTIWAN {$IF_IP} && \
+                        0x8001012$MULTIWAN {$IF_NM} && \
+                        0x8001013$MULTIWAN {$IF_GW} && \
+                        0x8001014$MULTIWAN {$IF_DNS1} && \
+                        0x8001015$MULTIWAN {$IF_DNS2} && \
+                        0x8001019$MULTIWAN \"$PPP_IF && \
+                        0x8001016$MULTIWAN 0x02"		
+            fi
+        fi
+    fi
+}
+
+#clear last ppp auth fail tmp file
+rm -rf /var/run/ppp_auth_fail
+
+# Check for $PIDFILE.connect
+if [ -r "$PIDFILE_CONNECT" ] ; then
+    # Check if still running
+    PID=`cat "$PIDFILE_CONNECT"`
+    kill -0 $PID > /dev/null 2>&1
+    if [ $? = 0 ] ; then
+        echo "$0: There already seems to be a PPPoE connection up (PID $PID)" >& 2
+        exit 0
+    fi
+    # Delete bogus PIDFILE
+    rm -f "$PIDFILE_CONNECT" "$PIDFILE_START"
+fi
+
+echo $$ > $PIDFILE_START
+DUALSTACK=$(rdcsman 0x00900004 u32) #check DUALSTACK
+LOCALWANIF=$(rdcsman 0x00010023 u32) # for adsl to connect ,it takes some time
+
+pppoev6-connect "$@" &
+CONNECT_PID=$!
+sleep 5 #Important! it must be waited for pppd creating the pppx interface
+
+# Monitor connection
+RET=1
+TIME=0
+CONNECT_POLL=1
+CONNECT_TIMEOUT=20
+#WRITEV4CSID=0
+V4READY=0
+V6READY=0
+while [ true ] ; do
+    if [ -z $MULTIWAN ] ; then
+        pppoe-status > /dev/null 2>&1
+    else
+        pppoe-status $MULTIWAN > /dev/null 2>&1
+    fi
+
+    sl_get_ppp_PID_IFname $PIDFILE_PPPD PPP_PID PPP_IF
+    echo "PPP_IF=$PPP_IF" >> /var/pppoev6_log
+    if [ "$PPP_IF" == "" ] ; then
+        echo "No PPPoE interface" >> /var/pppoev6_log
+    else
+		#if [ -e /var/run/multiwan_enable ] && [ $WRITEV4CSID -eq 0 ]; then
+		if [ -e /var/run/multiwan_enable ] && [ $BIND_V4V6 -eq 1 ]; then
+			if [ $V4READY -eq 0 ]; then
+				sl_get_IP_NM_GW_in_ifconfig $PPP_IF IF_IP IF_NM IF_GW
+				if [ "$IF_IP" == "" ]; then
+					echo "No PPPoE ip" >> /var/pppoev6_log
+				else
+					writeCSIDvalues
+					V4READY=1
+				fi
+			fi
+		fi
+
+		if [ $V6READY -eq 0 ]; then
+			#Record the IPv6 pppoev6 interface when connection built
+			#We need to record this while have 2+ concurrent ppp connections exist.
+			IPv6_Link=`ifconfig $PPP_IF | grep :Link | awk '{print $3}' | awk -F"/" '{ print $1 }'`
+			if [ "$IPv6_Link" == "" ] ; then
+				echo "No link-local address" >> /var/pppoev6_log
+			else
+				echo "$IPv6_Link" >> /var/pppoev6_log
+				wrcsman "0x80900030 0x02" #status: connect
+				wrcsman "0x80900020 \"$PPP_IF"
+				wrcsman "0x80900006 \"$IPv6_Link"
+				echo "IPv6_Link=$IPv6_Link" >> /var/pppoev6_log
+
+				#######################################################
+				echo 1 > /proc/sys/net/ipv6/conf/$PPP_IF/accept_ra
+				echo 1 > /proc/sys/net/ipv6/conf/$PPP_IF/accept_redirects
+				echo "PPPoE Connected !!" >> /var/pppoev6_log
+
+				if [ -e /var/run/multiwan_enable ] && [ $BIND_V4V6 -eq 1 ]; then
+					V6READY=1
+				else
+                    RET=0;
+					break
+				fi
+			fi
+		fi
+	fi
+
+	if [ -e /var/run/multiwan_enable ] && [ $BIND_V4V6 -eq 1 ]; then
+		if [ $V4READY -eq 1 ] && [ $V6READY -eq 1 ]; then
+            RET=0;
+			break
+		fi
+	fi
+
+    IPv6_Global=`ifconfig $PPP_IF | grep :Global | awk '{print $3}'| awk -F"/" '{ print $1 }'`
+    IPv6_Global_PRELEN=`ifconfig $PPP_IF | grep :Global | awk '{print $3}'| awk -F"/" '{ print $2 }'`
+    if [ "$IPv6_Global" == "" ] ; then
+        echo "Wait for RA"
+    else
+        echo "====> PPPoE Connected!!"
+        echo "Connection IF:: $PPP_IF"
+        echo "IPv6 Global::   $IPv6_Global"
+            wrcsman "0x80900006 \"$IPv6_Link && \
+            0x80900000 \"$IPv6_Global && \
+            0x80900001 $IPv6_Global_PRELEN" 
+
+        ip -6 route add default dev $PPP_IF
+        echo 1 > /proc/sys/net/ipv6/conf/$PPP_IF/forwarding
+        echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+        #exit 1
+        exit 0
+    fi
+
+    if [ -f /var/run/ppp_auth_fail ] ; then
+        echo "$0: Authentication Fail!"
+        if [ $BIND_V4V6 -eq 1 ]; then
+            if [ -z $MULTIWAN ] ; then
+                wrcsman	"0x80010007 0x06 &&\
+                         0x80040700 0x06"
+                wrcsman "0x80900030 0x06" #Connect Status:connecting
+                echo "---------- DualStack Authentication Fail!------------"
+                RET=1;
+                break;
+            else
+                wrcsman	"0x8001016$MULTIWAN 0x06 &&\
+                         0x8004070$TMP 0x06"
+                wrcsman "0x80900030 0x06" #Connect Status:connecting
+            fi
+        else
+            if [ -z $MULTIWAN ] ; then
+                wrcsman "0x80900030 0x06" #Connect Status:connecting
+                RET=1;
+                break;
+            else
+                wrcsman "0x80900030 0x06" #Connect Status:connecting
+            fi
+        fi
+    fi
+
+    IPV4_CNT_STATUS=$(rdcsman 0x80040700 u32) #Polling v4 status 
+    sleep $CONNECT_POLL
+    TIME=$(($TIME + $CONNECT_POLL))
+    if [ $TIME -gt $CONNECT_TIMEOUT ] ; then
+        if [ $DUALSTACK -eq 1 -a $IPV4_CNT_STATUS -eq 2 ]; then
+            TIME=0 #keep on connecting despite the IPv6 session 
+            echo "$0: Unset the TimeOut!"
+            
+            RET=0;
+            break;
+        else
+            echo "$0: Time Out!"
+            kill $PPP_PID
+            kill $CONNECT_PID
+            wrcsman "0x80900030 0x00" #Connect Status:disconnect
+            
+            RET=1;
+            break;
+        fi
+    fi
+done
+echo "TIMED OUT" >& 2
+
+# Clean up PIDFILE(s)
+rm -f "$PIDFILE_START"
+echo "rm -f $PIDFILE_START" >> /var/pppoev6_log
+
+#exit 1
+echo "----- Exit Value: $RET ------"
+exit $RET
